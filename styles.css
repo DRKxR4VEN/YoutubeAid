@@ -1,0 +1,841 @@
+/**
+ * Youtube Aid - Stylesheet
+ * High-grade modern aesthetics designed to harmonize with YouTube UI
+ */
+
+/* ========================================================
+   1. COLOR TOKENS & SYSTEM VARIABLES
+   ======================================================== */
+:root {
+  --yta-bg-surface: #0f0f0f;
+  --yta-bg-surface-elevated: #1f1f1f;
+  --yta-bg-card: #272727;
+  --yta-bg-hover: rgba(255, 255, 255, 0.12);
+  --yta-bg-active: rgba(255, 255, 255, 0.2);
+  --yta-border: rgba(255, 255, 255, 0.15);
+  --yta-border-subtle: rgba(255, 255, 255, 0.08);
+
+  --yta-text-primary: #f1f1f1;
+  --yta-text-secondary: #aaaaaa;
+  --yta-text-muted: #717171;
+
+  --yta-brand-red: #ff0033;
+  --yta-brand-red-hover: #cc0029;
+  --yta-brand-blue: #3ea6ff;
+  --yta-brand-green: #2ba640;
+  --yta-brand-amber: #f59e0b;
+
+  --yta-radius-sm: 6px;
+  --yta-radius-md: 10px;
+  --yta-radius-lg: 16px;
+  --yta-radius-pill: 9999px;
+
+  --yta-shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.6);
+  --yta-shadow-md: 0 8px 20px rgba(0, 0, 0, 0.35);
+  --yta-font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Light mode overrides if YouTube is in light mode */
+html:not([dark]) {
+  --yta-bg-surface: #ffffff;
+  --yta-bg-surface-elevated: #f2f2f2;
+  --yta-bg-card: #e5e5e5;
+  --yta-bg-hover: rgba(0, 0, 0, 0.08);
+  --yta-bg-active: rgba(0, 0, 0, 0.15);
+  --yta-border: rgba(0, 0, 0, 0.15);
+  --yta-border-subtle: rgba(0, 0, 0, 0.08);
+
+  --yta-text-primary: #0f0f0f;
+  --yta-text-secondary: #606060;
+  --yta-text-muted: #909090;
+}
+
+/* Visibility toggles via settings */
+body.yt-aid-hide-copy-buttons .yt-aid-copy-title-group,
+body.yt-aid-hide-copy-buttons .yt-aid-copy-pure,
+body.yt-aid-hide-copy-buttons .yt-aid-copy-search,
+body.yt-aid-hide-copy-buttons .yt-aid-copy-enter {
+  display: none !important;
+}
+
+body.yt-aid-hide-clean-link .yt-aid-clean-link {
+  display: none !important;
+}
+
+body.yt-aid-hide-screenshot .yt-aid-screenshot-btn {
+  display: none !important;
+}
+
+/* ========================================================
+   2. TOAST NOTIFICATION SYSTEM
+   ======================================================== */
+.yt-aid-toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 9999999;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.yt-aid-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(18, 18, 18, 0.92);
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: var(--yta-radius-md);
+  border: 1px solid var(--yta-border);
+  box-shadow: var(--yta-shadow-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-family: var(--yta-font-family);
+  font-size: 13.5px;
+  font-weight: 500;
+  max-width: 420px;
+  transform: translateY(20px) scale(0.95);
+  opacity: 0;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  pointer-events: auto;
+}
+
+.yt-aid-toast-show {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+.yt-aid-toast-hide {
+  transform: translateY(12px) scale(0.95);
+  opacity: 0;
+}
+
+.yt-aid-toast-icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.yt-aid-toast-success .yt-aid-toast-icon {
+  color: #10b981;
+}
+
+.yt-aid-toast-warning .yt-aid-toast-icon {
+  color: #f59e0b;
+}
+
+.yt-aid-toast-info .yt-aid-toast-icon {
+  color: #38bdf8;
+}
+
+.yt-aid-toast-message {
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* ========================================================
+   3. WATCH PAGE TOOLBAR
+   ======================================================== */
+.yt-aid-watch-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--yta-border-subtle);
+  border-radius: var(--yta-radius-lg);
+  backdrop-filter: blur(6px);
+  font-family: var(--yta-font-family);
+  animation: ytAidFadeIn 0.3s ease;
+}
+
+@keyframes ytAidFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.yt-aid-toolbar-left,
+.yt-aid-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Button Pills */
+.yt-aid-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--yta-text-primary);
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: var(--yta-radius-pill);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  line-height: 1;
+}
+
+.yt-aid-pill-btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.yt-aid-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.yt-aid-pill-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Split Button Group for Copy Title */
+.yt-aid-split-group {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--yta-radius-pill);
+  border: 1px solid var(--yta-border-subtle);
+  overflow: hidden;
+}
+
+.yt-aid-split-group .yt-aid-pill-btn {
+  border-radius: 0;
+  background: transparent;
+  margin: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.yt-aid-split-group .yt-aid-pill-btn:last-child {
+  border-right: none;
+}
+
+.yt-aid-split-group .yt-aid-pill-sub {
+  padding: 6px 9px;
+  font-size: 11.5px;
+  color: var(--yta-text-secondary);
+}
+
+.yt-aid-split-group .yt-aid-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+/* Special button accents */
+.yt-aid-clean-link:hover {
+  border-color: rgba(62, 166, 255, 0.4);
+  color: var(--yta-brand-blue);
+}
+
+.yt-aid-screenshot-btn {
+  background: rgba(255, 0, 51, 0.14);
+  color: #ff4d6d;
+  border-color: rgba(255, 0, 51, 0.2);
+}
+
+.yt-aid-screenshot-btn:hover {
+  background: rgba(255, 0, 51, 0.28);
+  color: #ffffff;
+}
+
+/* Loop button */
+.yt-aid-loop-indicator {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yta-text-muted);
+}
+
+.yt-aid-loop-indicator.active {
+  background: rgba(43, 166, 64, 0.2);
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.4);
+}
+
+/* ========================================================
+   4. SIDEBAR ACTIONS (Related Videos)
+   ======================================================== */
+.yt-aid-sidebar-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  opacity: 0.65;
+  transition: opacity 0.2s ease;
+}
+
+ytd-compact-video-renderer:hover .yt-aid-sidebar-bar,
+ytd-compact-playlist-renderer:hover .yt-aid-sidebar-bar {
+  opacity: 1;
+}
+
+.yt-aid-mini-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--yta-radius-sm);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yta-text-secondary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.yt-aid-mini-action svg {
+  width: 14px;
+  height: 14px;
+}
+
+.yt-aid-mini-action:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* ========================================================
+   5. HOME PAGE & SEARCH FEED CARDS
+   ======================================================== */
+.yt-aid-home-card-bar {
+  margin-top: 8px;
+}
+
+.yt-aid-card-btn-cluster {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--yta-radius-pill);
+  border: 1px solid var(--yta-border-subtle);
+  overflow: hidden;
+}
+
+.yt-aid-card-btn-cluster .yt-aid-mini-action {
+  width: auto;
+  height: 26px;
+  padding: 0 8px;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+.yt-aid-card-btn-cluster .yt-aid-mini-action:last-child {
+  border-right: none;
+}
+
+.yt-aid-card-btn-cluster .yt-aid-mini-action:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+/* ========================================================
+   6. SCREENSHOT MODAL & CROP INTERFACE
+   ======================================================== */
+.yt-aid-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999999;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  animation: ytAidModalFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ytAidModalFade {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.yt-aid-modal-container {
+  display: flex;
+  flex-direction: column;
+  width: 96vw;
+  max-width: 1180px;
+  max-height: 92vh;
+  background: var(--yta-bg-surface-elevated);
+  border: 1px solid var(--yta-border);
+  border-radius: var(--yta-radius-lg);
+  box-shadow: var(--yta-shadow-lg);
+  overflow: hidden;
+  font-family: var(--yta-font-family);
+  color: var(--yta-text-primary);
+}
+
+/* Modal Header */
+.yt-aid-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--yta-bg-surface);
+  border-bottom: 1px solid var(--yta-border-subtle);
+  gap: 12px;
+}
+
+.yt-aid-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.yt-aid-modal-logo {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #ff334b;
+  letter-spacing: -0.2px;
+}
+
+.yt-aid-badge {
+  background: rgba(255, 255, 255, 0.12);
+  padding: 3px 8px;
+  border-radius: var(--yta-radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #38bdf8;
+  font-variant-numeric: tabular-nums;
+}
+
+.yt-aid-meta-res {
+  font-size: 11.5px;
+  color: var(--yta-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.yt-aid-video-name {
+  font-size: 13px;
+  color: var(--yta-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.yt-aid-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.yt-aid-btn-tab {
+  background: transparent;
+  color: var(--yta-text-secondary);
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  border-radius: var(--yta-radius-md);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.yt-aid-btn-tab svg {
+  width: 16px;
+  height: 16px;
+}
+
+.yt-aid-btn-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-btn-tab.active {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.yt-aid-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--yta-text-secondary);
+  font-size: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.yt-aid-modal-close:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+/* Modal Toolbar */
+.yt-aid-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--yta-border-subtle);
+}
+
+.yt-aid-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.yt-aid-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--yta-radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.18s ease;
+}
+
+.yt-aid-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.yt-aid-tool-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yta-text-primary);
+  border-color: var(--yta-border);
+}
+
+.yt-aid-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.yt-aid-tool-btn.active {
+  background: var(--yta-brand-red);
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.yt-aid-btn-primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.yt-aid-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.yt-aid-btn-success {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.yt-aid-btn-success:hover {
+  background: #059669;
+}
+
+.yt-aid-btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.yt-aid-btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.yt-aid-btn-danger:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+/* Aspect ratio chips */
+.yt-aid-aspect-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 3px 6px;
+  border-radius: var(--yta-radius-md);
+  border: 1px solid var(--yta-border-subtle);
+}
+
+.yt-aid-label {
+  font-size: 11.5px;
+  color: var(--yta-text-muted);
+  margin-right: 4px;
+}
+
+.yt-aid-btn-chip {
+  background: transparent;
+  border: none;
+  color: var(--yta-text-secondary);
+  padding: 4px 8px;
+  font-size: 11.5px;
+  border-radius: var(--yta-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.yt-aid-btn-chip:hover {
+  color: #ffffff;
+}
+
+.yt-aid-btn-chip.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Modal Body & Viewport */
+.yt-aid-modal-body {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+}
+
+.yt-aid-editor-view {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.yt-aid-canvas-wrapper {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  max-height: calc(92vh - 160px);
+  user-select: none;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.yt-aid-preview-img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(92vh - 160px);
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* Crop Overlay */
+.yt-aid-crop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: crosshair;
+}
+
+.yt-aid-crop-box {
+  position: absolute;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  border: 1.5px solid #ffffff;
+  cursor: move;
+  box-sizing: border-box;
+}
+
+/* Rule of Thirds Grid */
+.yt-aid-crop-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, transparent 33.33%, rgba(255, 255, 255, 0.3) 33.33%, rgba(255, 255, 255, 0.3) 34%, transparent 34%, transparent 66.66%, rgba(255, 255, 255, 0.3) 66.66%, rgba(255, 255, 255, 0.3) 67.33%, transparent 67.33%),
+    linear-gradient(to bottom, transparent 33.33%, rgba(255, 255, 255, 0.3) 33.33%, rgba(255, 255, 255, 0.3) 34%, transparent 34%, transparent 66.66%, rgba(255, 255, 255, 0.3) 66.66%, rgba(255, 255, 255, 0.3) 67.33%, transparent 67.33%);
+}
+
+/* Handles */
+.yt-aid-crop-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 2px;
+}
+
+.handle-nw { top: -5px; left: -5px; cursor: nw-resize; }
+.handle-ne { top: -5px; right: -5px; cursor: ne-resize; }
+.handle-sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+.handle-se { bottom: -5px; right: -5px; cursor: se-resize; }
+.handle-n  { top: -5px; left: calc(50% - 5px); cursor: n-resize; }
+.handle-s  { bottom: -5px; left: calc(50% - 5px); cursor: s-resize; }
+.handle-w  { left: -5px; top: calc(50% - 5px); cursor: w-resize; }
+.handle-e  { right: -5px; top: calc(50% - 5px); cursor: e-resize; }
+
+/* ========================================================
+   7. SESSION RAM GALLERY VIEW
+   ======================================================== */
+.yt-aid-gallery-view {
+  width: 100%;
+  max-height: calc(92vh - 120px);
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.yt-aid-gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--yta-border-subtle);
+  padding-bottom: 10px;
+}
+
+.yt-aid-gallery-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.yt-aid-gallery-card {
+  background: var(--yta-bg-surface);
+  border: 1px solid var(--yta-border-subtle);
+  border-radius: var(--yta-radius-md);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.yt-aid-gallery-card:hover {
+  border-color: var(--yta-border);
+  transform: translateY(-2px);
+  box-shadow: var(--yta-shadow-md);
+}
+
+.yt-aid-card-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+}
+
+.yt-aid-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.yt-aid-card-time {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.yt-aid-card-res {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #aaa;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.yt-aid-card-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.yt-aid-card-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--yta-text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.yt-aid-card-date {
+  font-size: 11px;
+  color: var(--yta-text-muted);
+  margin-bottom: 10px;
+}
+
+.yt-aid-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.yt-aid-btn-mini {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yta-text-primary);
+  border: 1px solid transparent;
+  border-radius: var(--yta-radius-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.yt-aid-btn-mini:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.yt-aid-empty-gallery {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--yta-text-muted);
+  font-size: 14px;
+}
