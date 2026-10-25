@@ -394,7 +394,8 @@ body.yt-aid-hide-copy-buttons.yt-aid-hide-clean-link.yt-aid-hide-thumb-btn .yt-a
 /* ========================================================
    3c. THUMBNAIL CROP DIALOG
    ======================================================== */
-body.yt-aid-crop-open {
+body.yt-aid-crop-open,
+html.yt-aid-crop-open {
   overflow: hidden !important;
 }
 

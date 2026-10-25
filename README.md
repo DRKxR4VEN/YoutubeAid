@@ -22,6 +22,7 @@ Tiêm tự động vào **Watch page (dưới tiêu đề)**, **Sidebar (video l
 - Kết hợp hoàn hảo với Copy Khi Bôi Đen: bôi đen text → click ô tìm kiếm → Enter là xong.
 - Dùng được với nội dung copy thủ công (<kbd>Ctrl</kbd> + <kbd>C</kbd> hoặc chuột phải → Copy) kể cả khi đã tắt tính năng copy khi bôi đen, và với nội dung copy từ **tab hoặc ứng dụng khác** — tiện ích đọc clipboard hệ thống khi bạn click vào ô tìm kiếm (quyền `clipboardRead`). Nếu không đọc được clipboard, tiện ích dùng nội dung copy gần nhất mà nó đã ghi nhận.
 - Chỉ dán khi ô tìm kiếm trống để không ghi đè query người dùng đang gõ.
+- Bộ nhớ dự phòng này được chia sẻ giữa các tab và tự hết hạn sau 15 phút, nên không dán nhầm nội dung cũ.
 
 ### 4. Menu Tools (Tính Năng Phụ)
 Nút **Tools** nằm ngay bên phải nút **Auto Loop** trên thanh công cụ Watch page, mở dropdown tập hợp các tính năng phụ kèm công tắc bật/tắt:
@@ -39,11 +40,13 @@ Trạng thái được lưu vào `chrome.storage.local` và đồng bộ với t
 ### 6. Nút Clean Copy Link (URL Chuẩn Không Tracking)
 - Tự động loại bỏ toàn bộ các query tracking rác khi chia sẻ: `si`, `pp`, `feature`, `utm_*`, `fbclid`, `gclid`, v.v.
 - Chuẩn hóa link dạng gọn gàng: `https://www.youtube.com/watch?v={videoId}` hoặc `https://www.youtube.com/shorts/{id}`.
+- Vẫn giữ mốc thời gian `t` nếu bạn đang xem dở một đoạn và muốn chia sẻ đúng đoạn đó.
 
 ### 7. Tải Ảnh Bìa Thumbnail & Cắt Ảnh Trước Khi Lưu
 Nút **Downloads** trên thanh công cụ Watch page mở hộp thoại **Cắt & tải ảnh bìa**: ảnh bìa chất lượng cao nhất hiện có được tải về trước, sau đó bạn tự do chọn vùng muốn lưu.
 
-- **Chất lượng tối đa:** thử lần lượt `maxresdefault` (1280×720) → `sddefault` (640×360) → `hqdefault` (480×360) → `mqdefault` (320×180), nên video cũ không có maxres vẫn tải được bình thường.
+- **Chất lượng tối đa:** thử lần lượt `maxresdefault` (1280×720, cả `.jpg` và `.webp`) → `sddefault` (640×360) → `hq720` → `hqdefault` (480×360) → `mqdefault` (320×180), nên video cũ không có maxres vẫn tải được bình thường.
+- **Tải lại nhanh:** ảnh bìa vừa tải được giữ trong bộ nhớ đệm (20 video gần nhất), mở lại hộp thoại cắt ảnh gần như tức thì.
 - **Cắt tuỳ ý:** kéo bên trong khung để di chuyển vùng chọn, kéo 4 góc để thay đổi kích thước; nút **Đặt lại** trả về toàn bộ ảnh.
 - **Xuất đúng độ phân giải gốc:** vùng cắt được vẽ từ pixel gốc của ảnh (không phải ảnh đang thu nhỏ trên màn hình) và lưu thành JPEG chất lượng 0.92.
 - **Tải ảnh gốc:** nút **Tải ảnh gốc** bỏ qua bước cắt nếu bạn chỉ cần ảnh nguyên bản.
@@ -113,6 +116,6 @@ Youtube_Aid/
    - Microsoft Edge: `edge://extensions/`
 3. Bật chế độ dành cho nhà phát triển (**Developer mode**) ở góc trên bên phải.
 4. Nhấn vào nút **Tải tiện ích đã giải nén** (**Load unpacked**).
-5. Chọn thư mục dự án: `d:\Uni\'My Project\Youtube_Aid`.
+5. Chọn thư mục dự án: `D:\DỰ ÁN\YoutubeAid-main\YoutubeAid-main`.
 6. Hoàn tất! Truy cập [YouTube](https://www.youtube.com/) để trải nghiệm.
 7. Sau mỗi lần cập nhật code, bấm **Reload** tại `chrome://extensions/` (đặc biệt khi `manifest.json` thay đổi).
