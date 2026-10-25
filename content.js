@@ -1,6 +1,7 @@
 /**
  * Youtube Aid - Content Script
  * Manifest V3 Extension for YouTube
+ * Minimalist native YouTube interface integration
  */
 
 (function () {
@@ -16,23 +17,23 @@
     enableShortcuts: true,
     enableCopyButtons: true,
     enableCleanLink: true,
-    enableScreenshot: true,
     enableToasts: true,
-    screenshotFormat: 'image/png' // 'image/png' | 'image/jpeg'
+    enableSelectionCopy: true,
+    enableAutoPasteSearch: true
   };
 
   let settings = { ...DEFAULT_SETTINGS };
 
-  // --- Session RAM for Screenshot Captures ---
-  // In-memory array surviving during page session
-  const sessionCaptures = [];
+  // Last text copied by the extension — feeds the auto-paste search box
+  let lastCopiedText = '';
 
   // --- Shortcut Buffer State ---
+  const CHORD_KEYS = ['s', 'h', 'p', 'm'];
+  const CHORD_PREFIXES = new Set(['s', 'h', 'p', 'm', 'hh']);
+  const CHORD_ACTIONS = new Set(['ss', 'hh', 'hhh', 'pp', 'mm']);
+  const CHORD_TIMEOUT_MS = 320;
   let keyBuffer = '';
   let keyBufferTimer = null;
-  let hhPendingTimer = null;
-  const BUFFER_TIMEOUT_MS = 450;
-  const HH_WAIT_TIMEOUT_MS = 280; // Optimized wait window between hh and hhh for ultra-responsive navigation
 
   // Cache for the latest suggested Shorts video ID
   let cachedSuggestedShortsId = null;
@@ -54,7 +55,6 @@
   });
 
   function applySettingUpdates() {
-    // Loop setting changed
     const video = document.querySelector('video.video-stream, video');
     if (video) {
       video.loop = !!settings.enableLoop;
@@ -63,7 +63,9 @@
     // Toggle button visibility via body class
     document.body.classList.toggle('yt-aid-hide-copy-buttons', !settings.enableCopyButtons);
     document.body.classList.toggle('yt-aid-hide-clean-link', !settings.enableCleanLink);
-    document.body.classList.toggle('yt-aid-hide-screenshot', !settings.enableScreenshot);
+
+    syncToolbarState();
+    injectAllAreas();
   }
 
   // --- Main Initializer ---
@@ -71,6 +73,9 @@
     createToastContainer();
     initVideoLoopMonitor();
     initShortcutSystem();
+    initSelectionCopy();
+    initSearchAutoPaste();
+    initToolsMenuDismiss();
     initDOMObserver();
     applySettingUpdates();
   }
@@ -88,7 +93,7 @@
     document.body.appendChild(toastContainer);
   }
 
-  function showToast(message, type = 'info', duration = 2800) {
+  function showToast(message, type = 'info', duration = 2400) {
     if (!settings.enableToasts) return;
     if (!toastContainer) createToastContainer();
 
@@ -111,7 +116,6 @@
 
     toastContainer.appendChild(toast);
 
-    // Trigger animation
     requestAnimationFrame(() => {
       toast.classList.add('yt-aid-toast-show');
     });
@@ -121,7 +125,7 @@
       toast.classList.add('yt-aid-toast-hide');
       setTimeout(() => {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
-      }, 300);
+      }, 250);
     }, duration);
   }
 
@@ -142,7 +146,6 @@
       if (!video.loop) {
         video.loop = true;
       }
-      // Attach persistent listener to re-assert loop
       if (!video.__ytAidLoopBound) {
         video.__ytAidLoopBound = true;
         const enforceLoop = () => {
@@ -159,14 +162,13 @@
 
   function initVideoLoopMonitor() {
     ensureVideoLoop();
-    // YouTube SPA navigations
     window.addEventListener('yt-navigate-finish', ensureVideoLoop);
     document.addEventListener('yt-page-data-updated', ensureVideoLoop);
     window.addEventListener('spfdone', ensureVideoLoop);
   }
 
   // ==========================================
-  // 3. SHORTCUT SYSTEM (ss, hh, hhh, pp, mm)
+  // 4. SHORTCUT SYSTEM (ss, hh, hhh, pp, mm)
   // ==========================================
   function isTypingContext() {
     const el = document.activeElement;
@@ -177,12 +179,10 @@
       return true;
     }
 
-    // Check contentEditable
     if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') {
       return true;
     }
 
-    // YouTube specific inputs & comment boxes
     if (el.closest('#contenteditable-root, ytd-searchbox, ytd-comments, #comment-dialog, yt-formatted-string[contenteditable], #edit-box, paper-input')) {
       return true;
     }
@@ -190,77 +190,45 @@
     return false;
   }
 
-  // ==========================================
-  // HIGH-PERFORMANCE SPA NAVIGATION ENGINE
-  // Eliminates slow page reloads (window.location.href)
-  // Triggers instant YouTube client-side SPA navigation
-  // ==========================================
+  const SHORTS_LINK = 'a[href*="/shorts/"]';
 
+  function shortsIdFromAnchor(anchor) {
+    if (!anchor) return null;
+    const href = anchor.getAttribute('href') || anchor.href || '';
+    const match = href.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : null;
+  }
+
+  // Shelves / related rail carry real video links, the guide only has "/shorts"
   function updateCachedShorts() {
-    // 1. Look into guide / mini-guide for a suggested Short with specific ID
-    const guideShorts = document.querySelector(
-      'ytd-guide-entry-renderer a[href^="/shorts/"], ytd-mini-guide-entry-renderer a[href^="/shorts/"], a#endpoint[href^="/shorts/"]'
+    const preferred = document.querySelectorAll(
+      `ytd-rich-shelf-renderer[is-shorts] ${SHORTS_LINK}, ytd-reel-shelf-renderer ${SHORTS_LINK}, ` +
+      `ytd-compact-video-renderer ${SHORTS_LINK}, ytd-rich-item-renderer ${SHORTS_LINK}`
     );
-    if (guideShorts) {
-      const href = guideShorts.getAttribute('href') || guideShorts.href;
-      const match = href.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
-      if (match) {
-        cachedSuggestedShortsId = match[1];
-        return;
-      }
-    }
+    const pool = preferred.length ? preferred : document.querySelectorAll(SHORTS_LINK);
 
-    // 2. Look for any shorts shelf or card on current page
-    const pageShorts = document.querySelector(
-      'ytd-rich-shelf-renderer[is-shorts] a[href^="/shorts/"], ytd-reel-shelf-renderer a[href^="/shorts/"], ytd-rich-item-renderer a[href^="/shorts/"], a[href^="/shorts/"]'
-    );
-    if (pageShorts) {
-      const href = pageShorts.getAttribute('href') || pageShorts.href;
-      const match = href.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
-      if (match) {
-        cachedSuggestedShortsId = match[1];
+    for (const anchor of pool) {
+      const id = shortsIdFromAnchor(anchor);
+      if (id) {
+        cachedSuggestedShortsId = id;
+        return;
       }
     }
   }
 
   function findSuggestedShortsElement() {
-    // Priority 1: Sidebar Guide or Mini Guide entry with specific video ID (/shorts/{id})
-    const guideWithId = document.querySelector(
-      'ytd-guide-entry-renderer a[href^="/shorts/"], ytd-mini-guide-entry-renderer a[href^="/shorts/"], a#endpoint[href^="/shorts/"]'
+    const withId = document.querySelector(
+      `ytd-rich-shelf-renderer[is-shorts] ${SHORTS_LINK}, ytd-reel-shelf-renderer ${SHORTS_LINK}, ` +
+      `ytd-compact-video-renderer ${SHORTS_LINK}, ytd-rich-item-renderer ${SHORTS_LINK}, ${SHORTS_LINK}`
     );
-    if (guideWithId) {
-      return guideWithId.tagName === 'A' ? guideWithId : guideWithId.closest('a');
-    }
+    const withIdAnchor = withId ? (withId.tagName === 'A' ? withId : withId.closest('a')) : null;
+    if (shortsIdFromAnchor(withIdAnchor)) return withIdAnchor;
 
-    // Priority 2: Any general Shorts entry in the Guide (desktop guide drawer exists even when collapsed)
+    // Fallback: the guide "Shorts" entry (no video id, opens the Shorts feed)
     const guideGeneral = document.querySelector(
       'ytd-guide-entry-renderer a[href*="/shorts"], ytd-mini-guide-entry-renderer a[href*="/shorts"], a#endpoint[title="Shorts"], a#endpoint[aria-label*="Shorts"], a[title="Shorts"]'
     );
-    if (guideGeneral) {
-      const a = guideGeneral.tagName === 'A' ? guideGeneral : guideGeneral.closest('a');
-      if (a) {
-        const href = a.getAttribute('href') || a.href;
-        // Check if YouTube dynamically populated the suggested video ID
-        if (href && href.length > '/shorts/'.length && !href.endsWith('/shorts')) {
-          return a;
-        }
-      }
-    }
-
-    // Priority 3: Any Shorts reel/shelf card rendered on the page
-    const pageShortWithId = document.querySelector(
-      'ytd-rich-shelf-renderer[is-shorts] a[href^="/shorts/"], ytd-reel-shelf-renderer a[href^="/shorts/"], ytd-rich-item-renderer a[href^="/shorts/"], ytd-video-renderer a[href^="/shorts/"], a[href^="/shorts/"]'
-    );
-    if (pageShortWithId) {
-      return pageShortWithId.tagName === 'A' ? pageShortWithId : pageShortWithId.closest('a');
-    }
-
-    // Priority 4: Return general guide entry if available (native click triggers YouTube's internal SPA router)
-    if (guideGeneral) {
-      return guideGeneral.tagName === 'A' ? guideGeneral : guideGeneral.closest('a');
-    }
-
-    return null;
+    return guideGeneral ? (guideGeneral.tagName === 'A' ? guideGeneral : guideGeneral.closest('a')) : null;
   }
 
   function simulateSpaNavigation(pathOrUrl) {
@@ -274,7 +242,7 @@
       a.click();
       setTimeout(() => a.remove(), 80);
       return true;
-    } catch (e) {}
+    } catch (e) { }
 
     window.location.href = pathOrUrl.startsWith('http') ? pathOrUrl : `https://www.youtube.com${pathOrUrl}`;
     return false;
@@ -285,30 +253,28 @@
     const shortsAnchor = findSuggestedShortsElement();
 
     if (shortsAnchor) {
-      const href = shortsAnchor.getAttribute('href') || shortsAnchor.href;
-      const match = href.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
-      if (match) {
-        showToast(`⚡ Phím tắt [SS]: Mở Shorts gợi ý [${match[1]}]`, 'info', 1600);
+      const id = shortsIdFromAnchor(shortsAnchor);
+      if (id) {
+        showToast(`Phím tắt [SS]: Mở Shorts gợi ý [${id}]`, 'info', 1600);
       } else {
-        showToast('⚡ Phím tắt [SS]: Chuyển sang YouTube Shorts', 'info', 1600);
+        showToast('Phím tắt [SS]: Chuyển sang YouTube Shorts', 'info', 1600);
       }
-      // Native click triggers YouTube internal router instantly without page reload
       shortsAnchor.click();
       return;
     }
 
     if (cachedSuggestedShortsId) {
-      showToast(`⚡ Phím tắt [SS]: Mở Shorts gợi ý [${cachedSuggestedShortsId}]`, 'info', 1600);
+      showToast(`Phím tắt [SS]: Mở Shorts gợi ý [${cachedSuggestedShortsId}]`, 'info', 1600);
       simulateSpaNavigation(`/shorts/${cachedSuggestedShortsId}`);
       return;
     }
 
-    showToast('⚡ Phím tắt [SS]: Chuyển sang YouTube Shorts', 'info', 1600);
+    showToast('Phím tắt [SS]: Chuyển sang YouTube Shorts', 'info', 1600);
     simulateSpaNavigation('/shorts');
   }
 
   function navigateToHome() {
-    showToast('⚡ Phím tắt [HH]: Về trang chủ', 'info', 1600);
+    showToast('Phím tắt [HH]: Về trang chủ', 'info', 1600);
     const homeSelectors = [
       'ytd-topbar-logo-renderer a#logo',
       'a#logo',
@@ -329,7 +295,7 @@
   }
 
   function navigateToHistory() {
-    showToast('⚡ Phím tắt [HHH]: Mở lịch sử xem', 'info', 1600);
+    showToast('Phím tắt [HHH]: Mở lịch sử xem', 'info', 1600);
     const historySelectors = [
       'ytd-guide-entry-renderer a[href^="/feed/history"]',
       'ytd-mini-guide-entry-renderer a[href^="/feed/history"]',
@@ -349,7 +315,7 @@
   }
 
   function navigateToPlaylists() {
-    showToast('⚡ Phím tắt [PP]: Danh sách phát', 'info', 1600);
+    showToast('Phím tắt [PP]: Danh sách phát', 'info', 1600);
     const playlistSelectors = [
       'ytd-guide-entry-renderer a[href^="/feed/playlists"]',
       'ytd-mini-guide-entry-renderer a[href^="/feed/playlists"]',
@@ -371,7 +337,7 @@
   }
 
   function navigateToMusic() {
-    showToast('⚡ Phím tắt [MM]: Chuyển sang YouTube Music', 'info', 1600);
+    showToast('Phím tắt [MM]: Chuyển sang YouTube Music', 'info', 1600);
     window.location.href = 'https://music.youtube.com/';
   }
 
@@ -395,94 +361,90 @@
     }
   }
 
+  // YouTube binds "m" (mute) and "p" (previous) to the same keys that start
+  // our chords. We swallow the key and replay the native action ourselves when
+  // no chord completes, so both behaviours keep working.
+  const SINGLE_KEY_FALLBACK = {
+    m: () => {
+      const btn = document.querySelector('.ytp-mute-button');
+      if (btn) btn.click();
+    },
+    p: () => {
+      const btn = document.querySelector('.ytp-prev-button');
+      if (btn) btn.click();
+    }
+  };
+
+  function resetKeyBuffer(runFallback = false) {
+    const pending = keyBuffer;
+    keyBuffer = '';
+    if (keyBufferTimer) {
+      clearTimeout(keyBufferTimer);
+      keyBufferTimer = null;
+    }
+    if (runFallback && pending.length === 1 && SINGLE_KEY_FALLBACK[pending]) {
+      SINGLE_KEY_FALLBACK[pending]();
+    }
+  }
+
+  function flushKeyBuffer() {
+    if (keyBuffer === 'hh') {
+      resetKeyBuffer();
+      executeShortcut('hh');
+      return;
+    }
+    resetKeyBuffer(true);
+  }
+
   function initShortcutSystem() {
     document.addEventListener('keydown', (e) => {
       if (!settings.enableShortcuts) return;
-
-      // Ignore if user is inside an input/comment/search or using modifiers
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      if (e.repeat) return;
       if (isTypingContext()) return;
 
+      if (e.key === 'Escape') {
+        resetKeyBuffer();
+        return;
+      }
+
       const key = e.key.toLowerCase();
-      if (!['s', 'h', 'p', 'm'].includes(key)) {
-        // Reset buffer if unrelated key pressed
-        keyBuffer = '';
-        if (hhPendingTimer) {
-          clearTimeout(hhPendingTimer);
-          hhPendingTimer = null;
-        }
+      if (!CHORD_KEYS.includes(key)) {
+        resetKeyBuffer(true);
         return;
       }
 
-      // Clear existing timeout
-      if (keyBufferTimer) clearTimeout(keyBufferTimer);
+      // Own the key: YouTube's native single-key shortcuts must not fire
+      e.preventDefault();
+      e.stopPropagation();
 
-      keyBuffer += key;
+      const next = keyBuffer + key;
 
-      // Handle HH vs HHH conflict:
-      if (keyBuffer === 'hh') {
-        // Wait briefly for a 3rd 'h' before triggering 'hh'
-        if (hhPendingTimer) clearTimeout(hhPendingTimer);
-        hhPendingTimer = setTimeout(() => {
-          if (keyBuffer === 'hh') {
-            keyBuffer = '';
-            executeShortcut('hh');
-          }
-          hhPendingTimer = null;
-        }, HH_WAIT_TIMEOUT_MS);
+      if (CHORD_ACTIONS.has(next) && next !== 'hh') {
+        resetKeyBuffer();
+        executeShortcut(next);
         return;
       }
 
-      if (keyBuffer === 'hhh') {
-        if (hhPendingTimer) {
-          clearTimeout(hhPendingTimer);
-          hhPendingTimer = null;
-        }
-        keyBuffer = '';
-        executeShortcut('hhh');
+      if (CHORD_PREFIXES.has(next)) {
+        keyBuffer = next;
+        if (keyBufferTimer) clearTimeout(keyBufferTimer);
+        keyBufferTimer = setTimeout(flushKeyBuffer, CHORD_TIMEOUT_MS);
         return;
       }
 
-      // Check 2-letter combos
-      if (keyBuffer === 'ss') {
-        keyBuffer = '';
-        executeShortcut('ss');
-        return;
-      }
-
-      if (keyBuffer === 'pp') {
-        keyBuffer = '';
-        executeShortcut('pp');
-        return;
-      }
-
-      if (keyBuffer === 'mm') {
-        keyBuffer = '';
-        executeShortcut('mm');
-        return;
-      }
-
-      // If buffer has exceeded 3 chars, reset
-      if (keyBuffer.length >= 3) {
-        keyBuffer = '';
-      }
-
-      // Reset buffer after inactivity
-      keyBufferTimer = setTimeout(() => {
-        keyBuffer = '';
-      }, BUFFER_TIMEOUT_MS);
+      resetKeyBuffer(true);
     }, true);
   }
 
   // ==========================================
-  // 4. CLEAN COPY LINK & COPY TITLE UTILS
+  // 5. CLEAN COPY LINK & SEARCH BAR UTILS
   // ==========================================
   function cleanYoutubeUrl(rawUrl) {
     if (!rawUrl) return '';
     try {
       const url = new URL(rawUrl, window.location.origin);
-      
-      // Watch page: keep only video ID 'v'
+
       if (url.pathname === '/watch') {
         const v = url.searchParams.get('v');
         if (v) {
@@ -490,7 +452,6 @@
         }
       }
 
-      // Shorts: keep clean /shorts/{id}
       if (url.pathname.startsWith('/shorts/')) {
         const id = url.pathname.split('/')[2];
         if (id) {
@@ -498,7 +459,6 @@
         }
       }
 
-      // Channel / User / Playlist
       if (url.pathname.startsWith('/playlist')) {
         const list = url.searchParams.get('list');
         if (list) {
@@ -506,7 +466,6 @@
         }
       }
 
-      // Generic URL without tracking queries
       const trackingParams = [
         'si', 'pp', 'feature', 'utm_source', 'utm_medium', 'utm_campaign',
         'utm_term', 'utm_content', 'fbclid', 'gclid', 'ab_channel', 'sub_confirmation'
@@ -525,670 +484,146 @@
     return el ? el.textContent.trim() : document.title.replace(' - YouTube', '').trim();
   }
 
-  function copyTextToClipboard(text, successMsg) {
-    if (!text) {
-      showToast('⚠️ Không tìm thấy nội dung để sao chép!', 'warning');
-      return;
+  function previewText(text, max = 40) {
+    const flat = String(text).replace(/\s+/g, ' ').trim();
+    return flat.length > max ? `${flat.slice(0, max)}…` : flat;
+  }
+
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype, 'value'
+  )?.set;
+
+  function setSearchInputValue(input, text) {
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(input, text);
+    } else {
+      input.value = text;
     }
-    navigator.clipboard.writeText(text).then(() => {
-      showToast(successMsg, 'success');
-    }).catch(err => {
-      // Fallback using textarea
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Low-level clipboard write, resolves true on success
+  function writeClipboard(text) {
+    return navigator.clipboard.writeText(text).then(() => true).catch(() => {
       const ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position = 'fixed';
       ta.style.left = '-9999px';
       document.body.appendChild(ta);
       ta.select();
+      let ok = false;
       try {
-        document.execCommand('copy');
-        showToast(successMsg, 'success');
-      } catch (e) {
-        showToast('⚠️ Lỗi sao chép: ' + e.message, 'warning');
-      }
+        ok = document.execCommand('copy');
+      } catch (e) { }
       document.body.removeChild(ta);
+      return ok;
     });
   }
 
+  function copyTextToClipboard(text, successMsg) {
+    if (!text) {
+      showToast('Không tìm thấy nội dung để sao chép!', 'warning');
+      return;
+    }
+    lastCopiedText = text;
+    writeClipboard(text).then((ok) => {
+      if (!ok) {
+        showToast('Lỗi sao chép vào clipboard', 'warning');
+      } else if (successMsg) {
+        showToast(successMsg, 'success');
+      }
+    });
+  }
+
+  // Open search query directly in a brand new tab
+  function openSearchInNewTab(text) {
+    window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(text)}`, '_blank');
+    showToast(`Đã mở tìm kiếm trong tab mới: "${previewText(text, 30)}"`, 'success');
+  }
+
+  // Fill the search bar then run the search on the current tab
   function autoEnterSearch(text) {
-    // Fill search input and submit directly
-    const searchInput = document.querySelector('input#search, input.ytd-searchbox');
-    const searchForm = document.querySelector('form#search-form, ytd-searchbox form');
+    const searchInput = document.querySelector('input#search, ytd-searchbox input');
+    const startHref = window.location.href;
+
     if (searchInput) {
-      searchInput.value = text;
-      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-      if (searchForm) {
-        searchForm.dispatchEvent(new Event('submit', { bubbles: true }));
-      } else {
-        const searchBtn = document.querySelector('#search-icon-legacy, button#search-icon-legacy');
-        if (searchBtn) searchBtn.click();
+      setSearchInputValue(searchInput, text);
+      searchInput.focus();
+    }
+
+    const searchBtn = document.querySelector('ytd-searchbox button#search-icon-legacy, button#search-icon-legacy');
+    if (searchBtn) searchBtn.click();
+
+    // Synthetic search clicks are not always trusted — fall back to SPA routing
+    setTimeout(() => {
+      if (window.location.href === startHref) {
+        simulateSpaNavigation(`/results?search_query=${encodeURIComponent(text)}`);
       }
-      showToast(`⏎ Đã nhập & tìm kiếm: "${text.slice(0, 35)}..."`, 'success');
-    } else {
-      window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(text)}`;
-    }
+    }, 450);
+
+    showToast(`Đang tìm kiếm: "${previewText(text, 35)}"`, 'success');
   }
 
   // ==========================================
-  // 5. SCREENSHOT HTML5 VIDEO & MODAL
+  // 5. COPY ON SELECT & AUTO-PASTE INTO SEARCH
   // ==========================================
-  function captureCurrentVideoFrame() {
-    const video = document.querySelector('video.video-stream, video');
-    if (!video || !video.videoWidth || !video.videoHeight) {
-      showToast('⚠️ Không tìm thấy khung hình video!', 'warning');
-      return;
-    }
+  function initSelectionCopy() {
+    let copyTimer = null;
+    let lastCopied = { text: '', at: 0 };
 
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const copySelection = () => {
+      if (!settings.enableSelectionCopy) return;
+      if (isTypingContext()) return;
 
-      const mimeType = settings.screenshotFormat || 'image/png';
-      const dataUrl = canvas.toDataURL(mimeType, 0.95);
-      const title = getWatchVideoTitle();
-      const curTime = video.currentTime || 0;
-      const timeStr = formatTimestamp(curTime);
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
 
-      const captureItem = {
-        id: 'cap_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-        dataUrl: dataUrl,
-        mimeType: mimeType,
-        width: canvas.width,
-        height: canvas.height,
-        title: title,
-        currentTime: curTime,
-        timeStr: timeStr,
-        createdAt: new Date().toLocaleTimeString()
-      };
+      const text = selection.toString().trim();
+      if (!text) return;
 
-      // Save into Session RAM
-      sessionCaptures.unshift(captureItem);
-      if (sessionCaptures.length > 40) sessionCaptures.pop();
+      const now = Date.now();
+      if (text === lastCopied.text && now - lastCopied.at < 1200) return;
+      lastCopied = { text, at: now };
+      lastCopiedText = text;
 
-      showToast(`📷 Đã chụp ảnh video [${timeStr}] (${canvas.width}x${canvas.height})`, 'success');
-      openScreenshotModal(captureItem);
-    } catch (err) {
-      console.error('[YouTube Aid] Screenshot error:', err);
-      showToast('⚠️ Không thể chụp ảnh (có thể do bản quyền DRM / CORS)', 'warning');
-    }
-  }
-
-  function formatTimestamp(seconds) {
-    const s = Math.floor(seconds || 0);
-    const hrs = Math.floor(s / 3600);
-    const mins = Math.floor((s % 3600) / 60);
-    const secs = s % 60;
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  // ==========================================
-  // SCREENSHOT MODAL & CROP COMPONENT
-  // ==========================================
-  let activeModal = null;
-  let currentActiveCapture = null;
-  let cropState = {
-    active: false,
-    aspectRatio: 'free', // 'free' | '16:9' | '4:3' | '1:1'
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-    isDragging: false,
-    isResizing: false,
-    dragStart: { x: 0, y: 0 },
-    handle: null
-  };
-
-  function openScreenshotModal(captureItem) {
-    currentActiveCapture = captureItem;
-    if (activeModal) {
-      activeModal.remove();
-      activeModal = null;
-    }
-
-    const modal = document.createElement('div');
-    modal.id = 'yt-aid-screenshot-modal';
-    modal.className = 'yt-aid-modal-overlay';
-
-    modal.innerHTML = `
-      <div class="yt-aid-modal-container">
-        <!-- Header -->
-        <div class="yt-aid-modal-header">
-          <div class="yt-aid-modal-title">
-            <span class="yt-aid-modal-logo">⚡ YouTube Aid</span>
-            <span class="yt-aid-badge">${escapeHtml(captureItem.timeStr)}</span>
-            <span class="yt-aid-meta-res" id="yt-aid-meta-res">${captureItem.width}×${captureItem.height}</span>
-            <span class="yt-aid-video-name" title="${escapeHtml(captureItem.title)}">${escapeHtml(captureItem.title)}</span>
-          </div>
-          <div class="yt-aid-modal-header-actions">
-            <button class="yt-aid-btn yt-aid-btn-tab active" id="yt-aid-tab-editor">
-              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-              Chỉnh sửa & Crop
-            </button>
-            <button class="yt-aid-btn yt-aid-btn-tab" id="yt-aid-tab-gallery">
-              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z"/></svg>
-              Lịch sử Session (${sessionCaptures.length})
-            </button>
-            <button class="yt-aid-modal-close" id="yt-aid-close-modal" title="Đóng (Esc)">✕</button>
-          </div>
-        </div>
-
-        <!-- Editor Toolbar -->
-        <div class="yt-aid-toolbar" id="yt-aid-editor-toolbar">
-          <div class="yt-aid-tool-group">
-            <button class="yt-aid-btn yt-aid-tool-btn" id="yt-aid-btn-toggle-crop">
-              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 15h2V7c0-1.1-.9-2-2-2H9v2h8v8zM7 17V1H5v4H1v2h4v10c0 1.1.9 2 2 2h10v4h2v-4h4v-2H7z"/></svg>
-              <span id="yt-aid-crop-toggle-text">Bật Crop</span>
-            </button>
-            <div class="yt-aid-aspect-group" id="yt-aid-aspect-group" style="display: none;">
-              <span class="yt-aid-label">Tỷ lệ:</span>
-              <button class="yt-aid-btn-chip active" data-aspect="free">Tự do</button>
-              <button class="yt-aid-btn-chip" data-aspect="16:9">16:9</button>
-              <button class="yt-aid-btn-chip" data-aspect="4:3">4:3</button>
-              <button class="yt-aid-btn-chip" data-aspect="1:1">1:1</button>
-            </div>
-            <button class="yt-aid-btn yt-aid-btn-success" id="yt-aid-btn-apply-crop" style="display: none;">
-              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-              Cắt ảnh
-            </button>
-            <button class="yt-aid-btn yt-aid-btn-secondary" id="yt-aid-btn-reset-crop" style="display: none;">
-              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
-              Hoàn tác gốc
-            </button>
-          </div>
-
-          <div class="yt-aid-tool-group yt-aid-actions-group">
-            <button class="yt-aid-btn yt-aid-btn-primary" id="yt-aid-btn-copy-img">
-              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-              Copy ảnh
-            </button>
-            <button class="yt-aid-btn yt-aid-btn-primary" id="yt-aid-btn-download-png">
-              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
-              Tải PNG
-            </button>
-            <button class="yt-aid-btn yt-aid-btn-secondary" id="yt-aid-btn-download-jpg">
-              Tải JPG
-            </button>
-          </div>
-        </div>
-
-        <!-- Viewport Area -->
-        <div class="yt-aid-modal-body">
-          <div class="yt-aid-editor-view" id="yt-aid-editor-view">
-            <div class="yt-aid-canvas-wrapper" id="yt-aid-canvas-wrapper">
-              <img id="yt-aid-preview-img" class="yt-aid-preview-img" src="${captureItem.dataUrl}" alt="Preview" />
-              <!-- Interactive Crop Overlay -->
-              <div class="yt-aid-crop-overlay" id="yt-aid-crop-overlay" style="display: none;">
-                <div class="yt-aid-crop-box" id="yt-aid-crop-box">
-                  <div class="yt-aid-crop-grid"></div>
-                  <!-- 8 Handles -->
-                  <div class="yt-aid-crop-handle handle-nw" data-handle="nw"></div>
-                  <div class="yt-aid-crop-handle handle-ne" data-handle="ne"></div>
-                  <div class="yt-aid-crop-handle handle-sw" data-handle="sw"></div>
-                  <div class="yt-aid-crop-handle handle-se" data-handle="se"></div>
-                  <div class="yt-aid-crop-handle handle-n" data-handle="n"></div>
-                  <div class="yt-aid-crop-handle handle-s" data-handle="s"></div>
-                  <div class="yt-aid-crop-handle handle-w" data-handle="w"></div>
-                  <div class="yt-aid-crop-handle handle-e" data-handle="e"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- History Gallery View (Hidden by default) -->
-          <div class="yt-aid-gallery-view" id="yt-aid-gallery-view" style="display: none;">
-            <div class="yt-aid-gallery-header">
-              <h3>Bộ sưu tập phiên làm việc (Session RAM: ${sessionCaptures.length} ảnh)</h3>
-              <button class="yt-aid-btn yt-aid-btn-danger" id="yt-aid-clear-gallery">
-                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                Xóa tất cả
-              </button>
-            </div>
-            <div class="yt-aid-gallery-grid" id="yt-aid-gallery-grid">
-              <!-- Rendered items -->
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-    activeModal = modal;
-
-    // Attach listeners
-    setupModalEvents(modal, captureItem);
-  }
-
-  function setupModalEvents(modal, captureItem) {
-    let activeDataUrl = captureItem.dataUrl;
-    const previewImg = modal.querySelector('#yt-aid-preview-img');
-    const cropOverlay = modal.querySelector('#yt-aid-crop-overlay');
-    const cropBox = modal.querySelector('#yt-aid-crop-box');
-    const canvasWrapper = modal.querySelector('#yt-aid-canvas-wrapper');
-    const aspectGroup = modal.querySelector('#yt-aid-aspect-group');
-    const btnToggleCrop = modal.querySelector('#yt-aid-btn-toggle-crop');
-    const cropToggleText = modal.querySelector('#yt-aid-crop-toggle-text');
-    const btnApplyCrop = modal.querySelector('#yt-aid-btn-apply-crop');
-    const btnResetCrop = modal.querySelector('#yt-aid-btn-reset-crop');
-    const metaRes = modal.querySelector('#yt-aid-meta-res');
-
-    // Close logic
-    const closeModal = () => {
-      if (activeModal) {
-        activeModal.remove();
-        activeModal = null;
-      }
-      document.removeEventListener('keydown', handleEsc);
+      writeClipboard(text).then((ok) => {
+        if (!ok) return;
+        showToast(`Đã sao chép đoạn bôi đen: "${previewText(text)}"`, 'success', 1800);
+      });
     };
 
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', handleEsc);
-
-    modal.querySelector('#yt-aid-close-modal').addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeModal();
-    });
-
-    // Tab switching
-    const tabEditor = modal.querySelector('#yt-aid-tab-editor');
-    const tabGallery = modal.querySelector('#yt-aid-tab-gallery');
-    const viewEditor = modal.querySelector('#yt-aid-editor-view');
-    const viewGallery = modal.querySelector('#yt-aid-gallery-view');
-    const toolbarEditor = modal.querySelector('#yt-aid-editor-toolbar');
-
-    tabEditor.addEventListener('click', () => {
-      tabEditor.classList.add('active');
-      tabGallery.classList.remove('active');
-      viewEditor.style.display = 'block';
-      viewGallery.style.display = 'none';
-      toolbarEditor.style.display = 'flex';
-    });
-
-    tabGallery.addEventListener('click', () => {
-      tabGallery.classList.add('active');
-      tabEditor.classList.remove('active');
-      viewEditor.style.display = 'none';
-      viewGallery.style.display = 'block';
-      toolbarEditor.style.display = 'none';
-      renderGalleryGrid(modal);
-    });
-
-    // --- Crop Tool Logic ---
-    let cropActive = false;
-
-    function initCropBox() {
-      const rect = previewImg.getBoundingClientRect();
-      const w = Math.round(rect.width * 0.75);
-      const h = Math.round(rect.height * 0.75);
-      const x = Math.round((rect.width - w) / 2);
-      const y = Math.round((rect.height - h) / 2);
-
-      cropState.x = x;
-      cropState.y = y;
-      cropState.width = w;
-      cropState.height = h;
-
-      updateCropBoxDOM();
-    }
-
-    function updateCropBoxDOM() {
-      cropBox.style.left = `${cropState.x}px`;
-      cropBox.style.top = `${cropState.y}px`;
-      cropBox.style.width = `${cropState.width}px`;
-      cropBox.style.height = `${cropState.height}px`;
-    }
-
-    btnToggleCrop.addEventListener('click', () => {
-      cropActive = !cropActive;
-      cropState.active = cropActive;
-      if (cropActive) {
-        cropOverlay.style.display = 'block';
-        aspectGroup.style.display = 'flex';
-        btnApplyCrop.style.display = 'inline-flex';
-        btnResetCrop.style.display = 'inline-flex';
-        cropToggleText.textContent = 'Hủy Crop';
-        btnToggleCrop.classList.add('active');
-        initCropBox();
-      } else {
-        cropOverlay.style.display = 'none';
-        aspectGroup.style.display = 'none';
-        btnApplyCrop.style.display = 'none';
-        btnResetCrop.style.display = 'none';
-        cropToggleText.textContent = 'Bật Crop';
-        btnToggleCrop.classList.remove('active');
-      }
-    });
-
-    // Aspect ratio chips
-    modal.querySelectorAll('.yt-aid-btn-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        modal.querySelectorAll('.yt-aid-btn-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        cropState.aspectRatio = chip.dataset.aspect;
-
-        // Apply ratio constraint
-        const rect = previewImg.getBoundingClientRect();
-        if (cropState.aspectRatio === '16:9') {
-          cropState.height = Math.round(cropState.width * (9 / 16));
-        } else if (cropState.aspectRatio === '4:3') {
-          cropState.height = Math.round(cropState.width * (3 / 4));
-        } else if (cropState.aspectRatio === '1:1') {
-          cropState.height = cropState.width;
-        }
-
-        // Keep inside bounds
-        if (cropState.y + cropState.height > rect.height) {
-          cropState.y = Math.max(0, rect.height - cropState.height);
-        }
-        updateCropBoxDOM();
-      });
-    });
-
-    // Drag & Resize crop box
-    let isDragging = false;
-    let isResizing = false;
-    let activeHandle = null;
-    let startMouse = { x: 0, y: 0 };
-    let startBox = { x: 0, y: 0, w: 0, h: 0 };
-
-    cropBox.addEventListener('mousedown', (e) => {
-      if (e.target.dataset.handle) {
-        isResizing = true;
-        activeHandle = e.target.dataset.handle;
-      } else {
-        isDragging = true;
-      }
-      startMouse = { x: e.clientX, y: e.clientY };
-      startBox = { x: cropState.x, y: cropState.y, w: cropState.width, h: cropState.height };
-      e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', (e) => {
-      if (!cropActive || (!isDragging && !isResizing)) return;
-
-      const dx = e.clientX - startMouse.x;
-      const dy = e.clientY - startMouse.y;
-      const rect = previewImg.getBoundingClientRect();
-
-      if (isDragging) {
-        let nx = startBox.x + dx;
-        let ny = startBox.y + dy;
-        nx = Math.max(0, Math.min(rect.width - cropState.width, nx));
-        ny = Math.max(0, Math.min(rect.height - cropState.height, ny));
-        cropState.x = nx;
-        cropState.y = ny;
-        updateCropBoxDOM();
-      } else if (isResizing) {
-        let nw = startBox.w;
-        let nh = startBox.h;
-        let nx = startBox.x;
-        let ny = startBox.y;
-
-        if (activeHandle.includes('e')) nw = Math.max(50, startBox.w + dx);
-        if (activeHandle.includes('s')) nh = Math.max(50, startBox.h + dy);
-        if (activeHandle.includes('w')) {
-          const possibleW = startBox.w - dx;
-          if (possibleW >= 50) {
-            nw = possibleW;
-            nx = startBox.x + dx;
-          }
-        }
-        if (activeHandle.includes('n')) {
-          const possibleH = startBox.h - dy;
-          if (possibleH >= 50) {
-            nh = possibleH;
-            ny = startBox.y + dy;
-          }
-        }
-
-        // Apply aspect ratio if active
-        if (cropState.aspectRatio === '16:9') nh = Math.round(nw * (9 / 16));
-        if (cropState.aspectRatio === '4:3') nh = Math.round(nw * (3 / 4));
-        if (cropState.aspectRatio === '1:1') nh = nw;
-
-        // Boundaries
-        if (nx + nw <= rect.width && nx >= 0) {
-          cropState.x = nx;
-          cropState.width = nw;
-        }
-        if (ny + nh <= rect.height && ny >= 0) {
-          cropState.y = ny;
-          cropState.height = nh;
-        }
-        updateCropBoxDOM();
-      }
-    });
-
-    document.addEventListener('mouseup', () => {
-      isDragging = false;
-      isResizing = false;
-      activeHandle = null;
-    });
-
-    // Apply Crop Action
-    btnApplyCrop.addEventListener('click', () => {
-      const img = new Image();
-      img.onload = () => {
-        const rect = previewImg.getBoundingClientRect();
-        const scaleX = img.naturalWidth / rect.width;
-        const scaleY = img.naturalHeight / rect.height;
-
-        const sourceX = Math.round(cropState.x * scaleX);
-        const sourceY = Math.round(cropState.y * scaleY);
-        const sourceW = Math.round(cropState.width * scaleX);
-        const sourceH = Math.round(cropState.height * scaleY);
-
-        const cropCanvas = document.createElement('canvas');
-        cropCanvas.width = sourceW;
-        cropCanvas.height = sourceH;
-        const ctx = cropCanvas.getContext('2d');
-        ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, 0, 0, sourceW, sourceH);
-
-        const croppedDataUrl = cropCanvas.toDataURL('image/png');
-        activeDataUrl = croppedDataUrl;
-        previewImg.src = croppedDataUrl;
-
-        metaRes.textContent = `${sourceW}×${sourceH}`;
-        showToast(`✂️ Đã cắt ảnh (${sourceW}×${sourceH})`, 'success');
-
-        // Close crop mode
-        btnToggleCrop.click();
-      };
-      img.src = activeDataUrl;
-    });
-
-    // Reset Crop Action
-    btnResetCrop.addEventListener('click', () => {
-      activeDataUrl = captureItem.dataUrl;
-      previewImg.src = activeDataUrl;
-      metaRes.textContent = `${captureItem.width}×${captureItem.height}`;
-      showToast('🔄 Đã khôi phục ảnh gốc', 'info');
-      if (cropActive) btnToggleCrop.click();
-    });
-
-    // Copy Image to Clipboard
-    modal.querySelector('#yt-aid-btn-copy-img').addEventListener('click', () => {
-      copyImageToClipboard(activeDataUrl);
-    });
-
-    // Download PNG
-    modal.querySelector('#yt-aid-btn-download-png').addEventListener('click', () => {
-      downloadDataUrl(activeDataUrl, `${sanitizeFilename(captureItem.title)}_${captureItem.timeStr}.png`, 'image/png');
-    });
-
-    // Download JPG
-    modal.querySelector('#yt-aid-btn-download-jpg').addEventListener('click', () => {
-      downloadDataUrl(activeDataUrl, `${sanitizeFilename(captureItem.title)}_${captureItem.timeStr}.jpg`, 'image/jpeg');
-    });
-
-    // Clear all captures in Session RAM
-    modal.querySelector('#yt-aid-clear-gallery').addEventListener('click', () => {
-      if (confirm('Bạn có chắc muốn xóa tất cả ảnh chụp trong phiên làm việc này?')) {
-        sessionCaptures.length = 0;
-        renderGalleryGrid(modal);
-        modal.querySelector('#yt-aid-tab-gallery').innerHTML = `
-          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z"/></svg>
-          Lịch sử Session (0)
-        `;
-        showToast('🗑️ Đã xóa sạch lịch sử ảnh chụp', 'info');
-      }
-    });
+    document.addEventListener('mouseup', (e) => {
+      if (e.button !== 0) return;
+      if (copyTimer) clearTimeout(copyTimer);
+      // Let the selection settle before reading it
+      copyTimer = setTimeout(copySelection, 0);
+    }, true);
   }
 
-  function renderGalleryGrid(modal) {
-    const grid = modal.querySelector('#yt-aid-gallery-grid');
-    grid.innerHTML = '';
+  function initSearchAutoPaste() {
+    document.addEventListener('mousedown', (e) => {
+      if (!settings.enableAutoPasteSearch) return;
 
-    if (sessionCaptures.length === 0) {
-      grid.innerHTML = '<div class="yt-aid-empty-gallery">Chưa có ảnh nào trong bộ nhớ tạm phiên này. Hãy bấm chụp video!</div>';
-      return;
-    }
+      const input = e.target instanceof Element
+        ? e.target.closest('input#search, ytd-searchbox input')
+        : null;
+      if (!input) return;
+      if (input.value.trim()) return;
+      if (!lastCopiedText.trim()) return;
 
-    sessionCaptures.forEach((item, index) => {
-      const card = document.createElement('div');
-      card.className = 'yt-aid-gallery-card';
-      card.innerHTML = `
-        <div class="yt-aid-card-thumb">
-          <img src="${item.dataUrl}" alt="Capture ${index + 1}" />
-          <span class="yt-aid-card-time">${escapeHtml(item.timeStr)}</span>
-          <span class="yt-aid-card-res">${item.width}×${item.height}</span>
-        </div>
-        <div class="yt-aid-card-body">
-          <div class="yt-aid-card-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
-          <div class="yt-aid-card-date">${escapeHtml(item.createdAt)}</div>
-          <div class="yt-aid-card-actions">
-            <button class="yt-aid-btn-mini yt-aid-btn-primary" data-action="edit" title="Mở ảnh này">Mở</button>
-            <button class="yt-aid-btn-mini" data-action="copy" title="Copy ảnh">Copy</button>
-            <button class="yt-aid-btn-mini" data-action="download" title="Tải ảnh">Tải về</button>
-            <button class="yt-aid-btn-mini yt-aid-btn-danger" data-action="remove" title="Xóa">✕</button>
-          </div>
-        </div>
-      `;
-
-      card.querySelector('[data-action="edit"]').addEventListener('click', () => {
-        openScreenshotModal(item);
-      });
-
-      card.querySelector('[data-action="copy"]').addEventListener('click', () => {
-        copyImageToClipboard(item.dataUrl);
-      });
-
-      card.querySelector('[data-action="download"]').addEventListener('click', () => {
-        downloadDataUrl(item.dataUrl, `${sanitizeFilename(item.title)}_${item.timeStr}.png`, 'image/png');
-      });
-
-      card.querySelector('[data-action="remove"]').addEventListener('click', () => {
-        const idx = sessionCaptures.indexOf(item);
-        if (idx !== -1) {
-          sessionCaptures.splice(idx, 1);
-          renderGalleryGrid(modal);
-          modal.querySelector('#yt-aid-tab-gallery').innerHTML = `
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z"/></svg>
-            Lịch sử Session (${sessionCaptures.length})
-          `;
-        }
-      });
-
-      grid.appendChild(card);
-    });
-  }
-
-  function copyImageToClipboard(dataUrl) {
-    fetch(dataUrl)
-      .then(res => res.blob())
-      .then(blob => {
-        // Ensure image/png for clipboard API compatibility
-        if (blob.type !== 'image/png') {
-          const img = new Image();
-          img.onload = () => {
-            const c = document.createElement('canvas');
-            c.width = img.naturalWidth;
-            c.height = img.naturalHeight;
-            c.getContext('2d').drawImage(img, 0, 0);
-            c.toBlob(pngBlob => {
-              writeBlobToClipboard(pngBlob);
-            }, 'image/png');
-          };
-          img.src = dataUrl;
-        } else {
-          writeBlobToClipboard(blob);
-        }
-      })
-      .catch(err => {
-        console.error('Copy image error:', err);
-        showToast('⚠️ Không thể copy ảnh vào Clipboard!', 'warning');
-      });
-  }
-
-  function writeBlobToClipboard(blob) {
-    if (navigator.clipboard && window.ClipboardItem) {
-      navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob })
-      ]).then(() => {
-        showToast('📋 Đã sao chép ảnh vào Clipboard!', 'success');
-      }).catch(err => {
-        showToast('⚠️ Clipboard không hỗ trợ sao chép ảnh trực tiếp trên trình duyệt này', 'warning');
-      });
-    } else {
-      showToast('⚠️ Trình duyệt chưa hỗ trợ Clipboard Item API', 'warning');
-    }
-  }
-
-  function downloadDataUrl(dataUrl, filename, targetFormat = 'image/png') {
-    if (targetFormat === 'image/jpeg' && dataUrl.startsWith('data:image/png')) {
-      // Convert to JPEG
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement('canvas');
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        const ctx = c.getContext('2d');
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, c.width, c.height);
-        ctx.drawImage(img, 0, 0);
-        triggerDownload(c.toDataURL('image/jpeg', 0.92), filename);
-      };
-      img.src = dataUrl;
-    } else {
-      triggerDownload(dataUrl, filename);
-    }
-  }
-
-  function triggerDownload(url, filename) {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    showToast(`⬇️ Đã tải ảnh: ${filename}`, 'success');
-  }
-
-  function sanitizeFilename(name) {
-    if (!name) return 'youtube_screenshot';
-    return name.replace(/[/\\?%*:|"<>]/g, '_').slice(0, 50).trim();
+      setSearchInputValue(input, lastCopiedText);
+      showToast(`Đã dán vào ô tìm kiếm: "${previewText(lastCopiedText, 35)}"`, 'success', 2000);
+    }, true);
   }
 
   // ==========================================
-  // 6. HIGH-PERFORMANCE DOM OBSERVER & BUTTON INJECTION
+  // 6. DOM OBSERVER & NATIVE TOOLBAR INJECTION
   // ==========================================
-
   function initDOMObserver() {
-    // Initial injection & suggested shorts caching
     injectAllAreas();
     updateCachedShorts();
 
-    // Lightweight MutationObserver:
-    // Ignores text/attribute/style mutations to prevent any CPU overhead during video playback or scrolling
     let observerDebounce = null;
     const observer = new MutationObserver((mutations) => {
       let hasAddedNodes = false;
@@ -1212,15 +647,10 @@
       subtree: true
     });
 
-    // YouTube SPA instant navigation hooks
-    window.addEventListener('yt-navigate-start', () => {
-      // Route transition started
-    });
-
     window.addEventListener('yt-navigate-finish', () => {
       updateCachedShorts();
       ensureVideoLoop();
-      // Fast injection on navigation finish
+      closeToolsMenu();
       setTimeout(() => {
         injectAllAreas();
         updateCachedShorts();
@@ -1234,21 +664,14 @@
   }
 
   function injectAllAreas() {
-    if (!settings.enableCopyButtons && !settings.enableCleanLink && !settings.enableScreenshot) {
-      return;
-    }
-
     const path = window.location.pathname;
-    // Route-targeted injection prevents scanning non-relevant elements
+    const hasCopyTools = settings.enableCopyButtons || settings.enableCleanLink;
+
     if (path.startsWith('/watch')) {
       injectWatchPageToolbar();
-      if (settings.enableCopyButtons || settings.enableCleanLink) {
-        injectSidebarButtons();
-      }
+      if (hasCopyTools) injectSidebarButtons();
     } else if (path === '/' || path.startsWith('/results') || path.startsWith('/feed')) {
-      if (settings.enableCopyButtons || settings.enableCleanLink) {
-        injectHomePageCards();
-      }
+      if (hasCopyTools) injectHomePageCards();
     }
   }
 
@@ -1259,7 +682,6 @@
     if (!window.location.pathname.startsWith('/watch')) return;
     if (document.getElementById('yt-aid-watch-toolbar')) return;
 
-    // Target watch metadata title container or action bar
     const titleContainer = document.querySelector(
       'ytd-watch-metadata #title, #above-the-fold #title, ytd-video-primary-info-renderer #container'
     );
@@ -1274,17 +696,23 @@
       <div class="yt-aid-toolbar-left">
         <!-- Copy Title Split Button Group -->
         <div class="yt-aid-split-group" id="yt-aid-copy-title-group">
-          <button class="yt-aid-pill-btn" id="yt-aid-btn-copy-pure" title="Sao chép tiêu đề thuần túy">
+          <!-- 1. Copy Title Pure -->
+          <button class="yt-aid-pill-btn" id="yt-aid-btn-copy-pure" title="Sao chép tiêu đề video">
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
             <span>Copy Title</span>
           </button>
-          <button class="yt-aid-pill-btn yt-aid-pill-sub" id="yt-aid-btn-copy-search" title="Copy & Tìm kiếm tab mới">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-            <span>+ Search</span>
+
+          <!-- 2. Copy + Search + Enter -->
+          <button class="yt-aid-pill-btn yt-aid-pill-sub" id="yt-aid-btn-copy-enter" title="Copy & tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)">
+            <svg viewBox="0 0 24 24">
+              <path fill="currentColor" d="M3 2h7a2 2 0 0 1 2 2v1h-2V4H3v9h1v2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 4h6a2 2 0 0 1 2 2v1h-2V8H6v7h2v2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
+              <path fill="currentColor" d="M17 2a3 3 0 1 0 2 5.2l2.3 2.3 1.4-1.4-2.3-2.3A3 3 0 0 0 17 2zm0 1.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
+              <path fill="currentColor" d="M19 14v3H12.8l2.6-2.6-1.4-1.4L9 18l5 5 1.4-1.4-2.6-2.6H21v-5h-2z"/>
+            </svg>
+            <span>Copy + Search + Enter</span>
           </button>
-          <button class="yt-aid-pill-btn yt-aid-pill-sub" id="yt-aid-btn-copy-enter" title="Copy & Tự động Enter tìm kiếm trực tiếp">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7h-2z"/></svg>
-            <span>+ Enter</span>
+          <button class="yt-aid-newtab-btn" id="yt-aid-btn-copy-enter-newtab" title="Mở tìm kiếm sang tab mới">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
           </button>
         </div>
 
@@ -1293,52 +721,64 @@
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
           <span>Clean Link</span>
         </button>
-
-        <!-- Screenshot HTML5 -->
-        <button class="yt-aid-pill-btn yt-aid-screenshot-btn" id="yt-aid-btn-screenshot" title="Chụp ảnh khung hình video HTML5">
-          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9.4 10.5l4.77-8.26C13.47 2.09 12.75 2 12 2c-2.4 0-4.6.85-6.32 2.25l3.66 6.35.06-.1zM21.54 9c-.92-2.92-3.15-5.26-6-6.34L11.88 9h9.66zm.26 1h-7.49l.02.04 4.54 7.87C20.64 16.14 21.8 13.9 21.8 11.4c0-.47-.04-.94-.1-1.4zM8.58 12l-4.55-7.87C2.7 5.86 1.8 8.1 1.8 10.6c0 .47.04.94.1 1.4h7.49l-.02-.04zm-.38.74L3.43 21c.73.15 1.45.24 2.2.24 2.4 0 4.6-.85 6.32-2.25l-3.66-6.35-.09.1zM12 22c2.4 0 4.6-.85 6.32-2.25l-3.66-6.35-.09.1-4.77 8.26c.7.15 1.42.24 2.2.24zM12 16c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/></svg>
-          <span>Chụp Video</span>
-        </button>
       </div>
 
       <div class="yt-aid-toolbar-right">
-        <!-- Loop Toggle Button -->
+        <!-- Auto Loop Toggle Button -->
         <button class="yt-aid-pill-btn yt-aid-loop-indicator ${settings.enableLoop ? 'active' : ''}" id="yt-aid-btn-toggle-loop" title="Tự động lặp lại video">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
-          <span>Loop</span>
+          <span>Auto Loop</span>
+        </button>
+
+        <!-- Extra tools dropdown -->
+        <button class="yt-aid-pill-btn yt-aid-tools-btn" id="yt-aid-btn-tools" title="Tính năng phụ" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+          <span>Tools</span>
+          <svg class="yt-aid-chevron" viewBox="0 0 24 24"><path fill="currentColor" d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
         </button>
       </div>
     `;
 
     titleContainer.appendChild(toolbar);
 
-    // Event bindings for watch toolbar
+    // 1. Copy Pure
     toolbar.querySelector('#yt-aid-btn-copy-pure').addEventListener('click', () => {
       const title = getWatchVideoTitle();
-      copyTextToClipboard(title, `📋 Đã sao chép tiêu đề: "${title.slice(0, 35)}..."`);
+      copyTextToClipboard(title, `Đã sao chép tiêu đề: "${previewText(title, 35)}"`);
     });
 
-    toolbar.querySelector('#yt-aid-btn-copy-search').addEventListener('click', () => {
+    // 2. Copy + Search + Enter
+    const btnCopyEnter = toolbar.querySelector('#yt-aid-btn-copy-enter');
+    const handleCopyEnter = (e) => {
       const title = getWatchVideoTitle();
-      copyTextToClipboard(title, `🔍 Đã chép & tìm kiếm: "${title.slice(0, 35)}..."`);
-      window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`, '_blank');
+      copyTextToClipboard(title, '');
+      if (e.ctrlKey || e.metaKey || e.button === 1) {
+        openSearchInNewTab(title);
+      } else {
+        autoEnterSearch(title);
+      }
+    };
+    btnCopyEnter.addEventListener('click', handleCopyEnter);
+    btnCopyEnter.addEventListener('auxclick', (e) => {
+      if (e.button === 1) handleCopyEnter(e);
     });
 
-    toolbar.querySelector('#yt-aid-btn-copy-enter').addEventListener('click', () => {
+    // 2b. New Tab Action for Copy + Search + Enter
+    toolbar.querySelector('#yt-aid-btn-copy-enter-newtab').addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
       const title = getWatchVideoTitle();
-      copyTextToClipboard(title, `⏎ Đang tìm kiếm: "${title.slice(0, 35)}..."`);
-      autoEnterSearch(title);
+      copyTextToClipboard(title, '');
+      openSearchInNewTab(title);
     });
 
+    // Clean Link
     toolbar.querySelector('#yt-aid-btn-clean-link').addEventListener('click', () => {
       const cleanUrl = cleanYoutubeUrl(window.location.href);
-      copyTextToClipboard(cleanUrl, `🔗 Đã chép liên kết sạch: ${cleanUrl}`);
+      copyTextToClipboard(cleanUrl, `Đã chép liên kết sạch: ${cleanUrl}`);
     });
 
-    toolbar.querySelector('#yt-aid-btn-screenshot').addEventListener('click', () => {
-      captureCurrentVideoFrame();
-    });
-
+    // Toggle Auto Loop
     const loopBtn = toolbar.querySelector('#yt-aid-btn-toggle-loop');
     loopBtn.addEventListener('click', () => {
       const nextLoop = !settings.enableLoop;
@@ -1347,8 +787,125 @@
       loopBtn.classList.toggle('active', nextLoop);
       const video = document.querySelector('video.video-stream, video');
       if (video) video.loop = nextLoop;
-      showToast(nextLoop ? '🔁 Đã bật tự động lặp video' : '⏸️ Đã tắt tự động lặp video', 'info');
+      showToast(nextLoop ? 'Đã bật tự động lặp lại video' : 'Đã tắt tự động lặp lại video', 'info');
     });
+
+    // Tools dropdown
+    const toolsBtn = toolbar.querySelector('#yt-aid-btn-tools');
+    toolsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openToolsMenu(toolsBtn);
+    });
+  }
+
+  // ==========================================
+  // 7. TOOLS DROPDOWN (Extra features)
+  // ==========================================
+  let toolsMenuEl = null;
+
+  function closeToolsMenu() {
+    const btn = document.getElementById('yt-aid-btn-tools');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    if (!toolsMenuEl) return;
+
+    const menu = toolsMenuEl;
+    toolsMenuEl = null;
+    menu.classList.remove('yt-aid-tools-menu-show');
+    setTimeout(() => menu.remove(), 160);
+  }
+
+  function syncToolbarState() {
+    const loopBtn = document.getElementById('yt-aid-btn-toggle-loop');
+    if (loopBtn) loopBtn.classList.toggle('active', !!settings.enableLoop);
+
+    const selectionToggle = document.getElementById('yt-aid-toggle-selection-copy');
+    if (selectionToggle) selectionToggle.checked = !!settings.enableSelectionCopy;
+
+    const autoPasteToggle = document.getElementById('yt-aid-toggle-auto-paste');
+    if (autoPasteToggle) autoPasteToggle.checked = !!settings.enableAutoPasteSearch;
+  }
+
+  function updateSetting(key, value) {
+    settings[key] = value;
+    chrome.storage.local.set({ [key]: value });
+  }
+
+  function buildToolsMenu() {
+    const menu = document.createElement('div');
+    menu.id = 'yt-aid-tools-menu';
+    menu.className = 'yt-aid-tools-menu';
+    menu.innerHTML = `
+      <div class="yt-aid-tools-title">Tính năng phụ</div>
+
+      <label class="yt-aid-tools-item">
+        <span class="yt-aid-tools-text">
+          <span class="yt-aid-tools-name">Tự động copy khi bôi đen</span>
+          <span class="yt-aid-tools-desc">Bôi xanh đoạn text để sao chép ngay</span>
+        </span>
+        <span class="yt-aid-switch">
+          <input type="checkbox" id="yt-aid-toggle-selection-copy">
+          <span class="yt-aid-switch-slider"></span>
+        </span>
+      </label>
+
+      <label class="yt-aid-tools-item">
+        <span class="yt-aid-tools-text">
+          <span class="yt-aid-tools-name">Tự động dán vào ô tìm kiếm</span>
+          <span class="yt-aid-tools-desc">Click ô tìm kiếm trống để dán nội dung vừa copy</span>
+        </span>
+        <span class="yt-aid-switch">
+          <input type="checkbox" id="yt-aid-toggle-auto-paste">
+          <span class="yt-aid-switch-slider"></span>
+        </span>
+      </label>
+    `;
+    return menu;
+  }
+
+  function openToolsMenu(btn) {
+    if (toolsMenuEl) {
+      closeToolsMenu();
+      return;
+    }
+
+    const menu = buildToolsMenu();
+    document.body.appendChild(menu);
+
+    menu.querySelector('#yt-aid-toggle-selection-copy').addEventListener('change', (e) => {
+      updateSetting('enableSelectionCopy', e.target.checked);
+    });
+    menu.querySelector('#yt-aid-toggle-auto-paste').addEventListener('change', (e) => {
+      updateSetting('enableAutoPasteSearch', e.target.checked);
+    });
+
+    syncToolbarState();
+
+    const rect = btn.getBoundingClientRect();
+    const maxLeft = window.innerWidth - menu.offsetWidth - 12;
+    menu.style.top = `${Math.round(rect.bottom + 12)}px`;
+    menu.style.left = `${Math.round(Math.max(12, Math.min(rect.right - menu.offsetWidth, maxLeft)))}px`;
+    menu.style.maxHeight = `${Math.round(Math.max(160, window.innerHeight - rect.bottom - 24))}px`;
+
+    toolsMenuEl = menu;
+    btn.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(() => menu.classList.add('yt-aid-tools-menu-show'));
+  }
+
+  function initToolsMenuDismiss() {
+    document.addEventListener('mousedown', (e) => {
+      if (!toolsMenuEl) return;
+      const target = e.target;
+      if (toolsMenuEl.contains(target)) return;
+      if (target instanceof Element && target.closest('#yt-aid-btn-tools')) return;
+      closeToolsMenu();
+    }, true);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && toolsMenuEl) closeToolsMenu();
+    }, true);
+
+    window.addEventListener('resize', closeToolsMenu);
+    window.addEventListener('scroll', closeToolsMenu, { passive: true, capture: true });
   }
 
   // ----------------------------------------------------
@@ -1371,11 +928,12 @@
         <button class="yt-aid-mini-action yt-aid-copy-pure" title="Copy tiêu đề">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
         </button>
-        <button class="yt-aid-mini-action yt-aid-copy-search" title="Copy & Tìm kiếm tab mới">
-          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        </button>
-        <button class="yt-aid-mini-action yt-aid-copy-enter" title="Copy & Auto Enter tìm kiếm">
-          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7h-2z"/></svg>
+        <button class="yt-aid-mini-action yt-aid-copy-enter" title="Copy & tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)">
+          <svg viewBox="0 0 24 24">
+            <path fill="currentColor" d="M3 2h7a2 2 0 0 1 2 2v1h-2V4H3v9h1v2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 4h6a2 2 0 0 1 2 2v1h-2V8H6v7h2v2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
+            <path fill="currentColor" d="M17 2a3 3 0 1 0 2 5.2l2.3 2.3 1.4-1.4-2.3-2.3A3 3 0 0 0 17 2zm0 1.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
+            <path fill="currentColor" d="M19 14v3H12.8l2.6-2.6-1.4-1.4L9 18l5 5 1.4-1.4-2.6-2.6H21v-5h-2z"/>
+          </svg>
         </button>
         <button class="yt-aid-mini-action yt-aid-clean-link" title="Copy liên kết sạch">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
@@ -1384,7 +942,6 @@
 
       details.appendChild(cardBar);
 
-      // Event handlers
       const getCardTitle = () => {
         const titleEl = item.querySelector('#video-title, span#video-title');
         return titleEl ? titleEl.textContent.trim() : '';
@@ -1399,30 +956,26 @@
         e.stopPropagation();
         e.preventDefault();
         const title = getCardTitle();
-        copyTextToClipboard(title, `📋 Đã sao chép: "${title.slice(0, 30)}..."`);
-      });
-
-      cardBar.querySelector('.yt-aid-copy-search').addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const title = getCardTitle();
-        copyTextToClipboard(title, `🔍 Đã chép & tìm kiếm: "${title.slice(0, 30)}..."`);
-        window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`, '_blank');
+        copyTextToClipboard(title, `Đã sao chép: "${previewText(title, 30)}"`);
       });
 
       cardBar.querySelector('.yt-aid-copy-enter').addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
         const title = getCardTitle();
-        copyTextToClipboard(title, `⏎ Đang tìm kiếm: "${title.slice(0, 30)}..."`);
-        autoEnterSearch(title);
+        copyTextToClipboard(title, '');
+        if (e.ctrlKey || e.metaKey || e.button === 1) {
+          openSearchInNewTab(title);
+        } else {
+          autoEnterSearch(title);
+        }
       });
 
       cardBar.querySelector('.yt-aid-clean-link').addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
         const clean = cleanYoutubeUrl(getCardUrl());
-        copyTextToClipboard(clean, `🔗 Đã chép link sạch: ${clean}`);
+        copyTextToClipboard(clean, `Đã chép link sạch: ${clean}`);
       });
     });
   }
@@ -1449,11 +1002,13 @@
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
             <span>Title</span>
           </button>
-          <button class="yt-aid-mini-action yt-aid-copy-search" title="Copy & Tìm kiếm tab mới">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-          </button>
-          <button class="yt-aid-mini-action yt-aid-copy-enter" title="Copy & Auto Enter tìm kiếm trực tiếp">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7h-2z"/></svg>
+          <button class="yt-aid-mini-action yt-aid-copy-enter" title="Copy & tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)">
+            <svg viewBox="0 0 24 24">
+              <path fill="currentColor" d="M3 2h7a2 2 0 0 1 2 2v1h-2V4H3v9h1v2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 4h6a2 2 0 0 1 2 2v1h-2V8H6v7h2v2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
+              <path fill="currentColor" d="M17 2a3 3 0 1 0 2 5.2l2.3 2.3 1.4-1.4-2.3-2.3A3 3 0 0 0 17 2zm0 1.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
+              <path fill="currentColor" d="M19 14v3H12.8l2.6-2.6-1.4-1.4L9 18l5 5 1.4-1.4-2.6-2.6H21v-5h-2z"/>
+            </svg>
+            <span>+ Enter</span>
           </button>
           <button class="yt-aid-mini-action yt-aid-clean-link" title="Copy liên kết sạch">
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
@@ -1464,7 +1019,6 @@
 
       details.appendChild(cardBar);
 
-      // Event handlers
       const getCardTitle = () => {
         const titleEl = item.querySelector('#video-title, #video-title-link');
         return titleEl ? titleEl.textContent.trim() : '';
@@ -1479,30 +1033,26 @@
         e.stopPropagation();
         e.preventDefault();
         const title = getCardTitle();
-        copyTextToClipboard(title, `📋 Đã sao chép: "${title.slice(0, 30)}..."`);
-      });
-
-      cardBar.querySelector('.yt-aid-copy-search').addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const title = getCardTitle();
-        copyTextToClipboard(title, `🔍 Đã chép & tìm kiếm: "${title.slice(0, 30)}..."`);
-        window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`, '_blank');
+        copyTextToClipboard(title, `Đã sao chép: "${previewText(title, 30)}"`);
       });
 
       cardBar.querySelector('.yt-aid-copy-enter').addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
         const title = getCardTitle();
-        copyTextToClipboard(title, `⏎ Đang tìm kiếm: "${title.slice(0, 30)}..."`);
-        autoEnterSearch(title);
+        copyTextToClipboard(title, '');
+        if (e.ctrlKey || e.metaKey || e.button === 1) {
+          openSearchInNewTab(title);
+        } else {
+          autoEnterSearch(title);
+        }
       });
 
       cardBar.querySelector('.yt-aid-clean-link').addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
         const clean = cleanYoutubeUrl(getCardUrl());
-        copyTextToClipboard(clean, `🔗 Đã chép link sạch: ${clean}`);
+        copyTextToClipboard(clean, `Đã chép link sạch: ${clean}`);
       });
     });
   }

@@ -3,26 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YouTube Aid - Cài đặt & Phím tắt</title>
+  <title>YouTube Aid - Bảng điều khiển</title>
   <style>
     :root {
-      --bg-base: #0f0f0f;
-      --bg-card: #181818;
-      --bg-card-hover: #222222;
-      --border-color: rgba(255, 255, 255, 0.1);
-      --border-focus: #ff0033;
-      --text-main: #f1f1f1;
-      --text-sub: #aaaaaa;
-      --text-dim: #717171;
-      --brand-red: #ff0033;
-      --brand-red-hover: #d9002c;
-      --brand-blue: #3ea6ff;
-      --brand-green: #2ba640;
-      --radius-sm: 6px;
-      --radius-md: 10px;
-      --radius-lg: 14px;
-      --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.4);
-      --font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --yt-bg: #0f0f0f;
+      --yt-surface: #181818;
+      --yt-surface-hover: #222222;
+      --yt-border: rgba(255, 255, 255, 0.1);
+      --yt-border-hover: rgba(255, 255, 255, 0.2);
+      --yt-red: #ff0000;
+      --yt-red-hover: #cc0000;
+      --yt-text-primary: #f1f1f1;
+      --yt-text-secondary: #aaaaaa;
+      --yt-text-muted: #717171;
+      --yt-radius-sm: 6px;
+      --yt-radius-md: 10px;
+      --yt-radius-pill: 9999px;
+      --yt-font: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
     }
 
     * {
@@ -32,14 +29,15 @@
     }
 
     body {
-      background-color: var(--bg-base);
-      color: var(--text-main);
-      font-family: var(--font-family);
-      line-height: 1.5;
-      padding: 24px;
+      background-color: var(--yt-bg);
+      color: var(--yt-text-primary);
+      font-family: var(--yt-font);
+      line-height: 1.45;
+      padding: 20px 24px;
       min-width: 480px;
-      max-width: 780px;
+      max-width: 720px;
       margin: 0 auto;
+      user-select: none;
     }
 
     /* Header */
@@ -47,9 +45,9 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-bottom: 20px;
-      margin-bottom: 24px;
-      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+      margin-bottom: 22px;
+      border-bottom: 1px solid var(--yt-border);
     }
 
     .brand-wrap {
@@ -58,27 +56,19 @@
       gap: 12px;
     }
 
-    .brand-logo {
-      width: 40px;
-      height: 40px;
-      background: linear-gradient(135deg, #ff0033, #c20027);
-      border-radius: var(--radius-md);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(255, 0, 51, 0.35);
-    }
-
-    .brand-logo svg {
-      width: 22px;
-      height: 22px;
-      fill: #ffffff;
+    .brand-logo-img {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: block;
+      object-fit: contain;
     }
 
     .brand-text h1 {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      color: var(--yt-text-primary);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -86,105 +76,136 @@
 
     .version-tag {
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 500;
       background: rgba(255, 255, 255, 0.1);
-      color: var(--brand-blue);
-      padding: 2px 6px;
-      border-radius: var(--radius-sm);
+      color: var(--yt-text-secondary);
+      padding: 2px 7px;
+      border-radius: 4px;
     }
 
     .brand-text p {
-      font-size: 12.5px;
-      color: var(--text-sub);
+      font-size: 12px;
+      color: var(--yt-text-secondary);
+      margin-top: 1px;
     }
 
     .header-links a {
-      color: var(--brand-blue);
-      font-size: 13px;
+      color: var(--yt-text-secondary);
+      font-size: 12.5px;
       text-decoration: none;
-      font-weight: 500;
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      transition: opacity 0.15s ease;
+      gap: 5px;
+      padding: 6px 12px;
+      border-radius: var(--yt-radius-pill);
+      background: rgba(255, 255, 255, 0.08);
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
 
     .header-links a:hover {
-      text-decoration: underline;
+      background: rgba(255, 255, 255, 0.16);
+      color: var(--yt-text-primary);
     }
 
     /* Section */
     section {
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
     .section-title {
-      font-size: 15px;
+      font-size: 13.5px;
       font-weight: 600;
-      color: var(--text-main);
+      color: var(--yt-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       margin-bottom: 12px;
       display: flex;
       align-items: center;
       gap: 8px;
     }
 
-    .section-title svg {
-      width: 18px;
-      height: 18px;
-      color: var(--brand-red);
+    .section-title img {
+      width: 15px;
+      height: 15px;
+      opacity: 0.85;
+      display: block;
     }
 
-    /* Cards */
+    /* Toggle Cards */
     .card-list {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
     .toggle-card {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 14px 18px;
+      background: var(--yt-surface);
+      border: 1px solid var(--yt-border);
+      border-radius: var(--yt-radius-md);
+      padding: 12px 16px;
       transition: background-color 0.15s ease, border-color 0.15s ease;
       cursor: pointer;
     }
 
     .toggle-card:hover {
-      background: var(--bg-card-hover);
-      border-color: rgba(255, 255, 255, 0.2);
+      background: var(--yt-surface-hover);
+      border-color: var(--yt-border-hover);
+    }
+
+    .toggle-main {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+      padding-right: 16px;
+    }
+
+    .toggle-icon-wrap {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--yt-radius-sm);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .toggle-icon-wrap img {
+      width: 18px;
+      height: 18px;
+      opacity: 0.95;
+      display: block;
     }
 
     .toggle-info {
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      padding-right: 16px;
+      gap: 2px;
     }
 
     .toggle-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--yt-text-primary);
     }
 
     .toggle-desc {
-      font-size: 12.5px;
-      color: var(--text-sub);
+      font-size: 12px;
+      color: var(--yt-text-secondary);
+      line-height: 1.4;
     }
 
-    /* iOS Style Toggle Switch */
+    /* Switch - Red when active */
     .switch {
       position: relative;
       display: inline-block;
-      width: 44px;
-      height: 24px;
+      width: 40px;
+      height: 22px;
       flex-shrink: 0;
     }
 
@@ -199,36 +220,36 @@
       cursor: pointer;
       inset: 0;
       background-color: rgba(255, 255, 255, 0.2);
-      transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      border-radius: 24px;
+      transition: background-color 0.2s ease;
+      border-radius: 22px;
     }
 
     .slider:before {
       position: absolute;
       content: "";
-      height: 18px;
-      width: 18px;
+      height: 16px;
+      width: 16px;
       left: 3px;
       bottom: 3px;
-      background-color: white;
-      transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      background-color: #ffffff;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       border-radius: 50%;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
 
     input:checked + .slider {
-      background-color: var(--brand-red);
+      background-color: var(--yt-red);
     }
 
     input:checked + .slider:before {
-      transform: translateX(20px);
+      transform: translateX(18px);
     }
 
     /* Shortcut Table */
     .table-container {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
+      background: var(--yt-surface);
+      border: 1px solid var(--yt-border);
+      border-radius: var(--yt-radius-md);
       overflow: hidden;
     }
 
@@ -240,20 +261,20 @@
     }
 
     th {
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text-sub);
-      font-weight: 600;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border-color);
-      font-size: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--yt-text-secondary);
+      font-weight: 500;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--yt-border);
+      font-size: 11.5px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
     td {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border-color);
-      color: var(--text-main);
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--yt-border);
+      color: var(--yt-text-primary);
     }
 
     tr:last-child td {
@@ -266,78 +287,37 @@
 
     .kbd-badge {
       display: inline-block;
-      background: #2a2a2a;
+      background: #272727;
       color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 4px;
       padding: 2px 7px;
       font-family: monospace;
       font-size: 12px;
-      font-weight: 700;
-      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     }
 
     .shortcut-desc {
       font-weight: 500;
+      color: var(--yt-text-primary);
     }
 
     .shortcut-url {
-      color: var(--brand-blue);
+      color: var(--yt-text-secondary);
       font-family: monospace;
       font-size: 12px;
     }
 
-    /* Callout Note */
-    .callout {
-      background: rgba(62, 166, 255, 0.08);
-      border-left: 3px solid var(--brand-blue);
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-      padding: 12px 16px;
-      font-size: 12.5px;
-      color: var(--text-sub);
-      margin-top: 12px;
-      line-height: 1.5;
-    }
-
-    .callout strong {
-      color: var(--text-main);
-    }
-
-    /* Format selector card */
-    .select-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 12px 18px;
-    }
-
-    .select-row select {
-      background: #282828;
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      padding: 6px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      outline: none;
-      cursor: pointer;
-    }
-
-    .select-row select:focus {
-      border-color: var(--brand-blue);
-    }
-
-    /* Footer & Save Status */
+    /* Footer */
     footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-top: 18px;
-      border-top: 1px solid var(--border-color);
-      font-size: 12.5px;
-      color: var(--text-dim);
+      padding-top: 16px;
+      border-top: 1px solid var(--yt-border);
+      font-size: 12px;
+      color: var(--yt-text-muted);
     }
 
     .status-msg {
@@ -356,19 +336,20 @@
 
     .btn-reset {
       background: transparent;
-      border: 1px solid var(--border-color);
-      color: var(--text-sub);
+      border: 1px solid var(--yt-border);
+      color: var(--yt-text-secondary);
       padding: 6px 14px;
-      border-radius: var(--radius-md);
-      font-size: 12.5px;
+      border-radius: var(--yt-radius-pill);
+      font-size: 12px;
+      font-weight: 500;
       cursor: pointer;
       transition: all 0.15s ease;
     }
 
     .btn-reset:hover {
       background: rgba(255, 255, 255, 0.08);
-      color: var(--text-main);
-      border-color: rgba(255, 255, 255, 0.25);
+      color: var(--yt-text-primary);
+      border-color: var(--yt-border-hover);
     }
   </style>
 </head>
@@ -377,36 +358,37 @@
   <!-- Header -->
   <header>
     <div class="brand-wrap">
-      <div class="brand-logo">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
-        </svg>
-      </div>
+      <img src="icons/youtube_aid.png" alt="YouTube Aid Logo" class="brand-logo-img" />
       <div class="brand-text">
-        <h1>YouTube Aid <span class="version-tag">Manifest V3</span></h1>
-        <p>Bảng điều khiển & Phím tắt nhanh trên YouTube</p>
+        <h1>YouTube Aid <span class="version-tag">Extension</span></h1>
+        <p>Bảng điều khiển & Phím tắt nhanh</p>
       </div>
     </div>
     <div class="header-links">
-      <a href="https://www.youtube.com/" target="_blank" title="Mở YouTube trong tab mới">
-        Mở YouTube ↗
+      <a href="https://www.youtube.com/" target="_blank" title="Mở YouTube">
+        <span>Mở YouTube ↗</span>
       </a>
     </div>
   </header>
 
-  <!-- Main Feature Toggles -->
+  <!-- Main Features -->
   <section>
     <div class="section-title">
-      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19H7v-2.65c.67.42 1.41.75 2.2 1 0-.12.02-.23.05-.35l1-4.01c-.13-.33-.2-.68-.2-1.04 0-1.66 1.34-3 3-3s3 1.34 3 3c0 .36-.07.71-.2 1.04l1 4.01c.03.12.05.23.05.35.79-.25 1.53-.58 2.2-1V19h2.65l-.62-1.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9z"/></svg>
-      Tính năng chính
+      <img src="icons/shortcuts.png" alt="" />
+      <span>Tính năng chính</span>
     </div>
 
     <div class="card-list">
       <!-- Auto Loop -->
       <label class="toggle-card">
-        <div class="toggle-info">
-          <div class="toggle-title">🔁 Tự động lặp lại video (Auto Loop)</div>
-          <div class="toggle-desc">Tự động kích hoạt <code>video.loop = true</code> khi xem video trên YouTube.</div>
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <img src="icons/loop.png" alt="Loop" />
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title">Tự động lặp lại video (Auto Loop)</div>
+            <div class="toggle-desc">Tự động kích hoạt lặp lại khi xem video trên YouTube.</div>
+          </div>
         </div>
         <div class="switch">
           <input type="checkbox" id="enableLoop">
@@ -416,9 +398,14 @@
 
       <!-- Shortcuts -->
       <label class="toggle-card">
-        <div class="toggle-info">
-          <div class="toggle-title">⚡ Phím tắt đôi điều hướng nhanh</div>
-          <div class="toggle-desc">Kích hoạt phím tắt đôi: ss, hh, hhh, pp, mm. Tự động tránh ô gõ phím.</div>
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <img src="icons/shortcuts.png" alt="Shortcuts" />
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title">Phím tắt đôi điều hướng nhanh</div>
+            <div class="toggle-desc">Phím tắt đôi: ss, hh, hhh, pp, mm. Tự động tránh ô nhập liệu.</div>
+          </div>
         </div>
         <div class="switch">
           <input type="checkbox" id="enableShortcuts">
@@ -428,9 +415,14 @@
 
       <!-- Copy Title Buttons -->
       <label class="toggle-card">
-        <div class="toggle-info">
-          <div class="toggle-title">📋 Bộ nút Copy Title thông minh</div>
-          <div class="toggle-desc">Tiêm nút Copy thuần, Copy + Auto Search, Copy + Auto Enter vào Watch page, Sidebar và Home page.</div>
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <img src="icons/copy.png" alt="Copy Title" />
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title">Bộ nút Copy Title thông minh</div>
+            <div class="toggle-desc">Tiêm nút Copy Title, Copy + Search + Enter và tùy chọn mở tab mới vào Watch page, sidebar và feed.</div>
+          </div>
         </div>
         <div class="switch">
           <input type="checkbox" id="enableCopyButtons">
@@ -438,11 +430,50 @@
         </div>
       </label>
 
+      <!-- Copy on selection -->
+      <label class="toggle-card">
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <img src="icons/copy.png" alt="Copy khi bôi đen" />
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title">Tự động copy khi bôi đen</div>
+            <div class="toggle-desc">Giữ chuột kéo bôi xanh một đoạn text bất kỳ để sao chép ngay, kèm thông báo xác nhận.</div>
+          </div>
+        </div>
+        <div class="switch">
+          <input type="checkbox" id="enableSelectionCopy">
+          <span class="slider"></span>
+        </div>
+      </label>
+
+      <!-- Auto paste into search -->
+      <label class="toggle-card">
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <img src="icons/paste.png" alt="Auto paste" />
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title">Tự động dán vào ô tìm kiếm</div>
+            <div class="toggle-desc">Click vào ô tìm kiếm đang trống để dán ngay nội dung vừa sao chép, không cần Ctrl + V.</div>
+          </div>
+        </div>
+        <div class="switch">
+          <input type="checkbox" id="enableAutoPasteSearch">
+          <span class="slider"></span>
+        </div>
+      </label>
+
       <!-- Clean Copy Link -->
       <label class="toggle-card">
-        <div class="toggle-info">
-          <div class="toggle-title">🔗 Nút Clean Copy Link</div>
-          <div class="toggle-desc">Sao chép URL video chuẩn (loại bỏ sạch các query rác như si, pp, utm_*, fbclid).</div>
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <img src="icons/link.png" alt="Clean Link" />
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title">Nút Clean Copy Link</div>
+            <div class="toggle-desc">Sao chép URL video sạch (loại bỏ toàn bộ tracking query như si, pp, utm_*, fbclid).</div>
+          </div>
         </div>
         <div class="switch">
           <input type="checkbox" id="enableCleanLink">
@@ -450,23 +481,16 @@
         </div>
       </label>
 
-      <!-- Screenshot HTML5 -->
-      <label class="toggle-card">
-        <div class="toggle-info">
-          <div class="toggle-title">📷 Chụp ảnh màn hình Video HTML5 & Crop</div>
-          <div class="toggle-desc">Chụp khung hình video gốc, mở công cụ Crop tỷ lệ linh hoạt và lưu tạm vào Session RAM.</div>
-        </div>
-        <div class="switch">
-          <input type="checkbox" id="enableScreenshot">
-          <span class="slider"></span>
-        </div>
-      </label>
-
       <!-- Toast Notifications -->
       <label class="toggle-card">
-        <div class="toggle-info">
-          <div class="toggle-title">🔔 Thông báo nổi Toast</div>
-          <div class="toggle-desc">Hiển thị thông báo nhỏ ở góc màn hình khi sao chép hoặc thực thi thao tác thành công.</div>
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <img src="icons/bell.png" alt="Toast" />
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title">Thông báo nổi Toast</div>
+            <div class="toggle-desc">Hiển thị thông báo nhỏ ở góc màn hình khi thực thi thao tác thành công.</div>
+          </div>
         </div>
         <div class="switch">
           <input type="checkbox" id="enableToasts">
@@ -476,36 +500,18 @@
     </div>
   </section>
 
-  <!-- Preferences -->
+  <!-- Shortcuts Reference Table -->
   <section>
     <div class="section-title">
-      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-      Tùy chọn chụp ảnh
-    </div>
-    <div class="select-row">
-      <div class="toggle-info">
-        <div class="toggle-title">Định dạng ảnh chụp mặc định</div>
-        <div class="toggle-desc">PNG cho độ nét nguyên bản; JPEG cho dung lượng nhỏ hơn.</div>
-      </div>
-      <select id="screenshotFormat">
-        <option value="image/png">PNG (Chất lượng gốc)</option>
-        <option value="image/jpeg">JPEG (Nhẹ hơn)</option>
-      </select>
-    </div>
-  </section>
-
-  <!-- Shortcut Cheat Sheet Table -->
-  <section>
-    <div class="section-title">
-      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 5H5v-2h2v2zm0-3H5v-2h2v2zm0-3H5V8h2v2zm9 8H8v-2h8v2zm1-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 6h-2v-2h2v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
-      Bảng Tra Cứu Phím Tắt Đôi
+      <img src="icons/table.png" alt="" />
+      <span>Bảng tra cứu phím tắt đôi</span>
     </div>
 
     <div class="table-container">
       <table>
         <thead>
           <tr>
-            <th style="width: 110px;">Phím tắt</th>
+            <th style="width: 120px;">Phím tắt</th>
             <th>Hành động</th>
             <th>Đích đến</th>
           </tr>
@@ -514,12 +520,12 @@
           <tr>
             <td><span class="kbd-badge">s</span> <span class="kbd-badge">s</span></td>
             <td class="shortcut-desc">Mở ngay video Shorts gợi ý</td>
-            <td class="shortcut-url">youtube.com/shorts/{id} (Tức thì)</td>
+            <td class="shortcut-url">youtube.com/shorts/{id}</td>
           </tr>
           <tr>
             <td><span class="kbd-badge">h</span> <span class="kbd-badge">h</span></td>
             <td class="shortcut-desc">Về Trang chủ YouTube (Home)</td>
-            <td class="shortcut-url">youtube.com/ (SPA Navigation)</td>
+            <td class="shortcut-url">youtube.com/</td>
           </tr>
           <tr>
             <td><span class="kbd-badge">h</span> <span class="kbd-badge">h</span> <span class="kbd-badge">h</span></td>
@@ -539,17 +545,13 @@
         </tbody>
       </table>
     </div>
-
-    <div class="callout">
-      ⚡ <strong>Tốc độ tức thì & An toàn:</strong> Phím tắt sử dụng cơ chế điều hướng SPA nội bộ của YouTube (không tải lại trang, phản hồi ngay lập tức dưới 50ms). Đặc biệt, <code>ss</code> tự động kích hoạt video Shorts gợi ý có sẵn thay vì phải tải trang trung gian. Phím tắt <strong>tự động bị vô hiệu hóa</strong> khi bạn đang gõ trong ô tìm kiếm hoặc khung bình luận!
-    </div>
   </section>
 
   <!-- Footer -->
   <footer>
     <div class="status-msg" id="statusMsg">
-      <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-      Đã tự động lưu cài đặt!
+      <svg width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+      <span>Đã tự động lưu cài đặt!</span>
     </div>
     <button class="btn-reset" id="btnReset">Khôi phục mặc định</button>
   </footer>
