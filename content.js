@@ -19,7 +19,8 @@
     enableCleanLink: true,
     enableToasts: true,
     enableSelectionCopy: true,
-    enableAutoPasteSearch: true
+    enableAutoPasteSearch: true,
+    enableThumbnailDownload: true
   };
 
   let settings = { ...DEFAULT_SETTINGS };
@@ -63,6 +64,7 @@
     // Toggle button visibility via body class
     document.body.classList.toggle('yt-aid-hide-copy-buttons', !settings.enableCopyButtons);
     document.body.classList.toggle('yt-aid-hide-clean-link', !settings.enableCleanLink);
+    document.body.classList.toggle('yt-aid-hide-thumb-btn', !settings.enableThumbnailDownload);
 
     syncToolbarState();
     injectAllAreas();
@@ -75,7 +77,7 @@
     initShortcutSystem();
     initSelectionCopy();
     initSearchAutoPaste();
-    initToolsMenuDismiss();
+    initDropdownDismiss();
     initDOMObserver();
     applySettingUpdates();
   }
@@ -398,6 +400,7 @@
 
   function initShortcutSystem() {
     document.addEventListener('keydown', (e) => {
+      if (cropOverlayEl) return;
       if (!settings.enableShortcuts) return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
       if (e.repeat) return;
@@ -566,6 +569,354 @@
   }
 
   // ==========================================
+  // 5B. THUMBNAIL DOWNLOAD & CROP
+  // ==========================================
+  const THUMB_QUALITIES = ['maxresdefault', 'sddefault', 'hqdefault', 'mqdefault'];
+
+  function videoIdFromUrl(rawUrl) {
+    if (!rawUrl) return null;
+    try {
+      const url = new URL(rawUrl, window.location.origin);
+
+      const v = url.searchParams.get('v');
+      if (v && v.length === 11) return v;
+
+      if (/(^|\.)youtu\.be$/i.test(url.hostname)) {
+        const shortId = url.pathname.split('/').filter(Boolean)[0];
+        if (shortId && shortId.length === 11) return shortId;
+      }
+
+      const match = url.pathname.match(/\/(?:shorts|embed|live|v)\/([a-zA-Z0-9_-]{11})/);
+      return match ? match[1] : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function sanitizeFilename(name) {
+    const cleaned = String(name || '')
+      .replace(/[\\/:*?"<>|]/g, ' ')
+      .replace(/[\u0000-\u001f]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[. ]+$/, '');
+    return cleaned.slice(0, 80) || 'youtube-thumbnail';
+  }
+
+  async function fetchThumbnailBlob(videoId) {
+    for (const quality of THUMB_QUALITIES) {
+      try {
+        const res = await fetch(`https://i.ytimg.com/vi/${videoId}/${quality}.jpg`, { credentials: 'omit' });
+        if (!res.ok) continue;
+
+        const blob = await res.blob();
+        if (!blob.size) continue;
+
+        // Missing sizes come back as a tiny grey placeholder instead of a 404
+        const bitmap = await createImageBitmap(blob).catch(() => null);
+        if (bitmap) {
+          const tooSmall = bitmap.width < 300;
+          bitmap.close();
+          if (tooSmall) continue;
+        }
+
+        return blob;
+      } catch (e) { }
+    }
+    return null;
+  }
+
+  function saveBlobAsFile(blob, filename) {
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  }
+
+  let cropOverlayEl = null;
+  let cropCleanup = null;
+  const MIN_CROP_FRACTION = 0.03;
+
+  function closeThumbnailCropper() {
+    if (cropCleanup) {
+      cropCleanup();
+      cropCleanup = null;
+    }
+    if (cropOverlayEl) {
+      cropOverlayEl.remove();
+      cropOverlayEl = null;
+    }
+    document.body.classList.remove('yt-aid-crop-open');
+  }
+
+  function openThumbnailCropper(blob, filename, title) {
+    closeThumbnailCropper();
+    closeDropdown();
+
+    const objectUrl = URL.createObjectURL(blob);
+    const overlay = document.createElement('div');
+    overlay.className = 'yt-aid-crop-overlay';
+    overlay.innerHTML = `
+      <div class="yt-aid-crop-dialog" role="dialog" aria-modal="true" aria-label="Cắt ảnh bìa thumbnail">
+        <div class="yt-aid-crop-header">
+          <div>
+            <div class="yt-aid-crop-title">Cắt &amp; tải ảnh bìa</div>
+            <div class="yt-aid-crop-subtitle">${escapeHtml(previewText(title, 60))}</div>
+          </div>
+          <button type="button" class="yt-aid-crop-close" id="yt-aid-crop-close" title="Đóng" aria-label="Đóng">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"/></svg>
+          </button>
+        </div>
+
+        <div class="yt-aid-crop-stage">
+          <div class="yt-aid-crop-frame" id="yt-aid-crop-frame">
+            <img class="yt-aid-crop-image" id="yt-aid-crop-image" alt="Ảnh bìa thumbnail" draggable="false">
+            <div class="yt-aid-crop-box" id="yt-aid-crop-box">
+              <span class="yt-aid-crop-handle" data-handle="nw"></span>
+              <span class="yt-aid-crop-handle" data-handle="ne"></span>
+              <span class="yt-aid-crop-handle" data-handle="sw"></span>
+              <span class="yt-aid-crop-handle" data-handle="se"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="yt-aid-crop-footer">
+          <div class="yt-aid-crop-hint">Kéo trong khung để di chuyển, kéo 4 góc để thay đổi vùng cắt.</div>
+          <div class="yt-aid-crop-actions">
+            <button type="button" class="yt-aid-crop-btn" id="yt-aid-crop-reset">Đặt lại</button>
+            <button type="button" class="yt-aid-crop-btn" id="yt-aid-crop-cancel">Huỷ</button>
+            <button type="button" class="yt-aid-crop-btn" id="yt-aid-crop-original">Tải ảnh gốc</button>
+            <button type="button" class="yt-aid-crop-btn primary" id="yt-aid-crop-save">Tải phần đã chọn</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.classList.add('yt-aid-crop-open');
+    cropOverlayEl = overlay;
+
+    const image = overlay.querySelector('#yt-aid-crop-image');
+    const frame = overlay.querySelector('#yt-aid-crop-frame');
+    const box = overlay.querySelector('#yt-aid-crop-box');
+    const subtitle = overlay.querySelector('.yt-aid-crop-subtitle');
+    const saveBtn = overlay.querySelector('#yt-aid-crop-save');
+    const originalBtn = overlay.querySelector('#yt-aid-crop-original');
+    const resetBtn = overlay.querySelector('#yt-aid-crop-reset');
+
+    let selection = { x: 0, y: 0, w: 1, h: 1 };
+    let naturalSize = { width: 0, height: 0 };
+    let dragCleanup = null;
+    let closed = false;
+
+    const applySelection = () => {
+      box.style.left = `${selection.x * 100}%`;
+      box.style.top = `${selection.y * 100}%`;
+      box.style.width = `${selection.w * 100}%`;
+      box.style.height = `${selection.h * 100}%`;
+    };
+
+    const startDrag = (mode, startEvent) => {
+      if (!naturalSize.width) return;
+      const frameRect = frame.getBoundingClientRect();
+      if (!frameRect.width || !frameRect.height) return;
+
+      const start = {
+        clientX: startEvent.clientX,
+        clientY: startEvent.clientY,
+        sel: { ...selection }
+      };
+
+      const minW = Math.min(0.5, Math.max(MIN_CROP_FRACTION, 24 / frameRect.width));
+      const minH = Math.min(0.5, Math.max(MIN_CROP_FRACTION, 24 / frameRect.height));
+      const target = startEvent.currentTarget;
+
+      if (target.setPointerCapture) target.setPointerCapture(startEvent.pointerId);
+
+      const onMove = (moveEvent) => {
+        const dx = (moveEvent.clientX - start.clientX) / frameRect.width;
+        const dy = (moveEvent.clientY - start.clientY) / frameRect.height;
+        const s = start.sel;
+        const next = { ...s };
+
+        if (mode === 'move') {
+          next.x = Math.min(Math.max(0, s.x + dx), 1 - s.w);
+          next.y = Math.min(Math.max(0, s.y + dy), 1 - s.h);
+        } else {
+          if (mode === 'nw' || mode === 'sw') {
+            next.x = Math.min(Math.max(0, s.x + dx), s.x + s.w - minW);
+            next.w = s.x + s.w - next.x;
+          }
+          if (mode === 'ne' || mode === 'se') {
+            next.w = Math.min(Math.max(minW, s.w + dx), 1 - s.x);
+          }
+          if (mode === 'nw' || mode === 'ne') {
+            next.y = Math.min(Math.max(0, s.y + dy), s.y + s.h - minH);
+            next.h = s.y + s.h - next.y;
+          }
+          if (mode === 'sw' || mode === 'se') {
+            next.h = Math.min(Math.max(minH, s.h + dy), 1 - s.y);
+          }
+        }
+
+        selection = next;
+        applySelection();
+      };
+
+      const stop = () => {
+        target.removeEventListener('pointermove', onMove);
+        target.removeEventListener('pointerup', stop);
+        target.removeEventListener('pointercancel', stop);
+        if (target.releasePointerCapture) target.releasePointerCapture(startEvent.pointerId);
+        dragCleanup = null;
+      };
+
+      dragCleanup = stop;
+      target.addEventListener('pointermove', onMove);
+      target.addEventListener('pointerup', stop);
+      target.addEventListener('pointercancel', stop);
+    };
+
+    box.addEventListener('pointerdown', (event) => {
+      if (event.target instanceof Element && event.target.closest('.yt-aid-crop-handle')) return;
+      event.preventDefault();
+      startDrag('move', event);
+    });
+
+    box.querySelectorAll('.yt-aid-crop-handle').forEach((handle) => {
+      handle.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        startDrag(handle.dataset.handle, event);
+      });
+    });
+
+    const setBusy = (busy) => {
+      saveBtn.disabled = busy;
+      originalBtn.disabled = busy;
+      resetBtn.disabled = busy;
+      saveBtn.textContent = busy ? 'Đang lưu…' : 'Tải phần đã chọn';
+    };
+
+    const saveOriginal = () => {
+      saveBlobAsFile(blob, filename);
+      showToast(`Đã tải ảnh bìa: ${previewText(filename, 45)}`, 'success', 2800);
+      closeThumbnailCropper();
+    };
+
+    const saveCropped = async () => {
+      if (!naturalSize.width) return;
+
+      const sourceWidth = naturalSize.width;
+      const sourceHeight = naturalSize.height;
+      const sx = Math.round(selection.x * sourceWidth);
+      const sy = Math.round(selection.y * sourceHeight);
+      const sw = Math.max(1, Math.min(sourceWidth - sx, Math.round(selection.w * sourceWidth)));
+      const sh = Math.max(1, Math.min(sourceHeight - sy, Math.round(selection.h * sourceHeight)));
+
+      setBusy(true);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = sw;
+        canvas.height = sh;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, sw, sh);
+        ctx.drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
+
+        const cropped = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+        if (!cropped) throw new Error('empty canvas');
+
+        saveBlobAsFile(cropped, filename);
+        showToast(`Đã tải ảnh bìa đã cắt: ${sw} × ${sh}`, 'success', 2800);
+        closeThumbnailCropper();
+      } catch (e) {
+        if (closed) return;
+        setBusy(false);
+        showToast('Không tạo được ảnh đã cắt, thử lại nhé.', 'warning');
+      }
+    };
+
+    overlay.querySelector('#yt-aid-crop-close').addEventListener('click', closeThumbnailCropper);
+    overlay.querySelector('#yt-aid-crop-cancel').addEventListener('click', closeThumbnailCropper);
+    resetBtn.addEventListener('click', () => {
+      selection = { x: 0, y: 0, w: 1, h: 1 };
+      applySelection();
+    });
+    originalBtn.addEventListener('click', saveOriginal);
+    saveBtn.addEventListener('click', saveCropped);
+
+    const onBackdrop = (event) => {
+      if (event.target === overlay) closeThumbnailCropper();
+    };
+    overlay.addEventListener('mousedown', onBackdrop);
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeThumbnailCropper();
+        return;
+      }
+      // Keep YouTube's single-key shortcuts from firing behind the dialog
+      event.stopPropagation();
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+
+    image.addEventListener('load', () => {
+      if (cropOverlayEl !== overlay) return;
+      naturalSize = { width: image.naturalWidth, height: image.naturalHeight };
+      subtitle.textContent = `${previewText(title, 60)} · ${naturalSize.width} × ${naturalSize.height}`;
+      applySelection();
+    });
+
+    image.addEventListener('error', () => {
+      if (cropOverlayEl !== overlay) return;
+      showToast('Không hiển thị được ảnh bìa để cắt', 'warning');
+      closeThumbnailCropper();
+    });
+
+    applySelection();
+    image.src = objectUrl;
+
+    cropCleanup = () => {
+      closed = true;
+      if (dragCleanup) dragCleanup();
+      document.removeEventListener('keydown', onKeyDown, true);
+      overlay.removeEventListener('mousedown', onBackdrop);
+      URL.revokeObjectURL(objectUrl);
+    };
+  }
+
+  async function downloadThumbnail(triggerEl, title, rawUrl) {
+    if (triggerEl && triggerEl.dataset.ytAidBusy === 'true') return;
+
+    const videoId = videoIdFromUrl(rawUrl || window.location.href);
+    if (!videoId) {
+      showToast('Không tìm thấy mã video để tải ảnh bìa', 'warning');
+      return;
+    }
+
+    if (triggerEl) triggerEl.dataset.ytAidBusy = 'true';
+    showToast('Đang tải ảnh bìa…', 'info', 1400);
+
+    const blob = await fetchThumbnailBlob(videoId);
+    if (triggerEl) delete triggerEl.dataset.ytAidBusy;
+
+    if (!blob) {
+      showToast('Không tải được ảnh bìa của video này', 'warning');
+      return;
+    }
+
+    openThumbnailCropper(blob, `${sanitizeFilename(title)} [${videoId}].jpg`, title);
+  }
+
+  // ==========================================
   // 5. COPY ON SELECT & AUTO-PASTE INTO SEARCH
   // ==========================================
   function initSelectionCopy() {
@@ -573,6 +924,7 @@
     let lastCopied = { text: '', at: 0 };
 
     const copySelection = () => {
+      if (cropOverlayEl) return;
       if (!settings.enableSelectionCopy) return;
       if (isTypingContext()) return;
 
@@ -650,7 +1002,7 @@
     window.addEventListener('yt-navigate-finish', () => {
       updateCachedShorts();
       ensureVideoLoop();
-      closeToolsMenu();
+      closeDropdown();
       setTimeout(() => {
         injectAllAreas();
         updateCachedShorts();
@@ -665,13 +1017,13 @@
 
   function injectAllAreas() {
     const path = window.location.pathname;
-    const hasCopyTools = settings.enableCopyButtons || settings.enableCleanLink;
+    const hasCardTools = settings.enableCopyButtons || settings.enableCleanLink || settings.enableThumbnailDownload;
 
     if (path.startsWith('/watch')) {
       injectWatchPageToolbar();
-      if (hasCopyTools) injectSidebarButtons();
+      if (hasCardTools) injectSidebarButtons();
     } else if (path === '/' || path.startsWith('/results') || path.startsWith('/feed')) {
-      if (hasCopyTools) injectHomePageCards();
+      if (hasCardTools) injectHomePageCards();
     }
   }
 
@@ -720,6 +1072,12 @@
         <button class="yt-aid-pill-btn yt-aid-clean-link" id="yt-aid-btn-clean-link" title="Sao chép liên kết sạch không query tracking">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
           <span>Clean Link</span>
+        </button>
+
+        <!-- Downloads button (thumbnail crop) -->
+        <button class="yt-aid-pill-btn yt-aid-downloads-btn" id="yt-aid-btn-downloads" title="Tải ảnh bìa thumbnail (có cắt ảnh)">
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          <span>Downloads</span>
         </button>
       </div>
 
@@ -778,6 +1136,13 @@
       copyTextToClipboard(cleanUrl, `Đã chép liên kết sạch: ${cleanUrl}`);
     });
 
+    // Thumbnail download with crop dialog
+    const downloadsBtn = toolbar.querySelector('#yt-aid-btn-downloads');
+    downloadsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      downloadThumbnail(downloadsBtn, getWatchVideoTitle(), window.location.href);
+    });
+
     // Toggle Auto Loop
     const loopBtn = toolbar.querySelector('#yt-aid-btn-toggle-loop');
     loopBtn.addEventListener('click', () => {
@@ -794,24 +1159,47 @@
     const toolsBtn = toolbar.querySelector('#yt-aid-btn-tools');
     toolsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      openToolsMenu(toolsBtn);
+      toggleDropdown(toolsBtn, buildToolsMenu);
     });
   }
 
   // ==========================================
-  // 7. TOOLS DROPDOWN (Extra features)
+  // 7. TOOLS DROPDOWN
   // ==========================================
-  let toolsMenuEl = null;
+  let dropdownEl = null;
+  let dropdownBtn = null;
 
-  function closeToolsMenu() {
-    const btn = document.getElementById('yt-aid-btn-tools');
-    if (btn) btn.setAttribute('aria-expanded', 'false');
-    if (!toolsMenuEl) return;
+  function closeDropdown() {
+    if (dropdownBtn) dropdownBtn.setAttribute('aria-expanded', 'false');
+    const menu = dropdownEl;
+    dropdownEl = null;
+    dropdownBtn = null;
+    if (!menu) return;
 
-    const menu = toolsMenuEl;
-    toolsMenuEl = null;
     menu.classList.remove('yt-aid-tools-menu-show');
     setTimeout(() => menu.remove(), 160);
+  }
+
+  function toggleDropdown(btn, buildMenu) {
+    if (dropdownEl && dropdownBtn === btn) {
+      closeDropdown();
+      return;
+    }
+
+    closeDropdown();
+    const menu = buildMenu();
+    document.body.appendChild(menu);
+
+    const rect = btn.getBoundingClientRect();
+    const maxLeft = window.innerWidth - menu.offsetWidth - 12;
+    menu.style.top = `${Math.round(rect.bottom + 12)}px`;
+    menu.style.left = `${Math.round(Math.max(12, Math.min(rect.right - menu.offsetWidth, maxLeft)))}px`;
+    menu.style.maxHeight = `${Math.round(Math.max(160, window.innerHeight - rect.bottom - 24))}px`;
+
+    dropdownEl = menu;
+    dropdownBtn = btn;
+    btn.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(() => menu.classList.add('yt-aid-tools-menu-show'));
   }
 
   function syncToolbarState() {
@@ -823,6 +1211,9 @@
 
     const autoPasteToggle = document.getElementById('yt-aid-toggle-auto-paste');
     if (autoPasteToggle) autoPasteToggle.checked = !!settings.enableAutoPasteSearch;
+
+    const thumbToggle = document.getElementById('yt-aid-toggle-thumb');
+    if (thumbToggle) thumbToggle.checked = !!settings.enableThumbnailDownload;
   }
 
   function updateSetting(key, value) {
@@ -834,6 +1225,7 @@
     const menu = document.createElement('div');
     menu.id = 'yt-aid-tools-menu';
     menu.className = 'yt-aid-tools-menu';
+    const checked = (value) => (value ? ' checked' : '');
     menu.innerHTML = `
       <div class="yt-aid-tools-title">Tính năng phụ</div>
 
@@ -843,7 +1235,7 @@
           <span class="yt-aid-tools-desc">Bôi xanh đoạn text để sao chép ngay</span>
         </span>
         <span class="yt-aid-switch">
-          <input type="checkbox" id="yt-aid-toggle-selection-copy">
+          <input type="checkbox" id="yt-aid-toggle-selection-copy"${checked(settings.enableSelectionCopy)}>
           <span class="yt-aid-switch-slider"></span>
         </span>
       </label>
@@ -854,22 +1246,22 @@
           <span class="yt-aid-tools-desc">Click ô tìm kiếm trống để dán nội dung vừa copy</span>
         </span>
         <span class="yt-aid-switch">
-          <input type="checkbox" id="yt-aid-toggle-auto-paste">
+          <input type="checkbox" id="yt-aid-toggle-auto-paste"${checked(settings.enableAutoPasteSearch)}>
+          <span class="yt-aid-switch-slider"></span>
+        </span>
+      </label>
+
+      <label class="yt-aid-tools-item">
+        <span class="yt-aid-tools-text">
+          <span class="yt-aid-tools-name">Nút Downloads &amp; thumbnail</span>
+          <span class="yt-aid-tools-desc">Hiện nút tải ảnh bìa (có cắt ảnh) và nút tải ở các thẻ video</span>
+        </span>
+        <span class="yt-aid-switch">
+          <input type="checkbox" id="yt-aid-toggle-thumb"${checked(settings.enableThumbnailDownload)}>
           <span class="yt-aid-switch-slider"></span>
         </span>
       </label>
     `;
-    return menu;
-  }
-
-  function openToolsMenu(btn) {
-    if (toolsMenuEl) {
-      closeToolsMenu();
-      return;
-    }
-
-    const menu = buildToolsMenu();
-    document.body.appendChild(menu);
 
     menu.querySelector('#yt-aid-toggle-selection-copy').addEventListener('change', (e) => {
       updateSetting('enableSelectionCopy', e.target.checked);
@@ -877,35 +1269,28 @@
     menu.querySelector('#yt-aid-toggle-auto-paste').addEventListener('change', (e) => {
       updateSetting('enableAutoPasteSearch', e.target.checked);
     });
+    menu.querySelector('#yt-aid-toggle-thumb').addEventListener('change', (e) => {
+      updateSetting('enableThumbnailDownload', e.target.checked);
+    });
 
-    syncToolbarState();
-
-    const rect = btn.getBoundingClientRect();
-    const maxLeft = window.innerWidth - menu.offsetWidth - 12;
-    menu.style.top = `${Math.round(rect.bottom + 12)}px`;
-    menu.style.left = `${Math.round(Math.max(12, Math.min(rect.right - menu.offsetWidth, maxLeft)))}px`;
-    menu.style.maxHeight = `${Math.round(Math.max(160, window.innerHeight - rect.bottom - 24))}px`;
-
-    toolsMenuEl = menu;
-    btn.setAttribute('aria-expanded', 'true');
-    requestAnimationFrame(() => menu.classList.add('yt-aid-tools-menu-show'));
+    return menu;
   }
 
-  function initToolsMenuDismiss() {
+  function initDropdownDismiss() {
     document.addEventListener('mousedown', (e) => {
-      if (!toolsMenuEl) return;
+      if (!dropdownEl) return;
       const target = e.target;
-      if (toolsMenuEl.contains(target)) return;
-      if (target instanceof Element && target.closest('#yt-aid-btn-tools')) return;
-      closeToolsMenu();
+      if (target instanceof Node && dropdownEl.contains(target)) return;
+      if (target instanceof Node && dropdownBtn && dropdownBtn.contains(target)) return;
+      closeDropdown();
     }, true);
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && toolsMenuEl) closeToolsMenu();
+      if (e.key === 'Escape' && dropdownEl) closeDropdown();
     }, true);
 
-    window.addEventListener('resize', closeToolsMenu);
-    window.addEventListener('scroll', closeToolsMenu, { passive: true, capture: true });
+    window.addEventListener('resize', closeDropdown);
+    window.addEventListener('scroll', closeDropdown, { passive: true, capture: true });
   }
 
   // ----------------------------------------------------
@@ -937,6 +1322,9 @@
         </button>
         <button class="yt-aid-mini-action yt-aid-clean-link" title="Copy liên kết sạch">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+        </button>
+        <button class="yt-aid-mini-action yt-aid-thumb" title="Tải ảnh bìa thumbnail">
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
         </button>
       `;
 
@@ -977,6 +1365,12 @@
         const clean = cleanYoutubeUrl(getCardUrl());
         copyTextToClipboard(clean, `Đã chép link sạch: ${clean}`);
       });
+
+      cardBar.querySelector('.yt-aid-thumb').addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        downloadThumbnail(e.currentTarget, getCardTitle(), getCardUrl());
+      });
     });
   }
 
@@ -1013,6 +1407,10 @@
           <button class="yt-aid-mini-action yt-aid-clean-link" title="Copy liên kết sạch">
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
             <span>Link</span>
+          </button>
+          <button class="yt-aid-mini-action yt-aid-thumb" title="Tải ảnh bìa thumbnail">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            <span>Thumb</span>
           </button>
         </div>
       `;
@@ -1053,6 +1451,12 @@
         e.preventDefault();
         const clean = cleanYoutubeUrl(getCardUrl());
         copyTextToClipboard(clean, `Đã chép link sạch: ${clean}`);
+      });
+
+      cardBar.querySelector('.yt-aid-thumb').addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        downloadThumbnail(e.currentTarget, getCardTitle(), getCardUrl());
       });
     });
   }

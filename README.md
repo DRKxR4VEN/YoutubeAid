@@ -1,6 +1,6 @@
 # YouTube Aid - Chrome Extension (Manifest V3)
 
-Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm, clean link không query tracking, hệ thống phím tắt đôi điều hướng tức thì (SPA) và tự động lặp lại video (Auto Loop).
+Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm, clean link không query tracking, tải ảnh bìa thumbnail có cắt ảnh tuỳ ý, hệ thống phím tắt đôi điều hướng tức thì (SPA) và tự động lặp lại video (Auto Loop).
 
 ---
 
@@ -26,6 +26,7 @@ Tiêm tự động vào **Watch page (dưới tiêu đề)**, **Sidebar (video l
 Nút **Tools** nằm ngay bên phải nút **Auto Loop** trên thanh công cụ Watch page, mở dropdown tập hợp các tính năng phụ kèm công tắc bật/tắt:
 - Tự động copy khi bôi đen
 - Tự động dán vào ô tìm kiếm
+- Nút Downloads & thumbnail (ẩn/hiện nút cắt & tải ảnh bìa và các nút tải ảnh bìa)
 
 Trạng thái được lưu vào `chrome.storage.local` và đồng bộ với trang cài đặt.
 
@@ -38,7 +39,23 @@ Trạng thái được lưu vào `chrome.storage.local` và đồng bộ với t
 - Tự động loại bỏ toàn bộ các query tracking rác khi chia sẻ: `si`, `pp`, `feature`, `utm_*`, `fbclid`, `gclid`, v.v.
 - Chuẩn hóa link dạng gọn gàng: `https://www.youtube.com/watch?v={videoId}` hoặc `https://www.youtube.com/shorts/{id}`.
 
-### 7. Hệ Thống Phím Tắt Đôi Nhanh (Instant SPA Navigation)
+### 7. Tải Ảnh Bìa Thumbnail & Cắt Ảnh Trước Khi Lưu
+Nút **Downloads** trên thanh công cụ Watch page mở hộp thoại **Cắt & tải ảnh bìa**: ảnh bìa chất lượng cao nhất hiện có được tải về trước, sau đó bạn tự do chọn vùng muốn lưu.
+
+- **Chất lượng tối đa:** thử lần lượt `maxresdefault` (1280×720) → `sddefault` (640×360) → `hqdefault` (480×360) → `mqdefault` (320×180), nên video cũ không có maxres vẫn tải được bình thường.
+- **Cắt tuỳ ý:** kéo bên trong khung để di chuyển vùng chọn, kéo 4 góc để thay đổi kích thước; nút **Đặt lại** trả về toàn bộ ảnh.
+- **Xuất đúng độ phân giải gốc:** vùng cắt được vẽ từ pixel gốc của ảnh (không phải ảnh đang thu nhỏ trên màn hình) và lưu thành JPEG chất lượng 0.92.
+- **Tải ảnh gốc:** nút **Tải ảnh gốc** bỏ qua bước cắt nếu bạn chỉ cần ảnh nguyên bản.
+- Đóng hộp thoại bằng **Huỷ**, nút **×**, phím <kbd>Esc</kbd> hoặc click ra ngoài. Phím tắt của tiện ích và YouTube tạm ngưng khi hộp thoại đang mở.
+
+Ngoài ra icon tải xuống nhỏ cạnh **video liên quan (sidebar)** và trên **thẻ video ở trang chủ / search feed** mở cùng hộp thoại cắt ảnh cho video đó.
+
+Chi tiết kỹ thuật:
+- Ảnh được `fetch` từ `i.ytimg.com` (host trả `Access-Control-Allow-Origin: *`) rồi lưu qua Blob URL, **không cần thêm quyền nào** và không mở tab mới.
+- Tên file được làm sạch ký tự cấm và kèm mã video: `Tiêu đề video [videoId].jpg`, ví dụ `Rick Astley - Never Gonna Give You Up [dQw4w9WgXcQ].jpg`.
+- Bật/tắt trong trang cài đặt hoặc trong menu **Tools** trên Watch page.
+
+### 8. Hệ Thống Phím Tắt Đôi Nhanh (Instant SPA Navigation)
 | Phím tắt | Thao tác | Đích đến & Cơ chế |
 | :---: | :--- | :--- |
 | <kbd>s</kbd> <kbd>s</kbd> | Mở ngay video Shorts gợi ý | `youtube.com/shorts/{id}` *(Click trực tiếp link gợi ý có sẵn, phản hồi tức thì)* |
@@ -51,7 +68,7 @@ Trạng thái được lưu vào `chrome.storage.local` và đồng bộ với t
 - **Không xung đột phím native:** `<kbd>m</kbd>` (mute) và `<kbd>p</kbd>` (video trước) của YouTube trùng phím mở đầu chord, nên tiện ích chủ động "giữ" phím và **tự phát lại hành vi gốc** (click nút mute / nút previous của player) nếu sau 320ms không có phím thứ hai. Cả hai tính năng đều hoạt động.
 - **Cơ chế an toàn:** Tự động kiểm tra ngữ cảnh nhập liệu (`input`, `textarea`, `ytd-searchbox`, `ytd-comments`, `contenteditable`) để vô hiệu hóa phím tắt khi người dùng đang gõ; nhấn <kbd>Esc</kbd> để huỷ chuỗi phím đang chờ.
 
-### 8. Giao Diện & Bảng Cài Đặt (Options & Popup)
+### 9. Giao Diện & Bảng Cài Đặt (Options & Popup)
 - Thiết kế Dark mode tối giản, tinh gọn, hòa nhập 100% vào ngôn ngữ thiết kế của YouTube.
 - Toàn bộ icon được chuẩn hóa dạng đen trắng tối giản, chuyên nghiệp.
 - Công tắc bật/tắt (toggle) đỏ đặc trưng của YouTube khi kích hoạt.
@@ -63,10 +80,10 @@ Trạng thái được lưu vào `chrome.storage.local` và đồng bộ với t
 
 ```
 Youtube_Aid/
-├── manifest.json      # Cấu hình Manifest V3 & quyền storage, clipboardWrite
-├── content.js         # Logic tiêm DOM, copy/paste, SPA Navigation, Shortcuts, Loop, Tools menu
-├── styles.css         # CSS giao diện toolbar, tools dropdown, sidebar, card buttons, toast
-├── options.html       # Giao diện bảng điều khiển tinh gọn & tra cứu phím tắt
+├── manifest.json      # Manifest V3: quyền storage, clipboardWrite
+├── content.js         # Logic tiêm DOM, copy/paste, crop & tải thumbnail, SPA Navigation, Shortcuts, Loop, Tools menu
+├── styles.css         # CSS giao diện toolbar, tools dropdown, sidebar, card buttons, toast, hộp thoại cắt ảnh
+├── options.html       # Giao diện bảng điều khiển & tra cứu phím tắt
 ├── options.js         # Logic lưu/khôi phục cài đặt qua chrome.storage.local
 ├── generate_icons.js  # Script sinh tự động logo và bộ icon trắng đen chuẩn
 ├── icons/             # Thư mục icon PNG (16x16, 48x48, 128x128 và monochrome icons)
@@ -80,7 +97,8 @@ Youtube_Aid/
 │   ├── link.png
 │   ├── bell.png
 │   ├── table.png
-│   └── paste.png
+│   ├── paste.png
+│   └── thumbnail.png
 └── README.md          # Tài liệu hướng dẫn sử dụng và cài đặt
 ```
 
@@ -96,3 +114,4 @@ Youtube_Aid/
 4. Nhấn vào nút **Tải tiện ích đã giải nén** (**Load unpacked**).
 5. Chọn thư mục dự án: `d:\Uni\'My Project\Youtube_Aid`.
 6. Hoàn tất! Truy cập [YouTube](https://www.youtube.com/) để trải nghiệm.
+7. Sau mỗi lần cập nhật code, bấm **Reload** tại `chrome://extensions/` (đặc biệt khi `manifest.json` thay đổi).

@@ -11,17 +11,19 @@ document.addEventListener('DOMContentLoaded', () => {
     enableCleanLink: true,
     enableToasts: true,
     enableSelectionCopy: true,
-    enableAutoPasteSearch: true
+    enableAutoPasteSearch: true,
+    enableThumbnailDownload: true
   };
 
-  const inputs = {
+  const toggleInputs = {
     enableLoop: document.getElementById('enableLoop'),
     enableShortcuts: document.getElementById('enableShortcuts'),
     enableCopyButtons: document.getElementById('enableCopyButtons'),
     enableCleanLink: document.getElementById('enableCleanLink'),
     enableToasts: document.getElementById('enableToasts'),
     enableSelectionCopy: document.getElementById('enableSelectionCopy'),
-    enableAutoPasteSearch: document.getElementById('enableAutoPasteSearch')
+    enableAutoPasteSearch: document.getElementById('enableAutoPasteSearch'),
+    enableThumbnailDownload: document.getElementById('enableThumbnailDownload')
   };
 
   const statusMsg = document.getElementById('statusMsg');
@@ -41,38 +43,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 2200);
   }
 
-  // Load saved settings from chrome.storage.local
   function loadSettings() {
     chrome.storage.local.get(DEFAULTS, (items) => {
-      Object.keys(inputs).forEach(key => {
-        if (inputs[key]) inputs[key].checked = !!items[key];
+      Object.keys(toggleInputs).forEach((key) => {
+        if (toggleInputs[key]) toggleInputs[key].checked = !!items[key];
       });
     });
   }
 
-  // Save current settings
-  function saveCurrentSettings() {
+  function saveCurrentSettings(showSaved = true) {
     const current = {};
-    Object.keys(inputs).forEach(key => {
-      if (inputs[key]) current[key] = inputs[key].checked;
+
+    Object.keys(toggleInputs).forEach((key) => {
+      if (toggleInputs[key]) current[key] = toggleInputs[key].checked;
     });
 
     chrome.storage.local.set(current, () => {
-      showStatus('Đã tự động lưu cài đặt!');
+      if (showSaved) showStatus('Đã tự động lưu cài đặt!');
     });
   }
 
-  // Bind change events
-  Object.keys(inputs).forEach(key => {
-    const el = inputs[key];
-    if (el) {
-      el.addEventListener('change', () => {
-        saveCurrentSettings();
-      });
-    }
+  Object.keys(toggleInputs).forEach((key) => {
+    const el = toggleInputs[key];
+    if (!el) return;
+    el.addEventListener('change', () => saveCurrentSettings());
   });
 
-  // Reset to defaults
   btnReset.addEventListener('click', () => {
     if (confirm('Khôi phục tất cả cài đặt về mặc định ban đầu?')) {
       chrome.storage.local.set(DEFAULTS, () => {
@@ -82,6 +78,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Initial load
   loadSettings();
 });

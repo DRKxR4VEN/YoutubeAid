@@ -436,6 +436,55 @@ function drawPasteIcon(x, y, w, h) {
 }
 
 // -------------------------------------------------------------
+// 9. MONOCHROME THUMBNAIL ICON (Photo frame + download arrow)
+// -------------------------------------------------------------
+function drawThumbnailIcon(x, y, w, h) {
+  const nx = x / w, ny = y / h;
+
+  // Photo frame
+  const inFrame = isInRoundedRect(nx, ny, 0.08, 0.10, 0.84, 0.58, 0.08);
+  const inInner = isInRoundedRect(nx, ny, 0.15, 0.17, 0.70, 0.44, 0.04);
+
+  if (inFrame && !inInner) {
+    return [240, 240, 240, 255];
+  }
+
+  if (inInner) {
+    // Sun
+    const sunDist = Math.sqrt((nx - 0.29) ** 2 + (ny - 0.28) ** 2);
+    if (sunDist <= 0.055) {
+      return [240, 240, 240, 255];
+    }
+
+    // Two mountain silhouettes rising from the bottom of the frame
+    if (ny >= 0.44 && ny <= 0.61) {
+      const bigProg = (ny - 0.44) / 0.17;
+      if (Math.abs(nx - 0.40) <= 0.04 + bigProg * 0.19) {
+        return [240, 240, 240, 255];
+      }
+
+      const smallProg = (ny - 0.50) / 0.11;
+      if (Math.abs(nx - 0.64) <= 0.03 + smallProg * 0.12) {
+        return [240, 240, 240, 255];
+      }
+    }
+  }
+
+  // Download arrow under the frame
+  if (nx >= 0.45 && nx <= 0.55 && ny >= 0.70 && ny <= 0.83) {
+    return [240, 240, 240, 255];
+  }
+  if (ny >= 0.81 && ny <= 0.95) {
+    const headHalf = 0.14 * (0.95 - ny) / (0.95 - 0.81);
+    if (Math.abs(nx - 0.5) <= headHalf) {
+      return [240, 240, 240, 255];
+    }
+  }
+
+  return [0, 0, 0, 0];
+}
+
+// -------------------------------------------------------------
 // Write Icons to disk
 // -------------------------------------------------------------
 const iconsDir = path.join(__dirname, 'icons');
@@ -463,7 +512,8 @@ const bAndWIcons = [
   { name: 'link.png', fn: drawLinkIcon },
   { name: 'bell.png', fn: drawBellIcon },
   { name: 'table.png', fn: drawKeyboardTableIcon },
-  { name: 'paste.png', fn: drawPasteIcon }
+  { name: 'paste.png', fn: drawPasteIcon },
+  { name: 'thumbnail.png', fn: drawThumbnailIcon }
 ];
 
 bAndWIcons.forEach(({ name, fn }) => {
