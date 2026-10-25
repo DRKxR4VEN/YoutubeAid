@@ -42,6 +42,16 @@
 
   let settings = { ...DEFAULT_SETTINGS };
 
+  // Build marker: lets a newer copy of the extension take over UI injected by
+  // an older copy loaded from another folder.
+  const EXT_VERSION = (() => {
+    try {
+      return chrome.runtime.getManifest().version;
+    } catch (e) {
+      return '';
+    }
+  })();
+
   // Last text copied by the extension — feeds the auto-paste search box.
   // Mirrored to chrome.storage.local so it survives page reloads and is
   // shared between tabs; entries older than the TTL are ignored.
@@ -820,24 +830,28 @@
     });
   }
 
-  // YouTube now renders search as <yt-searchbox> with an input that has no id.
-  // That component also contains a hidden file input (image search), so the
-  // selector must exclude it — setting .value on a file input throws.
+  // YouTube now renders search as <yt-searchbox>, whose first <input> is a
+  // hidden file input for image search — so only name/class selectors may be
+  // used here. A bare "yt-searchbox input" would match the file input and the
+  // typed query would silently go nowhere.
   const SEARCH_INPUT_SELECTOR = [
+    'input#search',
     'yt-searchbox input[name="search_query"]',
     'ytd-searchbox input#search',
-    'yt-searchbox input#search',
     'ytd-searchbox input[name="search_query"]',
     'yt-searchbox input[type="text"]',
     'ytd-searchbox input[type="text"]',
-    'input#search:not([type="file"])'
+    'input.ytSearchboxComponentInput'
   ].join(', ');
   const SEARCH_SCOPE_SELECTOR = 'ytd-searchbox, yt-searchbox';
-  const SEARCH_SCOPE_INPUT_SELECTOR = 'input[name="search_query"], input#search:not([type="file"]), input[type="text"]:not([type="file"]), input:not([type="file"])';
   const SEARCH_BUTTON_SELECTOR = 'yt-searchbox button.ytSearchboxComponentSearchButton, ytd-searchbox button#search-icon-legacy, button#search-icon-legacy';
 
+  function isUsableSearchInput(el) {
+    return !!el && el.type !== 'file';
+  }
+
   function findSearchInput() {
-    return document.querySelector(SEARCH_INPUT_SELECTOR);
+    return [...document.querySelectorAll(SEARCH_INPUT_SELECTOR)].find(isUsableSearchInput) || null;
   }
 
   // Open search query directly in a brand new tab
@@ -1626,10 +1640,10 @@
       if (target.closest('button, a, [role="button"]')) return;
 
       let input = target.closest(SEARCH_INPUT_SELECTOR);
-      if (!input) {
+      if (!isUsableSearchInput(input)) {
         const scope = target.closest(SEARCH_SCOPE_SELECTOR);
         if (!scope) return;
-        input = scope.querySelector(SEARCH_SCOPE_INPUT_SELECTOR);
+        input = [...scope.querySelectorAll(SEARCH_INPUT_SELECTOR)].find(isUsableSearchInput) || null;
       }
       if (!input) return;
       if (clipboardReadBusy) return;
@@ -1774,7 +1788,15 @@
   // ----------------------------------------------------
   function injectWatchPageToolbar() {
     if (!window.location.pathname.startsWith('/watch')) return;
-    if (document.getElementById('yt-aid-watch-toolbar')) return;
+
+    // Replace any toolbar injected by a different build instead of silently
+    // reusing it: its click handlers may belong to older, broken code.
+    let hasCurrentToolbar = false;
+    document.querySelectorAll('.yt-aid-watch-toolbar').forEach((bar) => {
+      if (bar.dataset.ytAidVersion === EXT_VERSION) hasCurrentToolbar = true;
+      else bar.remove();
+    });
+    if (hasCurrentToolbar) return;
 
     const titleContainer = document.querySelector(
       'ytd-watch-metadata #title, #above-the-fold #title, ytd-video-primary-info-renderer #container'
@@ -1785,6 +1807,7 @@
     const toolbar = document.createElement('div');
     toolbar.id = 'yt-aid-watch-toolbar';
     toolbar.className = 'yt-aid-watch-toolbar';
+    toolbar.dataset.ytAidVersion = EXT_VERSION;
 
     toolbar.innerHTML = `
       <div class="yt-aid-toolbar-left">
@@ -1968,7 +1991,7 @@
     menu.className = 'yt-aid-tools-menu';
     const checked = (value) => (value ? ' checked' : '');
     menu.innerHTML = `
-      <div class="yt-aid-tools-title">Tính năng phụ</div>
+      <div class="yt-aid-tools-title">Tính năng phụ${EXT_VERSION ? ` · v${EXT_VERSION}` : ''}</div>
 
       <label class="yt-aid-tools-item">
         <span class="yt-aid-tools-text">
@@ -2098,6 +2121,17 @@
   // ----------------------------------------------------
   // B. SIDEBAR INJECTION (Related / Up-next videos)
   // ----------------------------------------------------
+  // YouTube recycles renderers and re-renders #details, so a marker attribute
+  // on the renderer would block re-injection after the bar is wiped out.
+  function hasCurrentCardBar(container) {
+    let hasCurrent = false;
+    container.querySelectorAll('.yt-aid-card-bar').forEach((bar) => {
+      if (bar.dataset.ytAidVersion === EXT_VERSION) hasCurrent = true;
+      else bar.remove();
+    });
+    return hasCurrent;
+  }
+
   function injectSidebarButtons() {
     const sidebarItems = document.querySelectorAll(
       'ytd-compact-video-renderer, ytd-compact-playlist-renderer, ' +
@@ -2106,9 +2140,7 @@
     );
 
     sidebarItems.forEach(item => {
-      // YouTube recycles renderers and re-renders #details, so a marker
-      // attribute would block re-injection after the bar is wiped out.
-      if (item.querySelector('.yt-aid-card-bar')) return;
+      if (hasCurrentCardBar(item)) return;
       // YouTube now renders related videos as bare lockup view models
       const isLockup = item.matches('yt-lockup-view-model');
       if (isLockup && !item.querySelector('a.ytLockupMetadataViewModelTitle')) return;
@@ -2117,6 +2149,7 @@
 
       const cardBar = document.createElement('div');
       cardBar.className = 'yt-aid-card-bar yt-aid-sidebar-bar';
+      cardBar.dataset.ytAidVersion = EXT_VERSION;
 
       cardBar.innerHTML = `
         <button class="yt-aid-mini-action yt-aid-copy-pure" title="Copy tiêu đề">
@@ -2216,7 +2249,7 @@
     );
 
     cardItems.forEach(item => {
-      if (item.querySelector('.yt-aid-card-bar')) return;
+      if (hasCurrentCardBar(item)) return;
       // Shorts lockups and non-video rich items have no video title row
       if (item.querySelector('ytd-reel-item-renderer, ytd-shorts-lockup-view-model, ytm-shorts-lockup-view-model')) return;
       // New home/search cards expose the title only through the lockup metadata
@@ -2229,6 +2262,7 @@
 
       const cardBar = document.createElement('div');
       cardBar.className = 'yt-aid-card-bar yt-aid-home-card-bar';
+      cardBar.dataset.ytAidVersion = EXT_VERSION;
 
       const buttons = [];
       if (showCopy) {
