@@ -223,9 +223,9 @@ body.yt-aid-hide-copy-buttons.yt-aid-hide-clean-link.yt-aid-hide-thumb-btn .yt-a
 }
 
 .yt-aid-split-group .yt-aid-pill-sub {
-  padding: 6px 9px;
-  font-size: 11.5px;
-  color: var(--yta-text-secondary);
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--yta-text-primary);
 }
 
 .yt-aid-split-group .yt-aid-pill-btn:hover {
