@@ -69,42 +69,12 @@
       font-weight: 600;
       letter-spacing: -0.2px;
       color: var(--yt-text-primary);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .version-tag {
-      font-size: 11px;
-      font-weight: 500;
-      background: rgba(255, 255, 255, 0.1);
-      color: var(--yt-text-secondary);
-      padding: 2px 7px;
-      border-radius: 4px;
     }
 
     .brand-text p {
       font-size: 12px;
       color: var(--yt-text-secondary);
       margin-top: 1px;
-    }
-
-    .header-links a {
-      color: var(--yt-text-secondary);
-      font-size: 12.5px;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 6px 12px;
-      border-radius: var(--yt-radius-pill);
-      background: rgba(255, 255, 255, 0.08);
-      transition: background-color 0.15s ease, color 0.15s ease;
-    }
-
-    .header-links a:hover {
-      background: rgba(255, 255, 255, 0.16);
-      color: var(--yt-text-primary);
     }
 
     /* Section */
@@ -309,6 +279,182 @@
       font-size: 12px;
     }
 
+    /* Keybind editor */
+    .keybind-card {
+      background: var(--yt-surface);
+      border: 1px solid var(--yt-border);
+      border-radius: var(--yt-radius-md);
+      padding: 14px;
+    }
+
+    .keybind-actions {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .keybind-action {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 4px;
+      min-height: 54px;
+      padding: 7px 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid transparent;
+      border-radius: var(--yt-radius-sm);
+      color: var(--yt-text-secondary);
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    @media (max-width: 560px) {
+      .keybind-actions {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    .keybind-action:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--yt-text-primary);
+    }
+
+    .keybind-action.is-active {
+      background: rgba(255, 0, 0, 0.1);
+      border-color: var(--yt-red);
+      color: var(--yt-text-primary);
+    }
+
+    .keybind-action:focus-visible,
+    .keybind-key:focus-visible {
+      outline: 2px solid var(--yt-red);
+      outline-offset: 1px;
+    }
+
+    .keybind-action-label {
+      min-width: 0;
+      overflow: hidden;
+      font-size: 12px;
+      font-weight: 500;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .keybind-action-keys {
+      display: inline-flex;
+      flex-shrink: 0;
+      gap: 3px;
+    }
+
+    .keybind-action .kbd-badge {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.14);
+      font-size: 10.5px;
+      padding: 1px 5px;
+    }
+
+    .keybind-action.is-active .kbd-badge {
+      background: var(--yt-red);
+      border-color: var(--yt-red);
+    }
+
+    .keybind-keyboard-wrap {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--yt-border);
+    }
+
+    .keybind-keyboard {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      width: fit-content;
+      margin: 0 auto;
+    }
+
+    .keybind-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .keybind-row-2 {
+      padding-left: 18px;
+    }
+
+    .keybind-row-3 {
+      padding-left: 36px;
+    }
+
+    .keybind-key {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: #272727;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: var(--yt-radius-sm);
+      color: var(--yt-text-primary);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    }
+
+    .keybind-key:hover:not(:disabled) {
+      background: #3a3a3a;
+      border-color: var(--yt-border-hover);
+    }
+
+    .keybind-key.is-current {
+      background: var(--yt-red);
+      border-color: var(--yt-red);
+      color: #ffffff;
+      box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.22);
+    }
+
+    .keybind-key.is-bound:not(.is-current)::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 3px;
+      width: 4px;
+      height: 4px;
+      margin-left: -2px;
+      border-radius: 50%;
+      background: var(--yt-red);
+    }
+
+    .keybind-key:disabled {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.06);
+      color: #5f5f5f;
+      cursor: not-allowed;
+    }
+
+    .keybind-key.is-native {
+      text-decoration: line-through;
+      text-decoration-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .keybind-hint {
+      font-size: 12px;
+      line-height: 1.4;
+      text-align: center;
+    }
+
+    .keybind-hint:empty {
+      display: none;
+    }
+
+    .keybind-hint.error {
+      margin-top: 10px;
+      color: #f87171;
+      font-weight: 500;
+    }
+
     /* Footer */
     footer {
       display: flex;
@@ -360,14 +506,9 @@
     <div class="brand-wrap">
       <img src="icons/youtube_aid.png" alt="YouTube Aid Logo" class="brand-logo-img" />
       <div class="brand-text">
-        <h1>YouTube Aid <span class="version-tag">Extension</span></h1>
+        <h1>YouTube Aid</h1>
         <p>Bảng điều khiển & Phím tắt nhanh</p>
       </div>
-    </div>
-    <div class="header-links">
-      <a href="https://www.youtube.com/" target="_blank" title="Mở YouTube">
-        <span>Mở YouTube ↗</span>
-      </a>
     </div>
   </header>
 
@@ -404,7 +545,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title">Phím tắt đôi điều hướng nhanh</div>
-            <div class="toggle-desc">Phím tắt đôi: ss, hh, hhh, pp, mm. Tự động tránh ô nhập liệu.</div>
+            <div class="toggle-desc">Mặc định ss, hh, hhh, pp, mm. Gán lại phím trực tiếp trên bàn phím thu nhỏ bên dưới.</div>
           </div>
         </div>
         <div class="switch">
@@ -421,7 +562,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title">Bộ nút Copy Title thông minh</div>
-            <div class="toggle-desc">Tiêm nút Copy Title, Copy + Search + Enter và tùy chọn mở tab mới vào Watch page, sidebar và feed.</div>
+            <div class="toggle-desc">Watch page: Copy Title, Copy + Search + Enter và mở tab mới. Sidebar: đầy đủ tiện ích. Feed/Home: 4 nút gọn hiện khi hover bất kỳ vị trí nào trên thẻ video (Tiêu đề, Tìm kiếm, Link, Ảnh bìa).</div>
           </div>
         </div>
         <div class="switch">
@@ -455,7 +596,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title">Tự động dán vào ô tìm kiếm</div>
-            <div class="toggle-desc">Click vào ô tìm kiếm đang trống để dán ngay nội dung bạn vừa copy — kể cả khi copy thủ công hoặc copy từ tab/ứng dụng khác.</div>
+            <div class="toggle-desc">Click vào ô tìm kiếm để dán ngay nội dung bạn vừa copy — kể cả khi copy thủ công hoặc copy từ tab/ứng dụng khác. Copy nội dung mới rồi click lại vẫn dán được.</div>
           </div>
         </div>
         <div class="switch">
@@ -464,36 +605,19 @@
         </div>
       </label>
 
-      <!-- Thumbnail Download -->
+      <!-- Replace previously auto-pasted content -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <img src="icons/thumbnail.png" alt="Thumbnail" />
+            <img src="icons/paste.png" alt="Replace pasted text" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Nút Downloads &amp; thumbnail</div>
-            <div class="toggle-desc">Bật nút Downloads trên Watch page (tải ảnh bìa, có cắt ảnh tuỳ ý trước khi lưu) và nút tải ảnh bìa cạnh các video nhỏ.</div>
+            <div class="toggle-title">Thay nội dung đã dán trước đó</div>
+            <div class="toggle-desc">Bật: nội dung mới thay thế nội dung đã tự động dán trước đó. Tắt: nối thêm vào sau, tự chèn một khoảng trắng giữa hai nội dung.</div>
           </div>
         </div>
         <div class="switch">
-          <input type="checkbox" id="enableThumbnailDownload">
-          <span class="slider"></span>
-        </div>
-      </label>
-
-      <!-- Clean Copy Link -->
-      <label class="toggle-card">
-        <div class="toggle-main">
-          <div class="toggle-icon-wrap">
-            <img src="icons/link.png" alt="Clean Link" />
-          </div>
-          <div class="toggle-info">
-            <div class="toggle-title">Nút Clean Copy Link</div>
-            <div class="toggle-desc">Sao chép URL video sạch (loại bỏ toàn bộ tracking query như si, pp, utm_*, fbclid).</div>
-          </div>
-        </div>
-        <div class="switch">
-          <input type="checkbox" id="enableCleanLink">
+          <input type="checkbox" id="enableAutoPasteReplace">
           <span class="slider"></span>
         </div>
       </label>
@@ -517,50 +641,20 @@
     </div>
   </section>
 
-  <!-- Shortcuts Reference Table -->
-  <section>
+  <!-- Shortcuts Customization -->
+  <section id="keybindSection">
     <div class="section-title">
-      <img src="icons/table.png" alt="" />
-      <span>Bảng tra cứu phím tắt đôi</span>
+      <img src="icons/shortcuts.png" alt="" />
+      <span>Tùy chỉnh phím tắt</span>
     </div>
 
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 120px;">Phím tắt</th>
-            <th>Hành động</th>
-            <th>Đích đến</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><span class="kbd-badge">s</span> <span class="kbd-badge">s</span></td>
-            <td class="shortcut-desc">Mở ngay video Shorts gợi ý</td>
-            <td class="shortcut-url">youtube.com/shorts/{id}</td>
-          </tr>
-          <tr>
-            <td><span class="kbd-badge">h</span> <span class="kbd-badge">h</span></td>
-            <td class="shortcut-desc">Về Trang chủ YouTube (Home)</td>
-            <td class="shortcut-url">youtube.com/</td>
-          </tr>
-          <tr>
-            <td><span class="kbd-badge">h</span> <span class="kbd-badge">h</span> <span class="kbd-badge">h</span></td>
-            <td class="shortcut-desc">Mở Lịch sử xem video (History)</td>
-            <td class="shortcut-url">youtube.com/feed/history</td>
-          </tr>
-          <tr>
-            <td><span class="kbd-badge">p</span> <span class="kbd-badge">p</span></td>
-            <td class="shortcut-desc">Mở Danh sách phát (Playlists)</td>
-            <td class="shortcut-url">youtube.com/feed/playlists</td>
-          </tr>
-          <tr>
-            <td><span class="kbd-badge">m</span> <span class="kbd-badge">m</span></td>
-            <td class="shortcut-desc">Mở YouTube Music</td>
-            <td class="shortcut-url">music.youtube.com/</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="keybind-card">
+      <div class="keybind-actions" id="keybindActions" role="tablist" aria-label="Chọn hành động cần gán phím"></div>
+
+      <div class="keybind-keyboard-wrap">
+        <div class="keybind-keyboard" id="keybindKeyboard" aria-label="Bàn phím chọn phím tắt"></div>
+        <div class="keybind-hint error" id="keybindError" role="alert" aria-live="polite"></div>
+      </div>
     </div>
   </section>
 
@@ -573,6 +667,7 @@
     <button class="btn-reset" id="btnReset">Khôi phục mặc định</button>
   </footer>
 
+  <script src="shortcut-keys.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

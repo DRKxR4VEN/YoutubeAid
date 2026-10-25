@@ -52,21 +52,8 @@ html:not([dark]) {
 /* Visibility toggles via settings */
 body.yt-aid-hide-copy-buttons #yt-aid-copy-title-group,
 body.yt-aid-hide-copy-buttons .yt-aid-copy-pure,
-body.yt-aid-hide-copy-buttons .yt-aid-copy-enter {
-  display: none !important;
-}
-
-body.yt-aid-hide-clean-link .yt-aid-clean-link {
-  display: none !important;
-}
-
-body.yt-aid-hide-thumb-btn #yt-aid-btn-downloads,
-body.yt-aid-hide-thumb-btn .yt-aid-thumb {
-  display: none !important;
-}
-
-body.yt-aid-hide-copy-buttons.yt-aid-hide-clean-link.yt-aid-hide-thumb-btn .yt-aid-sidebar-bar,
-body.yt-aid-hide-copy-buttons.yt-aid-hide-clean-link.yt-aid-hide-thumb-btn .yt-aid-home-card-bar {
+body.yt-aid-hide-copy-buttons .yt-aid-copy-enter,
+body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   display: none !important;
 }
 
@@ -408,7 +395,6 @@ html.yt-aid-crop-open {
   justify-content: center;
   padding: 24px;
   background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(3px);
   font-family: var(--yta-font-family);
   animation: yta-crop-fade 0.15s ease;
 }
@@ -502,6 +488,16 @@ html.yt-aid-crop-open {
   border-radius: 4px;
   user-select: none;
   pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* Four dim panes replace the old 9999px box-shadow, which forced the browser
+   to repaint a huge area on every pointer move. */
+.yt-aid-crop-pane {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  will-change: left, top, width, height;
 }
 
 .yt-aid-crop-box {
@@ -510,14 +506,16 @@ html.yt-aid-crop-open {
   top: 0;
   width: 100%;
   height: 100%;
+  z-index: 2;
   border: 2px solid #ffffff;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
   cursor: move;
   touch-action: none;
+  will-change: left, top, width, height;
 }
 
 .yt-aid-crop-handle {
   position: absolute;
+  z-index: 3;
   width: 14px;
   height: 14px;
   background: #ffffff;
@@ -672,6 +670,8 @@ html.yt-aid-crop-open {
    4. SIDEBAR ACTIONS (Related Videos)
    ======================================================== */
 .yt-aid-sidebar-bar {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -681,7 +681,8 @@ html.yt-aid-crop-open {
 }
 
 ytd-compact-video-renderer:hover .yt-aid-sidebar-bar,
-ytd-compact-playlist-renderer:hover .yt-aid-sidebar-bar {
+ytd-compact-playlist-renderer:hover .yt-aid-sidebar-bar,
+yt-lockup-view-model:hover .yt-aid-sidebar-bar {
   opacity: 1;
 }
 
@@ -714,7 +715,33 @@ ytd-compact-playlist-renderer:hover .yt-aid-sidebar-bar {
    5. HOME PAGE & SEARCH FEED CARDS
    ======================================================== */
 .yt-aid-home-card-bar {
+  position: relative;
+  z-index: 2;
   margin-top: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+ytd-rich-item-renderer:hover .yt-aid-home-card-bar,
+ytd-video-renderer:hover .yt-aid-home-card-bar,
+ytd-grid-video-renderer:hover .yt-aid-home-card-bar,
+yt-lockup-view-model:hover .yt-aid-home-card-bar,
+yt-lockup-metadata-view-model:hover .yt-aid-home-card-bar,
+.yt-aid-home-card-bar.yt-aid-bar-visible,
+.yt-aid-home-card-bar:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+@media (hover: none) {
+  .yt-aid-home-card-bar {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
 }
 
 .yt-aid-card-btn-cluster {
@@ -746,3 +773,86 @@ ytd-compact-playlist-renderer:hover .yt-aid-sidebar-bar {
   background: rgba(255, 255, 255, 0.18);
   color: #ffffff;
 }
+
+/* ========================================================
+   6. CHANNEL PAGE ACTIONS (Avatar & banner)
+   ======================================================== */
+.yt-aid-channel-actions-host {
+  position: relative !important;
+}
+
+.yt-aid-channel-actions {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Fallback when YouTube serves a channel layout without a known header node */
+.yt-aid-channel-actions-floating {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  z-index: 9998;
+}
+
+.yt-aid-channel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--yta-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(15, 15, 15, 0.72);
+  color: #ffffff;
+  font-family: var(--yta-font-family);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.yt-aid-channel-btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.yt-aid-channel-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.34);
+}
+
+.yt-aid-channel-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+html:not([dark]) .yt-aid-channel-btn {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #0f0f0f;
+}
+
+html:not([dark]) .yt-aid-channel-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(0, 0, 0, 0.24);
+}
+
+@media (max-width: 760px) {
+  .yt-aid-channel-btn {
+    width: 32px;
+    padding: 0;
+  }
+
+  .yt-aid-channel-btn span {
+    display: none;
+  }
+}
+

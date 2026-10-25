@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Youtube Aid",
-  "version": "1.6.1",
-  "description": "Tiện ích mở rộng YouTube: Copy title thông minh, Clean link không tracking, Phím tắt đôi điều hướng nhanh, Tự động copy khi bôi đen, tải ảnh bìa thumbnail có cắt ảnh và Tự động lặp video.",
+  "version": "1.9.0",
+  "description": "Tiện ích mở rộng YouTube: Copy title thông minh, Clean link không tracking, phím tắt đôi tùy chỉnh, tự động copy/dán khi bôi đen, tải ảnh bìa/avatar/banner có cắt ảnh và tự động lặp video (bỏ qua quảng cáo).",
   "permissions": [
     "storage",
     "clipboardWrite",
@@ -17,6 +17,7 @@
         "https://www.youtube.com/*"
       ],
       "js": [
+        "shortcut-keys.js",
         "content.js"
       ],
       "css": [
