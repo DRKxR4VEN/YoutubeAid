@@ -74,6 +74,7 @@
   function initExtension() {
     createToastContainer();
     initVideoLoopMonitor();
+    initClipboardCopyTracking();
     initShortcutSystem();
     initSelectionCopy();
     initSearchAutoPaste();
@@ -185,7 +186,7 @@
       return true;
     }
 
-    if (el.closest('#contenteditable-root, ytd-searchbox, ytd-comments, #comment-dialog, yt-formatted-string[contenteditable], #edit-box, paper-input')) {
+    if (el.closest('#contenteditable-root, ytd-searchbox, yt-searchbox, ytd-comments, #comment-dialog, yt-formatted-string[contenteditable], #edit-box, paper-input')) {
       return true;
     }
 
@@ -539,6 +540,15 @@
     });
   }
 
+  // YouTube now renders search as <yt-searchbox> with an input that has no id
+  const SEARCH_INPUT_SELECTOR = 'input#search, ytd-searchbox input, yt-searchbox input[name="search_query"], yt-searchbox input';
+  const SEARCH_SCOPE_SELECTOR = 'ytd-searchbox, yt-searchbox';
+  const SEARCH_BUTTON_SELECTOR = 'yt-searchbox button.ytSearchboxComponentSearchButton, ytd-searchbox button#search-icon-legacy, button#search-icon-legacy';
+
+  function findSearchInput() {
+    return document.querySelector(SEARCH_INPUT_SELECTOR);
+  }
+
   // Open search query directly in a brand new tab
   function openSearchInNewTab(text) {
     window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(text)}`, '_blank');
@@ -547,7 +557,7 @@
 
   // Fill the search bar then run the search on the current tab
   function autoEnterSearch(text) {
-    const searchInput = document.querySelector('input#search, ytd-searchbox input');
+    const searchInput = findSearchInput();
     const startHref = window.location.href;
 
     if (searchInput) {
@@ -555,7 +565,7 @@
       searchInput.focus();
     }
 
-    const searchBtn = document.querySelector('ytd-searchbox button#search-icon-legacy, button#search-icon-legacy');
+    const searchBtn = document.querySelector(SEARCH_BUTTON_SELECTOR);
     if (searchBtn) searchBtn.click();
 
     // Synthetic search clicks are not always trusted — fall back to SPA routing
@@ -919,6 +929,30 @@
   // ==========================================
   // 5. COPY ON SELECT & AUTO-PASTE INTO SEARCH
   // ==========================================
+  function normalizeClipboardText(raw) {
+    return String(raw || '').replace(/\s+/g, ' ').trim();
+  }
+
+  // Manual copies (Ctrl+C / context menu) also feed auto-paste, even when
+  // copy-on-select is disabled. Cross-tab copies come from readClipboardText().
+  function initClipboardCopyTracking() {
+    const rememberSelection = () => {
+      const text = normalizeClipboardText(window.getSelection());
+      if (text) lastCopiedText = text;
+    };
+    document.addEventListener('copy', rememberSelection, true);
+    document.addEventListener('cut', rememberSelection, true);
+  }
+
+  async function readClipboardText() {
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') return '';
+      return normalizeClipboardText(await navigator.clipboard.readText());
+    } catch (err) {
+      return '';
+    }
+  }
+
   function initSelectionCopy() {
     let copyTimer = null;
     let lastCopied = { text: '', at: 0 };
@@ -954,18 +988,52 @@
   }
 
   function initSearchAutoPaste() {
+    let clipboardReadBusy = false;
+
+    const pasteIntoSearch = (input, text) => {
+      setSearchInputValue(input, text);
+      input.focus();
+
+      // YouTube's search component may run its own focus/click handling; re-check once
+      setTimeout(() => {
+        if (!input.value.trim()) setSearchInputValue(input, text);
+        try {
+          input.setSelectionRange(text.length, text.length);
+        } catch (err) { }
+      }, 60);
+    };
+
     document.addEventListener('mousedown', (e) => {
       if (!settings.enableAutoPasteSearch) return;
 
-      const input = e.target instanceof Element
-        ? e.target.closest('input#search, ytd-searchbox input')
-        : null;
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target) return;
+      if (target.closest('button, a, [role="button"]')) return;
+
+      let input = target.closest(SEARCH_INPUT_SELECTOR);
+      if (!input) {
+        const scope = target.closest(SEARCH_SCOPE_SELECTOR);
+        if (!scope) return;
+        input = scope.querySelector('input[name="search_query"], input#search, input');
+      }
       if (!input) return;
       if (input.value.trim()) return;
-      if (!lastCopiedText.trim()) return;
+      if (clipboardReadBusy) return;
 
-      setSearchInputValue(input, lastCopiedText);
-      showToast(`Đã dán vào ô tìm kiếm: "${previewText(lastCopiedText, 35)}"`, 'success', 2000);
+      clipboardReadBusy = true;
+      readClipboardText().then((clipboardText) => {
+        clipboardReadBusy = false;
+
+        // Do not clobber text the user typed while the clipboard was being read
+        if (input.value.trim()) return;
+
+        const text = clipboardText || normalizeClipboardText(lastCopiedText);
+        if (!text) return;
+
+        pasteIntoSearch(input, text);
+        lastCopiedText = text;
+        showToast(`Đã dán vào ô tìm kiếm: "${previewText(text, 35)}"`, 'success', 2000);
+      });
     }, true);
   }
 
@@ -1243,7 +1311,7 @@
       <label class="yt-aid-tools-item">
         <span class="yt-aid-tools-text">
           <span class="yt-aid-tools-name">Tự động dán vào ô tìm kiếm</span>
-          <span class="yt-aid-tools-desc">Click ô tìm kiếm trống để dán nội dung vừa copy</span>
+          <span class="yt-aid-tools-desc">Click ô tìm kiếm trống để dán nội dung bạn vừa copy</span>
         </span>
         <span class="yt-aid-switch">
           <input type="checkbox" id="yt-aid-toggle-auto-paste"${checked(settings.enableAutoPasteSearch)}>

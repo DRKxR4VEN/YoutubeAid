@@ -18,9 +18,10 @@ Tiêm tự động vào **Watch page (dưới tiêu đề)**, **Sidebar (video l
 - Bật/tắt trong menu **Tools** trên thanh công cụ Watch page.
 
 ### 3. Tự Động Dán Vào Ô Tìm Kiếm (Auto Paste)
-- Click vào ô tìm kiếm YouTube đang **trống** → nội dung vừa được YouTube Aid sao chép sẽ tự động được dán vào, **không cần Ctrl + V**.
+- Click vào ô tìm kiếm YouTube đang **trống** → nội dung bạn vừa copy sẽ tự động được dán vào, **không cần Ctrl + V**.
 - Kết hợp hoàn hảo với Copy Khi Bôi Đen: bôi đen text → click ô tìm kiếm → Enter là xong.
-- Chỉ dán khi ô tìm kiếm trống để không ghi đè query người dùng đang gõ. Nội dung dán được lấy từ bộ nhớ của tiện ích (text do chính YouTube Aid copy), không đọc clipboard hệ thống nên không cần quyền `clipboardRead`.
+- Dùng được với nội dung copy thủ công (<kbd>Ctrl</kbd> + <kbd>C</kbd> hoặc chuột phải → Copy) kể cả khi đã tắt tính năng copy khi bôi đen, và với nội dung copy từ **tab hoặc ứng dụng khác** — tiện ích đọc clipboard hệ thống khi bạn click vào ô tìm kiếm (quyền `clipboardRead`). Nếu không đọc được clipboard, tiện ích dùng nội dung copy gần nhất mà nó đã ghi nhận.
+- Chỉ dán khi ô tìm kiếm trống để không ghi đè query người dùng đang gõ.
 
 ### 4. Menu Tools (Tính Năng Phụ)
 Nút **Tools** nằm ngay bên phải nút **Auto Loop** trên thanh công cụ Watch page, mở dropdown tập hợp các tính năng phụ kèm công tắc bật/tắt:
@@ -80,7 +81,7 @@ Chi tiết kỹ thuật:
 
 ```
 Youtube_Aid/
-├── manifest.json      # Manifest V3: quyền storage, clipboardWrite
+├── manifest.json      # Manifest V3: quyền storage, clipboardWrite, clipboardRead
 ├── content.js         # Logic tiêm DOM, copy/paste, crop & tải thumbnail, SPA Navigation, Shortcuts, Loop, Tools menu
 ├── styles.css         # CSS giao diện toolbar, tools dropdown, sidebar, card buttons, toast, hộp thoại cắt ảnh
 ├── options.html       # Giao diện bảng điều khiển & tra cứu phím tắt

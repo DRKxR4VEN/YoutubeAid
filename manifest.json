@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Youtube Aid",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Tiện ích mở rộng YouTube: Copy title thông minh, Clean link không tracking, Phím tắt đôi điều hướng nhanh, Tự động copy khi bôi đen, tải ảnh bìa thumbnail có cắt ảnh và Tự động lặp video.",
   "permissions": [
     "storage",
-    "clipboardWrite"
+    "clipboardWrite",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://www.youtube.com/*"
