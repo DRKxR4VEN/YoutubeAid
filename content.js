@@ -25,6 +25,13 @@
   const DEFAULT_SHORTCUT_KEYS = SHORTCUT_API
     ? { ...SHORTCUT_API.DEFAULT_KEYS }
     : { shorts: 's', home: 'h', history: 'h', playlists: 'p', music: 'm' };
+  const DEFAULT_SHORTCUT_TAPS = SHORTCUT_API
+    ? { ...SHORTCUT_API.DEFAULT_TAPS }
+    : { shorts: 2, home: 2, history: 3, playlists: 2, music: 2 };
+
+  // music.youtube.com only reuses the shortcut engine. Everything else in this
+  // script targets the www DOM / player stack and must stay off Music.
+  const IS_MUSIC_SITE = window.location.hostname === 'music.youtube.com';
 
   // --- Configuration & Default Settings ---
   const DEFAULT_SETTINGS = {
@@ -37,7 +44,8 @@
     enableAutoPasteSearch: true,
     enableAutoPasteReplace: true,
     enableThumbnailDownload: true,
-    shortcutKeys: { ...DEFAULT_SHORTCUT_KEYS }
+    shortcutKeys: { ...DEFAULT_SHORTCUT_KEYS },
+    shortcutTaps: { ...DEFAULT_SHORTCUT_TAPS }
   };
 
   let settings = { ...DEFAULT_SETTINGS };
@@ -111,6 +119,11 @@
           settingsChanged = true;
           continue;
         }
+        if (key === 'shortcutTaps') {
+          settings.shortcutTaps = sanitizeShortcutTaps(change.newValue);
+          settingsChanged = true;
+          continue;
+        }
         if (!(key in DEFAULT_SETTINGS)) continue;
         settings[key] = change.newValue === undefined ? DEFAULT_SETTINGS[key] : change.newValue;
         settingsChanged = true;
@@ -137,20 +150,27 @@
   }
 
   function sanitizeShortcutKeys(raw) {
-    if (SHORTCUT_API) return SHORTCUT_API.sanitizeKeys(raw);
+    if (SHORTCUT_API) return SHORTCUT_API.sanitizeKeys(raw, settings.shortcutTaps);
     return { ...DEFAULT_SHORTCUT_KEYS, ...(raw && typeof raw === 'object' ? raw : {}) };
+  }
+
+  function sanitizeShortcutTaps(raw) {
+    if (SHORTCUT_API) return SHORTCUT_API.sanitizeTaps(raw);
+    return { ...DEFAULT_SHORTCUT_TAPS };
   }
 
   function rebuildShortcutKeymap() {
     const keys = sanitizeShortcutKeys(settings.shortcutKeys);
     settings.shortcutKeys = keys;
+    const taps = sanitizeShortcutTaps(settings.shortcutTaps);
+    settings.shortcutTaps = taps;
 
     const map = {};
     for (const action of SHORTCUT_ACTIONS) {
       const key = keys[action.id];
       if (!key) continue;
       const entry = map[key] || (map[key] = {});
-      if (action.taps === 3) entry.triple = action.id;
+      if (taps[action.id] === 3) entry.triple = action.id;
       else entry.double = action.id;
     }
 
@@ -161,10 +181,12 @@
 
   // "HH" / "HHH" — used in shortcut toasts so they match the user's binding
   function shortcutSequence(actionId) {
-    if (SHORTCUT_API) return SHORTCUT_API.sequenceLabel(settings.shortcutKeys, actionId);
+    if (SHORTCUT_API) return SHORTCUT_API.sequenceLabel(settings.shortcutKeys, actionId, settings.shortcutTaps);
     const action = SHORTCUT_ACTIONS.find((item) => item.id === actionId);
     const key = settings.shortcutKeys && settings.shortcutKeys[actionId];
-    return action && key ? String(key).repeat(action.taps).toUpperCase() : '';
+    const taps = settings.shortcutTaps && settings.shortcutTaps[actionId];
+    const count = taps === 3 ? 3 : 2;
+    return action && key ? String(key).repeat(count).toUpperCase() : '';
   }
 
   function applySettingUpdates() {
@@ -176,7 +198,7 @@
     settings.enableThumbnailDownload = true;
 
     // Also clears loop on every player video when the setting is turned off
-    ensureVideoLoop();
+    if (!IS_MUSIC_SITE) ensureVideoLoop();
 
     // Toggle button visibility via body class
     document.body.classList.toggle('yt-aid-hide-copy-buttons', !settings.enableCopyButtons);
@@ -184,6 +206,8 @@
 
     if (!settings.enableShortcuts) resetKeyBuffer();
 
+    closeHomeFlyout();
+    if (IS_MUSIC_SITE) return;
     syncToolbarState();
     injectAllAreas();
   }
@@ -191,6 +215,14 @@
   // --- Main Initializer ---
   function initExtension() {
     createToastContainer();
+
+    if (IS_MUSIC_SITE) {
+      rebuildShortcutKeymap();
+      initShortcutSystem();
+      applySettingUpdates();
+      return;
+    }
+
     initVideoLoopMonitor();
     initClipboardCopyTracking();
     rebuildShortcutKeymap();
@@ -266,10 +298,26 @@
   // ==========================================
   // 2. AUTO VIDEO.LOOP = TRUE (never loops ads)
   // ==========================================
-  // YouTube marks the player with these classes for the whole ad break, so
-  // looping must stay off until the break finishes — otherwise the ad replays
-  // itself instead of handing over to the requested video.
+  // YouTube marks the player with these classes for the whole ad break, and
+  // some ad formats only expose their UI without the classes. Both signals
+  // keep loop off until the break finishes — otherwise the ad replays itself
+  // instead of handing over to the requested video.
   const AD_PLAYER_CLASSES = ['ad-showing', 'ad-interrupting'];
+  const AD_UI_SELECTORS = [
+    '.ytp-ad-player-overlay',
+    '.ytp-ad-preview-container',
+    '.ytp-ad-skip-button-container',
+    '.ytp-ad-duration-remaining',
+    '.ytp-ad-simple-ad-badge'
+  ].join(', ');
+  // Ad pods briefly clear the ad markers between two ads; waiting a moment
+  // before re-enabling loop avoids looping that next ad.
+  const AD_RELEASE_DELAY = 500;
+
+  let lastAdSeenAt = 0;
+  let loopPlayerObserver = null;
+  let loopWatchdogTimer = null;
+  const observedLoopPlayers = new WeakSet();
 
   function getPlayerElement() {
     return document.getElementById('movie_player') ||
@@ -279,12 +327,37 @@
   function isAdPlaying() {
     const player = getPlayerElement();
     if (!player) return false;
-    return AD_PLAYER_CLASSES.some((cls) => player.classList.contains(cls));
+
+    if (AD_PLAYER_CLASSES.some((cls) => player.classList.contains(cls))) {
+      lastAdSeenAt = Date.now();
+      return true;
+    }
+
+    try {
+      const state = typeof player.getAdState === 'function'
+        ? Number(player.getAdState())
+        : 0;
+      if (state > 0) {
+        lastAdSeenAt = Date.now();
+        return true;
+      }
+    } catch (e) { }
+
+    for (const el of player.querySelectorAll(AD_UI_SELECTORS)) {
+      if (el.hidden || !el.getClientRects().length) continue;
+      const style = getComputedStyle(el);
+      if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+        lastAdSeenAt = Date.now();
+        return true;
+      }
+    }
+    return false;
   }
 
-  let loopPlayerObserver = null;
-  let loopWatchdogTimer = null;
-  const observedLoopPlayers = new WeakSet();
+  function isLoopBlocked() {
+    if (isAdPlaying()) return true;
+    return Date.now() - lastAdSeenAt < AD_RELEASE_DELAY;
+  }
 
   function observePlayerAdState() {
     const player = getPlayerElement();
@@ -299,11 +372,14 @@
     });
   }
 
-  function collectPlayerVideos() {
+  function collectPlayerVideos(includePageVideos) {
     const videos = new Set();
     const player = getPlayerElement();
     if (player) player.querySelectorAll('video').forEach((video) => videos.add(video));
     document.querySelectorAll('video.video-stream').forEach((video) => videos.add(video));
+    // Ad videos can live outside the main player, so disabling targets every
+    // media element on the page.
+    if (includePageVideos) document.querySelectorAll('video').forEach((video) => videos.add(video));
     if (!videos.size) {
       const fallback = document.querySelector('video');
       if (fallback) videos.add(fallback);
@@ -312,8 +388,9 @@
   }
 
   function applyLoopState(enabled) {
-    collectPlayerVideos().forEach((video) => {
+    collectPlayerVideos(!enabled).forEach((video) => {
       if (video.loop !== enabled) video.loop = enabled;
+      if (!enabled) video.removeAttribute('loop');
       if (!video.__ytAidLoopBound) {
         video.__ytAidLoopBound = true;
         const enforceLoop = () => ensureVideoLoop();
@@ -322,6 +399,19 @@
         video.addEventListener('ended', enforceLoop);
       }
     });
+  }
+
+  // Always reflects the user's own choice. The ad-time forced pause is
+  // deliberately invisible: the user only tracks whether Auto Loop is on/off.
+  function syncLoopButton() {
+    const loopBtn = document.getElementById('yt-aid-btn-toggle-loop');
+    if (!loopBtn) return;
+    const wanted = !!settings.enableLoop;
+    loopBtn.classList.toggle('active', wanted);
+    loopBtn.setAttribute('aria-pressed', wanted ? 'true' : 'false');
+    loopBtn.title = wanted ? 'Auto Loop đang bật' : 'Auto Loop đang tắt';
+    const label = loopBtn.querySelector('span');
+    if (label) label.textContent = wanted ? 'Auto Loop: ON' : 'Auto Loop: OFF';
   }
 
   function stopLoopWatchdog() {
@@ -340,18 +430,20 @@
         stopLoopWatchdog();
         return;
       }
-      observePlayerAdState();
-      applyLoopState(!isAdPlaying());
-    }, 400);
+      ensureVideoLoop();
+    }, 250);
   }
 
   function ensureVideoLoop() {
     observePlayerAdState();
 
-    const enabled = !!settings.enableLoop && !isAdPlaying();
+    const onWatch = window.location.pathname.startsWith('/watch');
+    const blocked = onWatch && isLoopBlocked();
+    const enabled = onWatch && !!settings.enableLoop && !blocked;
     applyLoopState(enabled);
+    syncLoopButton();
 
-    if (settings.enableLoop && window.location.pathname.startsWith('/watch')) {
+    if (settings.enableLoop && onWatch) {
       startLoopWatchdog();
     } else {
       stopLoopWatchdog();
@@ -381,7 +473,7 @@
       return true;
     }
 
-    if (el.closest('#contenteditable-root, ytd-searchbox, yt-searchbox, ytd-comments, #comment-dialog, yt-formatted-string[contenteditable], #edit-box, paper-input')) {
+    if (el.closest('#contenteditable-root, ytd-searchbox, yt-searchbox, ytmusic-search-box, ytd-comments, #comment-dialog, yt-formatted-string[contenteditable], #edit-box, paper-input, tp-yt-paper-input')) {
       return true;
     }
 
@@ -462,7 +554,24 @@
     return true;
   }
 
+  // Cross-site targets must be a plain navigation: Music has no ytd-app router
+  // and its own link conventions.
+  function goToYoutubeTarget(pathOrUrl) {
+    const target = pathOrUrl.startsWith('http') ? pathOrUrl : `https://www.youtube.com${pathOrUrl}`;
+    if (IS_MUSIC_SITE) {
+      window.location.assign(target);
+      return;
+    }
+    simulateSpaNavigation(target);
+  }
+
   function navigateToShorts() {
+    if (IS_MUSIC_SITE) {
+      showToast(`Phím tắt [${shortcutSequence('shorts')}]: Chuyển sang YouTube Shorts`, 'info', 1600);
+      goToYoutubeTarget('/shorts');
+      return;
+    }
+
     updateCachedShorts();
     const shortsAnchor = findSuggestedShortsElement();
 
@@ -489,6 +598,10 @@
 
   function navigateToHome() {
     showToast(`Phím tắt [${shortcutSequence('home')}]: Về trang chủ`, 'info', 1600);
+    if (IS_MUSIC_SITE) {
+      goToYoutubeTarget('/');
+      return;
+    }
     const homeSelectors = [
       'ytd-topbar-logo-renderer a#logo',
       'a#logo',
@@ -510,6 +623,10 @@
 
   function navigateToHistory() {
     showToast(`Phím tắt [${shortcutSequence('history')}]: Mở lịch sử xem`, 'info', 1600);
+    if (IS_MUSIC_SITE) {
+      goToYoutubeTarget('/feed/history');
+      return;
+    }
     const historySelectors = [
       'ytd-guide-entry-renderer a[href^="/feed/history"]',
       'ytd-mini-guide-entry-renderer a[href^="/feed/history"]',
@@ -530,6 +647,10 @@
 
   function navigateToPlaylists() {
     showToast(`Phím tắt [${shortcutSequence('playlists')}]: Danh sách phát`, 'info', 1600);
+    if (IS_MUSIC_SITE) {
+      goToYoutubeTarget('/feed/playlists');
+      return;
+    }
     const playlistSelectors = [
       'ytd-guide-entry-renderer a[href^="/feed/playlists"]',
       'ytd-mini-guide-entry-renderer a[href^="/feed/playlists"]',
@@ -551,6 +672,11 @@
   }
 
   function navigateToMusic() {
+    if (IS_MUSIC_SITE) {
+      showToast(`Phím tắt [${shortcutSequence('music')}]: Bạn đang ở YouTube Music`, 'info', 1600);
+      if (window.location.pathname !== '/') window.location.assign('https://music.youtube.com/');
+      return;
+    }
     showToast(`Phím tắt [${shortcutSequence('music')}]: Chuyển sang YouTube Music`, 'info', 1600);
     window.location.href = 'https://music.youtube.com/';
   }
@@ -580,11 +706,16 @@
   // no chord completes, so both behaviours keep working.
   const SINGLE_KEY_FALLBACK = {
     m: () => {
-      const btn = document.querySelector('.ytp-mute-button');
-      if (btn) btn.click();
+      const btn = document.querySelector('.ytp-mute-button, #mute-button');
+      if (btn) {
+        btn.click();
+        return;
+      }
+      const video = document.querySelector('video');
+      if (video) video.muted = !video.muted;
     },
     p: () => {
-      const btn = document.querySelector('.ytp-prev-button');
+      const btn = document.querySelector('.ytp-prev-button, #previous-button');
       if (btn) btn.click();
     }
   };
@@ -1712,7 +1843,7 @@
       }, delay);
     };
 
-    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar';
+    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger';
     const containsAidUi = (node) => node.nodeType === 1 &&
       (node.matches(AID_UI_SELECTOR) || !!node.querySelector(AID_UI_SELECTOR));
 
@@ -1743,6 +1874,7 @@
     window.addEventListener('yt-navigate-finish', () => {
       updateCachedShorts();
       ensureVideoLoop();
+      closeHomeFlyout();
       closeDropdown();
       scheduleInjection(80);
     });
@@ -1772,6 +1904,8 @@
   function injectAllAreas() {
     const path = window.location.pathname;
     const hasCardTools = settings.enableCopyButtons || settings.enableCleanLink || settings.enableThumbnailDownload;
+
+    if (!isHomeFeedPage()) closeHomeFlyout();
 
     if (path.startsWith('/watch')) {
       injectWatchPageToolbar();
@@ -1848,9 +1982,9 @@
 
       <div class="yt-aid-toolbar-right">
         <!-- Auto Loop Toggle Button -->
-        <button class="yt-aid-pill-btn yt-aid-loop-indicator ${settings.enableLoop ? 'active' : ''}" id="yt-aid-btn-toggle-loop" title="Tự động lặp lại video">
+        <button class="yt-aid-pill-btn yt-aid-loop-indicator ${settings.enableLoop ? 'active' : ''}" id="yt-aid-btn-toggle-loop" title="${settings.enableLoop ? 'Auto Loop đang bật' : 'Auto Loop đang tắt'}">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
-          <span>Auto Loop</span>
+          <span>Auto Loop: ${settings.enableLoop ? 'ON' : 'OFF'}</span>
         </button>
 
         <!-- Extra tools dropdown -->
@@ -1912,11 +2046,15 @@
     const loopBtn = toolbar.querySelector('#yt-aid-btn-toggle-loop');
     loopBtn.addEventListener('click', () => {
       const nextLoop = !settings.enableLoop;
+      const forcedOff = isLoopBlocked();
       settings.enableLoop = nextLoop;
       safeSetStorage({ enableLoop: nextLoop });
-      loopBtn.classList.toggle('active', nextLoop);
+      // While an ad forces loop off, remember the new choice and let the
+      // button show it; skip the toast so the forced pause stays invisible.
       ensureVideoLoop();
-      showToast(nextLoop ? 'Đã bật tự động lặp lại video' : 'Đã tắt tự động lặp lại video', 'info');
+      if (!forcedOff) {
+        showToast(nextLoop ? 'Đã bật tự động lặp lại video' : 'Đã tắt tự động lặp lại video', 'info');
+      }
     });
 
     // Tools dropdown
@@ -1967,8 +2105,7 @@
   }
 
   function syncToolbarState() {
-    const loopBtn = document.getElementById('yt-aid-btn-toggle-loop');
-    if (loopBtn) loopBtn.classList.toggle('active', !!settings.enableLoop);
+    syncLoopButton();
 
     const selectionToggle = document.getElementById('yt-aid-toggle-selection-copy');
     if (selectionToggle) selectionToggle.checked = !!settings.enableSelectionCopy;
@@ -2221,6 +2358,9 @@
   // ----------------------------------------------------
   // C. HOME PAGE & FEED INJECTION
   // ----------------------------------------------------
+  // Every card owns a tiny stationary trigger in its bottom-right corner.
+  // The popover is a single node on <body>, created on demand, so hovering
+  // the feed costs nothing and YouTube re-rendering a card cannot wipe it.
   const HOME_CARD_LINK_SELECTOR = [
     'a#video-title-link',
     'a#video-title',
@@ -2232,145 +2372,368 @@
     '#video-title',
     'a.ytLockupMetadataViewModelTitle'
   ].join(', ');
-  const HOME_CARD_DETAILS_SELECTOR = [
-    '#details',
-    '#meta',
-    '.ytLockupViewModelHost',
-    '.ytLockupMetadataViewModelTextContainer'
-  ].join(', ');
+  const HOME_CARD_ITEM_SELECTOR = 'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer';
+  const HOME_CARD_IGNORE_SELECTOR = 'ytd-reel-item-renderer, ytd-shorts-lockup-view-model, ytm-shorts-lockup-view-model';
+  const HOME_TRIGGER_CLASS = 'yt-aid-home-trigger';
+  const HOME_FLYOUT_CLASS = 'yt-aid-home-flyout';
+
+  const homeFlyout = {
+    panel: null,
+    panelConfig: '',
+    trigger: null,
+    item: null,
+    data: null,
+    open: false,
+    listening: false
+  };
+
+  function isHomeFeedPage() {
+    const path = window.location.pathname;
+    return path === '/' || path.startsWith('/results') || path.startsWith('/feed');
+  }
+
+  function readHomeCardData(item) {
+    if (!item) return null;
+    const linkEl = item.querySelector(HOME_CARD_LINK_SELECTOR);
+    const titleEl = item.querySelector(HOME_CARD_TITLE_SELECTOR);
+    const url = linkEl ? (linkEl.href || linkEl.getAttribute('href') || '') : '';
+    const title = titleEl
+      ? (titleEl.getAttribute('title') || titleEl.textContent || '').trim()
+      : '';
+    if (!url || !title || !videoIdFromUrl(url)) return null;
+    return { url, title };
+  }
+
+  // The title/link nodes vanish for a moment while the inline preview loads,
+  // so keep the last valid pair for the card instead of dropping the trigger.
+  function homeCardData(item) {
+    if (!item) return null;
+    const live = readHomeCardData(item);
+    if (live) {
+      item.__ytAidCardData = live;
+      return live;
+    }
+    return item.__ytAidCardData || null;
+  }
+
+  function homeTriggerSvg() {
+    return [
+      '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">',
+      '<rect x="6.3" y="6.3" width="4.8" height="4.8" rx="1.3"/>',
+      '<rect x="12.9" y="6.3" width="4.8" height="4.8" rx="1.3"/>',
+      '<rect x="6.3" y="12.9" width="4.8" height="4.8" rx="1.3"/>',
+      '<rect x="12.9" y="12.9" width="4.8" height="4.8" rx="1.3"/>',
+      '</svg>'
+    ].join('');
+  }
+
+  function ensureHomeTrigger(item) {
+    let trigger = item.querySelector(`:scope > .${HOME_TRIGGER_CLASS}`);
+    if (trigger && trigger.dataset.ytAidVersion === EXT_VERSION) return trigger;
+    if (trigger) trigger.remove();
+
+    trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = HOME_TRIGGER_CLASS;
+    trigger.dataset.ytAidVersion = EXT_VERSION;
+    trigger.title = 'Công cụ video';
+    trigger.setAttribute('aria-label', 'Công cụ video');
+    trigger.setAttribute('aria-haspopup', 'true');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.innerHTML = homeTriggerSvg();
+    item.classList.add('yt-aid-home-card-host');
+    item.appendChild(trigger);
+    return trigger;
+  }
+
+  function homeFlyoutConfig() {
+    return `copy:${settings.enableCopyButtons ? 1 : 0}`;
+  }
+
+  function buildHomeFlyoutContent(panel) {
+    const buttons = [];
+
+    if (settings.enableCopyButtons) {
+      buttons.push(`
+        <button type="button" class="yt-aid-flyout-btn yt-aid-copy-pure" title="Sao chép tiêu đề" aria-label="Sao chép tiêu đề">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+        </button>
+        <button type="button" class="yt-aid-flyout-btn yt-aid-copy-enter" title="Copy &amp; tìm kiếm ngay (Ctrl+Click mở tab mới)" aria-label="Copy và tìm kiếm ngay">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M3 2h7a2 2 0 0 1 2 2v1h-2V4H3v9h1v2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 4h6a2 2 0 0 1 2 2v1h-2V8H6v7h2v2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
+            <path fill="currentColor" d="M17 2a3 3 0 1 0 2 5.2l2.3 2.3 1.4-1.4-2.3-2.3A3 3 0 0 0 17 2zm0 1.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
+            <path fill="currentColor" d="M19 14v3H12.8l2.6-2.6-1.4-1.4L9 18l5 5 1.4-1.4-2.6-2.6H21v-5h-2z"/>
+          </svg>
+        </button>
+        <button type="button" class="yt-aid-flyout-btn yt-aid-copy-link" title="Sao chép liên kết sạch" aria-label="Sao chép liên kết sạch">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+        </button>
+      `);
+    }
+
+    buttons.push(`
+      <button type="button" class="yt-aid-flyout-btn yt-aid-thumb" title="Tải ảnh bìa thumbnail" aria-label="Tải ảnh bìa thumbnail">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+      </button>
+    `);
+
+    panel.innerHTML = buttons.join('');
+    panel.dataset.ytAidConfig = homeFlyoutConfig();
+
+    const flyoutData = () => {
+      const live = homeFlyout.item ? readHomeCardData(homeFlyout.item) : null;
+      if (live) homeFlyout.data = live;
+      return homeFlyout.data || { url: '', title: '' };
+    };
+
+    const copyBtn = panel.querySelector('.yt-aid-copy-pure');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const title = flyoutData().title;
+        closeHomeFlyout();
+        if (!title) return;
+        copyTextToClipboard(title, `Đã sao chép: "${previewText(title, 30)}"`);
+      });
+    }
+
+    const enterBtn = panel.querySelector('.yt-aid-copy-enter');
+    if (enterBtn) {
+      const handleCopyEnter = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const title = flyoutData().title;
+        closeHomeFlyout();
+        if (!title) return;
+        copyTextToClipboard(title, '');
+        if (e.ctrlKey || e.metaKey || e.button === 1) {
+          openSearchInNewTab(title);
+        } else {
+          autoEnterSearch(title);
+        }
+      };
+      enterBtn.addEventListener('click', handleCopyEnter);
+      enterBtn.addEventListener('auxclick', (e) => {
+        if (e.button === 1) handleCopyEnter(e);
+      });
+    }
+
+    const linkBtn = panel.querySelector('.yt-aid-copy-link');
+    if (linkBtn) {
+      linkBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const clean = cleanYoutubeUrl(flyoutData().url);
+        closeHomeFlyout();
+        if (!clean) return;
+        copyTextToClipboard(clean, `Đã chép liên kết: ${previewText(clean, 45)}`);
+      });
+    }
+
+    const thumbBtn = panel.querySelector('.yt-aid-thumb');
+    if (thumbBtn) {
+      thumbBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const btn = e.currentTarget;
+        const data = flyoutData();
+        closeHomeFlyout();
+        downloadThumbnail(btn, data.title, data.url);
+      });
+    }
+  }
+
+  function ensureHomeFlyout() {
+    // A stale panel from an older build would keep the previous markup.
+    document.querySelectorAll(`.${HOME_FLYOUT_CLASS}`).forEach((el) => {
+      if (el !== homeFlyout.panel) el.remove();
+    });
+
+    let panel = homeFlyout.panel;
+    if (panel && !panel.isConnected) {
+      panel = null;
+      homeFlyout.panel = null;
+      homeFlyout.panelConfig = '';
+    }
+
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = HOME_FLYOUT_CLASS;
+      panel.dataset.ytAidVersion = EXT_VERSION;
+      panel.setAttribute('role', 'group');
+      panel.setAttribute('aria-label', 'Công cụ video');
+      panel.setAttribute('aria-hidden', 'true');
+      panel.addEventListener('pointerdown', (e) => e.stopPropagation());
+      panel.addEventListener('click', (e) => e.stopPropagation());
+      document.body.appendChild(panel);
+      homeFlyout.panel = panel;
+      homeFlyout.panelConfig = '';
+    }
+
+    if (homeFlyout.panelConfig !== homeFlyoutConfig()) {
+      buildHomeFlyoutContent(panel);
+      homeFlyout.panelConfig = homeFlyoutConfig();
+    }
+    return panel;
+  }
+
+  function positionHomeFlyout() {
+    const panel = homeFlyout.panel;
+    const trigger = homeFlyout.trigger;
+    if (!panel || !trigger || !trigger.isConnected) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const gap = 8;
+    const margin = 8;
+    const width = panel.offsetWidth;
+    const height = panel.offsetHeight;
+    const viewportW = document.documentElement.clientWidth || window.innerWidth;
+    const viewportH = document.documentElement.clientHeight || window.innerHeight;
+
+    let left = Math.round(rect.right - width);
+    let top = Math.round(rect.top - height - gap);
+    let origin = 'bottom';
+
+    if (top < margin) {
+      top = Math.round(rect.bottom + gap);
+      origin = 'top';
+    }
+
+    left = Math.max(margin, Math.min(left, viewportW - width - margin));
+    top = Math.max(margin, Math.min(top, viewportH - height - margin));
+
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.transformOrigin = `${origin} right`;
+  }
+
+  function openHomeFlyout(trigger) {
+    const item = trigger.closest(HOME_CARD_ITEM_SELECTOR);
+    if (!item) return;
+
+    const data = readHomeCardData(item) || homeCardData(item);
+    if (!data) return;
+    item.__ytAidCardData = data;
+
+    const panel = ensureHomeFlyout();
+    const wasOpen = homeFlyout.open;
+    if (homeFlyout.trigger && homeFlyout.trigger !== trigger) {
+      homeFlyout.trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    homeFlyout.trigger = trigger;
+    homeFlyout.item = item;
+    homeFlyout.data = data;
+    homeFlyout.open = true;
+    trigger.setAttribute('aria-expanded', 'true');
+    panel.setAttribute('aria-hidden', 'false');
+
+    if (!wasOpen) panel.classList.remove('yt-aid-flyout-open');
+    positionHomeFlyout();
+    panel.classList.add('yt-aid-flyout-open');
+    attachHomeFlyoutListeners();
+  }
+
+  function closeHomeFlyout() {
+    detachHomeFlyoutListeners();
+    if (homeFlyout.trigger) homeFlyout.trigger.setAttribute('aria-expanded', 'false');
+    if (homeFlyout.panel) {
+      homeFlyout.panel.classList.remove('yt-aid-flyout-open');
+      homeFlyout.panel.setAttribute('aria-hidden', 'true');
+    }
+    homeFlyout.open = false;
+    homeFlyout.trigger = null;
+    homeFlyout.item = null;
+    homeFlyout.data = null;
+  }
+
+  function onHomeFlyoutPointerDown(event) {
+    if (!homeFlyout.open) return;
+    const target = event.target;
+    if (homeFlyout.panel && homeFlyout.panel.contains(target)) return;
+    if (target && target.closest && target.closest(`.${HOME_TRIGGER_CLASS}`)) return;
+    closeHomeFlyout();
+  }
+
+  function onHomeFlyoutKeyDown(event) {
+    if (event.key !== 'Escape') return;
+    const trigger = homeFlyout.trigger;
+    event.preventDefault();
+    event.stopPropagation();
+    closeHomeFlyout();
+    if (trigger && trigger.isConnected) trigger.focus({ preventScroll: true });
+  }
+
+  // Scroll and resize listeners only exist while the popover is open.
+  function attachHomeFlyoutListeners() {
+    if (homeFlyout.listening) return;
+    homeFlyout.listening = true;
+    document.addEventListener('pointerdown', onHomeFlyoutPointerDown, true);
+    document.addEventListener('keydown', onHomeFlyoutKeyDown, true);
+    window.addEventListener('scroll', closeHomeFlyout, { capture: true, passive: true });
+    window.addEventListener('resize', closeHomeFlyout, { passive: true });
+  }
+
+  function detachHomeFlyoutListeners() {
+    if (!homeFlyout.listening) return;
+    homeFlyout.listening = false;
+    document.removeEventListener('pointerdown', onHomeFlyoutPointerDown, true);
+    document.removeEventListener('keydown', onHomeFlyoutKeyDown, true);
+    window.removeEventListener('scroll', closeHomeFlyout, { capture: true });
+    window.removeEventListener('resize', closeHomeFlyout);
+  }
+
+  // One delegated handler for every card: no per-card listeners to leak.
+  function onHomeTriggerClick(event) {
+    const target = event.target;
+    const trigger = target && target.closest ? target.closest(`.${HOME_TRIGGER_CLASS}`) : null;
+    if (!trigger) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (homeFlyout.open && homeFlyout.trigger === trigger) {
+      closeHomeFlyout();
+    } else {
+      openHomeFlyout(trigger);
+    }
+  }
+
+  document.addEventListener('click', onHomeTriggerClick, true);
 
   function injectHomePageCards() {
-    const showCopy = !!settings.enableCopyButtons;
-    const showThumb = !!settings.enableThumbnailDownload;
-    if (!showCopy && !showThumb) return;
+    if (!isHomeFeedPage()) {
+      closeHomeFlyout();
+      return;
+    }
 
-    const cardItems = document.querySelectorAll(
-      'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer'
-    );
+    document.querySelectorAll(HOME_CARD_ITEM_SELECTOR).forEach((item) => {
+      if (!item.isConnected) return;
+      const existing = item.querySelector(`:scope > .${HOME_TRIGGER_CLASS}`);
 
-    cardItems.forEach(item => {
-      if (hasCurrentCardBar(item)) return;
-      // Shorts lockups and non-video rich items have no video title row
-      if (item.querySelector('ytd-reel-item-renderer, ytd-shorts-lockup-view-model, ytm-shorts-lockup-view-model')) return;
-      // New home/search cards expose the title only through the lockup metadata
-      // view model; sponsored cards have no /watch link and are skipped below.
-      const linkEl = item.querySelector(HOME_CARD_LINK_SELECTOR);
-      if (!linkEl) return;
-      if (!videoIdFromUrl(linkEl.href || linkEl.getAttribute('href') || '')) return;
-      const details = item.querySelector(HOME_CARD_DETAILS_SELECTOR);
-      if (!details) return;
-
-      const cardBar = document.createElement('div');
-      cardBar.className = 'yt-aid-card-bar yt-aid-home-card-bar';
-      cardBar.dataset.ytAidVersion = EXT_VERSION;
-
-      const buttons = [];
-      if (showCopy) {
-        buttons.push(`
-          <button type="button" class="yt-aid-mini-action yt-aid-copy-pure" title="Sao chép tiêu đề">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-            <span>Tiêu đề</span>
-          </button>
-          <button type="button" class="yt-aid-mini-action yt-aid-copy-enter" title="Copy &amp; tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)">
-            <svg viewBox="0 0 24 24">
-              <path fill="currentColor" d="M3 2h7a2 2 0 0 1 2 2v1h-2V4H3v9h1v2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 4h6a2 2 0 0 1 2 2v1h-2V8H6v7h2v2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
-              <path fill="currentColor" d="M17 2a3 3 0 1 0 2 5.2l2.3 2.3 1.4-1.4-2.3-2.3A3 3 0 0 0 17 2zm0 1.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
-              <path fill="currentColor" d="M19 14v3H12.8l2.6-2.6-1.4-1.4L9 18l5 5 1.4-1.4-2.6-2.6H21v-5h-2z"/>
-            </svg>
-            <span>Tìm kiếm</span>
-          </button>
-          <button type="button" class="yt-aid-mini-action yt-aid-copy-link" title="Sao chép liên kết video sạch">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
-            <span>Link</span>
-          </button>
-        `);
-      }
-      if (showThumb) {
-        buttons.push(`
-          <button type="button" class="yt-aid-mini-action yt-aid-thumb" title="Tải ảnh bìa thumbnail">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-            <span>Ảnh bìa</span>
-          </button>
-        `);
+      if (item.querySelector(HOME_CARD_IGNORE_SELECTOR)) {
+        if (existing) existing.remove();
+        item.classList.remove('yt-aid-home-card-host');
+        return;
       }
 
-      cardBar.innerHTML = `<div class="yt-aid-card-btn-cluster">${buttons.join('')}</div>`;
-      details.appendChild(cardBar);
-
-      // Track hover on the whole card so the bar also appears when the pointer
-      // is over the thumbnail, not just the title/metadata area.
-      const setBarVisible = (visible) => {
-        cardBar.classList.toggle('yt-aid-bar-visible', visible);
-      };
-      item.addEventListener('pointerenter', () => setBarVisible(true));
-      item.addEventListener('pointerleave', () => setBarVisible(false));
-      item.addEventListener('focusin', () => setBarVisible(true));
-      item.addEventListener('focusout', (event) => {
-        if (!item.contains(event.relatedTarget)) setBarVisible(false);
-      });
-      if (item.matches(':hover')) setBarVisible(true);
-
-      const getCardTitle = () => {
-        const titleEl = item.querySelector(HOME_CARD_TITLE_SELECTOR);
-        if (!titleEl) return '';
-        const attr = titleEl.getAttribute('title');
-        return (attr || titleEl.textContent || '').trim();
-      };
-
-      const getCardUrl = () => {
-        const target = item.querySelector(HOME_CARD_LINK_SELECTOR);
-        return target ? (target.href || target.getAttribute('href') || '') : '';
-      };
-
-      const copyBtn = cardBar.querySelector('.yt-aid-copy-pure');
-      if (copyBtn) {
-        copyBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          const title = getCardTitle();
-          copyTextToClipboard(title, `Đã sao chép: "${previewText(title, 30)}"`);
-        });
+      if (!homeCardData(item)) {
+        if (existing && existing.dataset.ytAidVersion !== EXT_VERSION) existing.remove();
+        return;
       }
 
-      const enterBtn = cardBar.querySelector('.yt-aid-copy-enter');
-      if (enterBtn) {
-        const handleCopyEnter = (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          const title = getCardTitle();
-          copyTextToClipboard(title, '');
-          if (e.ctrlKey || e.metaKey || e.button === 1) {
-            openSearchInNewTab(title);
-          } else {
-            autoEnterSearch(title);
-          }
-        };
-        enterBtn.addEventListener('click', handleCopyEnter);
-        enterBtn.addEventListener('auxclick', (e) => {
-          if (e.button === 1) handleCopyEnter(e);
-        });
-      }
-
-      const linkBtn = cardBar.querySelector('.yt-aid-copy-link');
-      if (linkBtn) {
-        linkBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          const clean = cleanYoutubeUrl(getCardUrl());
-          if (!clean) return;
-          copyTextToClipboard(clean, `Đã chép liên kết: ${previewText(clean, 45)}`);
-        });
-      }
-
-      const thumbBtn = cardBar.querySelector('.yt-aid-thumb');
-      if (thumbBtn) {
-        thumbBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          downloadThumbnail(e.currentTarget, getCardTitle(), getCardUrl());
-        });
-      }
+      if (existing && existing.dataset.ytAidVersion === EXT_VERSION) return;
+      if (existing) existing.remove();
+      ensureHomeTrigger(item);
     });
+
+    // The card can be replaced while its menu is open; drop the stale anchor.
+    if (homeFlyout.open) {
+      const { item, trigger } = homeFlyout;
+      if (!item || !item.isConnected || !trigger || !trigger.isConnected) {
+        closeHomeFlyout();
+      }
+    }
   }
+
 
 })();

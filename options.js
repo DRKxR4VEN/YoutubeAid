@@ -12,6 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
     playlists: 'p',
     music: 'm'
   };
+  const FALLBACK_SHORTCUT_TAPS = {
+    shorts: 2,
+    home: 2,
+    history: 3,
+    playlists: 2,
+    music: 2
+  };
 
   const DEFAULTS = {
     enableLoop: true,
@@ -23,7 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     enableAutoPasteSearch: true,
     enableAutoPasteReplace: true,
     enableThumbnailDownload: true,
-    shortcutKeys: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_KEYS } : { ...FALLBACK_SHORTCUT_KEYS }
+    shortcutKeys: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_KEYS } : { ...FALLBACK_SHORTCUT_KEYS },
+    shortcutTaps: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_TAPS } : { ...FALLBACK_SHORTCUT_TAPS }
   };
 
   const toggleInputs = {
@@ -40,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnReset = document.getElementById('btnReset');
   const keybindActionsEl = document.getElementById('keybindActions');
   const keybindKeyboard = document.getElementById('keybindKeyboard');
+  const keybindTapsEl = document.getElementById('keybindTaps');
   const keybindError = document.getElementById('keybindError');
   const keybindSection = document.getElementById('keybindSection');
 
@@ -58,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   let currentShortcutKeys = { ...DEFAULTS.shortcutKeys };
+  let currentShortcutTaps = { ...DEFAULTS.shortcutTaps };
   let selectedActionId = 'shorts';
   let statusTimer = null;
 
@@ -138,7 +148,20 @@ document.addEventListener('DOMContentLoaded', () => {
       keybindKeyboard.appendChild(rowEl);
     });
 
+    if (keybindTapsEl) {
+      keybindTapsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
+        btn.addEventListener('click', () => handleTapPick(Number(btn.dataset.taps)));
+      });
+    }
+
     refreshKeybindState();
+  }
+
+  function actionTaps(actionId) {
+    const value = Number(currentShortcutTaps[actionId]);
+    if (value === 2 || value === 3) return value;
+    const action = SHORTCUTS ? SHORTCUTS.findAction(actionId) : null;
+    return action ? action.taps : 2;
   }
 
   function refreshKeybindState() {
@@ -158,13 +181,23 @@ document.addEventListener('DOMContentLoaded', () => {
       keysEl.textContent = '';
 
       if (!action || !key) return;
-      for (let i = 0; i < action.taps; i++) {
+      const taps = actionTaps(actionId);
+      for (let i = 0; i < taps; i++) {
         const badge = document.createElement('span');
         badge.className = 'kbd-badge';
         badge.textContent = key.toUpperCase();
         keysEl.appendChild(badge);
       }
     });
+
+    if (keybindTapsEl) {
+      const taps = actionTaps(selectedActionId);
+      keybindTapsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
+        const active = Number(btn.dataset.taps) === taps;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    }
 
     const selected = SHORTCUTS.findAction(selectedActionId);
     if (!selected) return;
@@ -175,9 +208,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const isCurrent = key === currentKey;
       const isNative = !SHORTCUTS.isAllowedKey(key);
       const conflictReason = !isNative && !isCurrent
-        ? SHORTCUTS.conflictMessage(selectedActionId, key, currentShortcutKeys)
+        ? SHORTCUTS.conflictMessage(selectedActionId, key, currentShortcutKeys, currentShortcutTaps)
         : '';
-      const usedBy = SHORTCUTS.ACTIONS.find((action) => currentShortcutKeys[action.id] === key);
+      const usedBy = SHORTCUTS.ACTIONS.find((action) =>
+        action.id !== selectedActionId && currentShortcutKeys[action.id] === key
+      );
 
       keyEl.classList.toggle('is-current', isCurrent);
       keyEl.classList.toggle('is-bound', !!usedBy && !isCurrent);
@@ -193,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (conflictReason) {
         keyEl.title = conflictReason;
       } else if (usedBy) {
-        keyEl.title = `Phím ${key.toUpperCase()} đang dùng cho "${usedBy.label}"`;
+        keyEl.title = `Phím ${key.toUpperCase()} đang dùng cho "${usedBy.label}" (${actionTaps(usedBy.id)} lần bấm) — vẫn chọn được vì khác số lần bấm`;
       } else {
         keyEl.title = `Gán phím ${key.toUpperCase()} cho "${selected.label}"`;
       }
@@ -203,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleKeyPick(key) {
     if (!SHORTCUTS) return;
 
-    const reason = SHORTCUTS.conflictMessage(selectedActionId, key, currentShortcutKeys);
+    const reason = SHORTCUTS.conflictMessage(selectedActionId, key, currentShortcutKeys, currentShortcutTaps);
     if (reason) {
       showKeybindError(reason);
       return;
@@ -220,10 +255,49 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshKeybindState();
   }
 
-  function saveShortcutKeys() {
-    chrome.storage.local.set({ shortcutKeys: { ...currentShortcutKeys } }, () => {
+  // 2 or 3 taps per action. If the new tap count makes the current letter clash
+  // with another action, only this action moves to a free letter — every other
+  // binding stays untouched.
+  function handleTapPick(taps) {
+    if (!SHORTCUTS) return;
+    if (taps !== 2 && taps !== 3) return;
+
+    const actionId = selectedActionId;
+    const action = SHORTCUTS.findAction(actionId);
+    if (!action || actionTaps(actionId) === taps) return;
+
+    const nextTaps = { ...currentShortcutTaps, [actionId]: taps };
+    let key = currentShortcutKeys[actionId];
+    let note = '';
+
+    if (SHORTCUTS.conflictMessage(actionId, key, currentShortcutKeys, nextTaps)) {
+      const usedKeys = new Set(Object.values(currentShortcutKeys));
+      const free = SHORTCUTS.ALLOWED_KEYS.find((letter) =>
+        !usedKeys.has(letter) &&
+        !SHORTCUTS.conflictMessage(actionId, letter, currentShortcutKeys, nextTaps)
+      );
+      if (!free) {
+        showKeybindError(`Không còn phím trống cho "${action.label}". Hãy đổi phím của hành động khác trước.`);
+        return;
+      }
+      key = free;
+      note = ` Đã đổi phím sang ${free.toUpperCase()} để không trùng phím khác.`;
+    }
+
+    currentShortcutTaps = SHORTCUTS.sanitizeTaps(nextTaps);
+    currentShortcutKeys[actionId] = key;
+    clearKeybindError();
+    saveShortcutKeys(`Đã đặt "${SHORT_LABELS[actionId] || action.label}" thành ${taps} lần bấm.${note}`);
+    refreshKeybindState();
+  }
+
+  function saveShortcutKeys(statusText = 'Đã lưu phím tắt mới!') {
+    chrome.storage.local.set({
+      shortcutKeys: { ...currentShortcutKeys },
+      shortcutTaps: { ...currentShortcutTaps }
+    }, () => {
       void chrome.runtime?.lastError;
-      showStatus('Đã lưu phím tắt mới!');
+      showStatus(statusText);
     });
   }
 
@@ -233,8 +307,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (toggleInputs[key]) toggleInputs[key].checked = !!items[key];
       });
 
+      currentShortcutTaps = SHORTCUTS
+        ? SHORTCUTS.sanitizeTaps(items.shortcutTaps)
+        : { ...FALLBACK_SHORTCUT_TAPS };
       currentShortcutKeys = SHORTCUTS
-        ? SHORTCUTS.sanitizeKeys(items.shortcutKeys)
+        ? SHORTCUTS.sanitizeKeys(items.shortcutKeys, currentShortcutTaps)
         : { ...FALLBACK_SHORTCUT_KEYS };
       buildKeybindEditor();
     });

@@ -272,10 +272,15 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   color: var(--yta-brand-blue);
 }
 
-/* Auto Loop button (Green accent when active) */
+/* Auto Loop button: soft red = OFF, green = ON */
 .yt-aid-loop-indicator {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--yta-text-secondary);
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.32);
+}
+
+.yt-aid-loop-indicator:hover {
+  background: rgba(239, 68, 68, 0.24);
 }
 
 .yt-aid-loop-indicator.active {
@@ -714,65 +719,122 @@ yt-lockup-view-model:hover .yt-aid-sidebar-bar {
 /* ========================================================
    5. HOME PAGE & SEARCH FEED CARDS
    ======================================================== */
-.yt-aid-home-card-bar {
-  position: relative;
-  z-index: 2;
-  margin-top: 8px;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(2px);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+/* One stationary trigger per card, pinned to its bottom-right corner. The
+   expanded menu is a single popover on <body>, opened only on demand. */
+.yt-aid-home-card-host {
+  position: relative !important;
 }
 
-ytd-rich-item-renderer:hover .yt-aid-home-card-bar,
-ytd-video-renderer:hover .yt-aid-home-card-bar,
-ytd-grid-video-renderer:hover .yt-aid-home-card-bar,
-yt-lockup-view-model:hover .yt-aid-home-card-bar,
-yt-lockup-metadata-view-model:hover .yt-aid-home-card-bar,
-.yt-aid-home-card-bar.yt-aid-bar-visible,
-.yt-aid-home-card-bar:focus-within {
+.yt-aid-home-trigger {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.14s ease, background-color 0.14s ease,
+    color 0.14s ease, border-color 0.14s ease;
+}
+
+.yt-aid-home-trigger svg {
+  width: 15px;
+  height: 15px;
+}
+
+ytd-rich-item-renderer:hover .yt-aid-home-trigger,
+ytd-video-renderer:hover .yt-aid-home-trigger,
+ytd-grid-video-renderer:hover .yt-aid-home-trigger,
+.yt-aid-home-trigger:hover,
+.yt-aid-home-trigger:focus-visible,
+.yt-aid-home-trigger[aria-expanded="true"] {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+html:not([dark]) .yt-aid-home-trigger {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+html:not([dark]) ytd-rich-item-renderer:hover .yt-aid-home-trigger,
+html:not([dark]) ytd-video-renderer:hover .yt-aid-home-trigger,
+html:not([dark]) ytd-grid-video-renderer:hover .yt-aid-home-trigger,
+html:not([dark]) .yt-aid-home-trigger:hover,
+html:not([dark]) .yt-aid-home-trigger:focus-visible,
+html:not([dark]) .yt-aid-home-trigger[aria-expanded="true"] {
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.22);
+  color: #0f0f0f;
+}
+
+.yt-aid-home-flyout {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999995;
+  display: grid;
+  grid-template-columns: repeat(2, 34px);
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--yta-border);
+  border-radius: 12px;
+  background: var(--yta-bg-menu);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px) scale(0.94);
+  transition: opacity 0.14s ease, transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.yt-aid-home-flyout.yt-aid-flyout-open {
   opacity: 1;
   pointer-events: auto;
   transform: none;
 }
 
-@media (hover: none) {
-  .yt-aid-home-card-bar {
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
-  }
-}
-
-.yt-aid-card-btn-cluster {
+.yt-aid-flyout-btn {
   display: inline-flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: var(--yta-radius-pill);
-  border: 1px solid var(--yta-border-subtle);
-  overflow: hidden;
-}
-
-.yt-aid-card-btn-cluster .yt-aid-mini-action {
-  width: auto;
-  height: 26px;
-  padding: 0 8px;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
   background: transparent;
+  color: var(--yta-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
 }
 
-.yt-aid-card-btn-cluster .yt-aid-mini-action:last-child {
-  border-right: none;
+.yt-aid-flyout-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
-.yt-aid-card-btn-cluster .yt-aid-mini-action:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+.yt-aid-flyout-btn:hover {
+  background: var(--yta-bg-hover);
+  color: var(--yta-text-primary);
 }
+
+.yt-aid-flyout-btn:focus-visible {
+  outline: 2px solid var(--yta-brand-blue);
+  outline-offset: 1px;
+}
+
 
 /* ========================================================
    6. CHANNEL PAGE ACTIONS (Avatar & banner)

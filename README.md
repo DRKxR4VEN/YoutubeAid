@@ -1,6 +1,6 @@
 # YouTube Aid - Chrome Extension (Manifest V3)
 
-Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm (thay thế hoặc nối thêm nội dung cũ), clean link không query tracking, tải ảnh bìa thumbnail/avatar/banner có cắt ảnh tuỳ ý, hệ thống phím tắt đôi điều hướng tức thì (SPA) có thể tùy chỉnh và tự động lặp lại video (Auto Loop, không lặp quảng cáo).
+Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm (thay thế hoặc nối thêm nội dung cũ), clean link không query tracking, tải ảnh bìa thumbnail/avatar/banner có cắt ảnh tuỳ ý, hệ thống phím tắt điều hướng tức thì (SPA) có thể tùy chỉnh số lần bấm và tự động lặp lại video (Auto Loop, không lặp quảng cáo). Phím tắt cũng hoạt động trên **music.youtube.com**.
 
 ---
 
@@ -10,7 +10,7 @@ Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nh
 Tiêm tự động vào **Watch page (dưới tiêu đề)** và **Sidebar (video liên quan)**:
 - **Copy Title**: Sao chép nguyên bản tiêu đề video vào Clipboard.
 - **Copy + Search + Enter**: Sao chép tiêu đề, tự động điền vào thanh tìm kiếm và thực hiện tìm kiếm trực tiếp ngay trên trang hiện tại. Đi kèm nút mở sang tab mới riêng biệt (`↗`) hoặc dùng phím tắt `Ctrl + Click`.
-- **Home page / Search feed**: mỗi thẻ video có **4 nút tinh gọn chỉ hiện khi hover** — Copy tiêu đề, Copy + tìm kiếm ngay, Copy link sạch và Tải ảnh bìa. Chỉ cần hover vào **bất kỳ vị trí nào trên thẻ video** (kể cả ảnh thumbnail) là cả 4 nút hiện ra, nên lưới video vẫn sạch sẽ khi không tương tác.
+- **Home page / Search feed**: mỗi thẻ video có **một nút tròn nhỏ cố định ở góc dưới-phải** (icon lưới 2×2). Bấm vào nút là xổ ra **popover 2×2 gồm 4 nút icon tinh gọn** — Copy tiêu đề, Copy + tìm kiếm ngay, Copy link sạch và Tải ảnh bìa — đặt ngay phía trên nút, canh mép phải và tự lật xuống dưới khi sát đáy màn hình. Popover chỉ được tạo khi mở lần đầu, tự đóng khi bấm ra ngoài, cuộn trang, nhấn <kbd>Esc</kbd> hoặc chuyển trang; không còn quét chuột, không còn thanh nổi bám theo con trỏ nên không tốn hiệu năng khi lướt feed.
 
 ### 2. Copy Khi Bôi Đen (Copy on Select)
 - Giữ chuột kéo bôi xanh một đoạn text bất kỳ trên YouTube (mô tả video, bình luận, tiêu đề...) là đoạn đó **được sao chép ngay** vào Clipboard.
@@ -38,8 +38,9 @@ Trạng thái được lưu vào `chrome.storage.local` và đồng bộ với t
 
 ### 5. Tự Động Lặp Lại Video (Auto Loop)
 - Tự động kích hoạt `video.loop = true` khi xem video trên YouTube.
-- **Không lặp quảng cáo:** ngay khi player chuyển sang trạng thái `ad-showing` / `ad-interrupting`, loop bị tắt và giữ tắt suốt thời gian quảng cáo (kể cả khi quảng cáo bị skip). Hết quảng cáo, loop được bật lại **tức thì nếu bạn đã bật Auto Loop từ trước**; nếu bạn đã tắt Auto Loop thì vẫn giữ tắt.
-- Nút bật/tắt nhanh trạng thái **Auto Loop** với hiệu ứng viền xanh lá trên thanh công cụ Watch page.
+- **Không lặp quảng cáo:** ngay khi player chuyển sang trạng thái `ad-showing` / `ad-interrupting` (hoặc xuất hiện lớp UI quảng cáo), loop bị tắt trên toàn bộ thẻ video và giữ tắt suốt thời gian quảng cáo, kể cả khi quảng cáo bị skip. Hết quảng cáo, loop được bật lại **tự động nếu bạn đã bật Auto Loop từ trước**; nếu bạn đã tắt Auto Loop thì vẫn giữ tắt.
+- **Trạng thái hiển thị rõ ràng:** nút Auto Loop có nền xanh lá + chữ `Auto Loop: ON` khi đang bật, nền đỏ nhẹ + chữ `Auto Loop: OFF` khi đang tắt.
+- **Việc tạm tắt khi có quảng cáo là hoàn toàn ngầm:** nút không đổi trạng thái, không hiện thông báo. Nếu bạn bật/tắt Auto Loop ngay trong lúc quảng cáo đang chạy, lựa chọn đó được ghi nhớ và áp dụng ngay khi quảng cáo kết thúc.
 - Tự động duy trì trạng thái lặp qua các lần chuyển video đơn trang (SPA Navigation).
 
 ### 6. Nút Clean Copy Link (URL Chuẩn Không Tracking)
@@ -58,7 +59,7 @@ Nút **Download Thumbnail** trên thanh công cụ Watch page mở hộp thoại
 - **Tải ảnh gốc:** nút **Tải ảnh gốc** bỏ qua bước cắt nếu bạn chỉ cần ảnh nguyên bản.
 - Đóng hộp thoại bằng **Huỷ**, nút **×**, phím <kbd>Esc</kbd> hoặc click ra ngoài. Phím tắt của tiện ích và YouTube tạm ngưng khi hộp thoại đang mở.
 
-Ngoài ra icon tải xuống nhỏ cạnh **video liên quan (sidebar)** và bộ 4 nút hiện khi hover trên **thẻ video ở trang chủ / search feed** (Copy tiêu đề, Copy + tìm kiếm, Copy link sạch, Tải ảnh bìa) mở cùng hộp thoại cắt ảnh cho video đó.
+Ngoài ra icon tải xuống nhỏ cạnh **video liên quan (sidebar)** và nút công cụ ở góc dưới-phải **thẻ video trang chủ / search feed** (mở popover 4 nút: Copy tiêu đề, Copy + tìm kiếm, Copy link sạch, Tải ảnh bìa) mở cùng hộp thoại cắt ảnh cho video đó.
 
 **Ảnh kênh:** trên bất kỳ trang kênh YouTube (`/@handle`, `/channel/...`, `/c/...`, `/user/...`), hai nút **Ảnh đại diện** và **Ảnh banner** (cùng icon tải xuống) xuất hiện ở góc trên bên phải phần thông tin kênh. Ảnh được lấy ở độ phân giải cao nhất mà kênh cung cấp (avatar được nâng lên tới 1024px, banner tới 2560px) và cũng mở hộp thoại cắt ảnh trước khi lưu.
 
@@ -67,7 +68,7 @@ Chi tiết kỹ thuật:
 - Tên file được làm sạch ký tự cấm và kèm mã video: `Tiêu đề video [videoId].jpg`, ví dụ `Rick Astley - Never Gonna Give You Up [dQw4w9WgXcQ].jpg`.
 - Luôn bật sẵn, không cần cấu hình.
 
-### 8. Hệ Thống Phím Tắt Đôi Nhanh & Tùy Chỉnh (Instant SPA Navigation)
+### 8. Hệ Thống Phím Tắt Nhanh & Tùy Chỉnh (YouTube + YouTube Music)
 | Phím tắt mặc định | Thao tác | Đích đến & Cơ chế |
 | :---: | :--- | :--- |
 | <kbd>s</kbd> <kbd>s</kbd> | Mở ngay video Shorts gợi ý | `youtube.com/shorts/{id}` *(Click trực tiếp link gợi ý có sẵn, phản hồi tức thì)* |
@@ -76,15 +77,18 @@ Chi tiết kỹ thuật:
 | <kbd>p</kbd> <kbd>p</kbd> | Mở Danh sách phát (Playlists) | `youtube.com/feed/playlists` |
 | <kbd>m</kbd> <kbd>m</kbd> | Mở YouTube Music | `music.youtube.com/` |
 
-**Tùy chỉnh phím tắt:** mở **Cài đặt** → mục **Tùy chỉnh phím tắt**. Chọn hành động ở hàng thẻ phía trên, rồi bấm trực tiếp chữ cái trên **bàn phím QWERTY thu nhỏ** để gán. Phím đang dùng cho hành động khác và phím YouTube đang dùng bị khoá ngay trên bàn phím, nên không thể tạo xung đột. Mọi thay đổi được lưu ngay và áp dụng tức thì trên các tab YouTube đang mở.
-- Mỗi phím tắt luôn là **2 lần nhấn** cùng một chữ cái; riêng **Lịch sử là 3 lần nhấn**. Phím đơn không được phép vì sẽ kích hoạt ngoài ý muốn khi đang lướt YouTube.
+**Hoạt động trên YouTube Music:** content script được nạp cho `music.youtube.com/*`, nên phím tắt chạy được ở mọi trang của YouTube Music (trang chủ, Explore, Library, album, playlist, bài hát…). Vì Music là origin khác, các đích `youtube.com/...` được mở bằng điều hướng thẳng thay vì router SPA; riêng <kbd>m</kbd> <kbd>m</kbd> khi đang ở Music chỉ đưa về trang chủ Music. Các tính năng gắn với DOM của YouTube thường (Auto Loop, toolbar watch page, nút trên thẻ feed, copy/dán tự động) **không** được nạp trên Music để không can thiệp vào trình phát nhạc.
+
+**Tùy chỉnh phím tắt:** mở **Cài đặt** → mục **Tùy chỉnh phím tắt**. Chọn hành động ở hàng thẻ phía trên, chọn **2 lần** hoặc **3 lần** bấm, rồi bấm trực tiếp chữ cái trên **bàn phím QWERTY thu nhỏ** để gán. Phím đang dùng cho hành động khác (cùng số lần bấm) và phím YouTube đang dùng bị khoá ngay trên bàn phím, nên không thể tạo xung đột. Mọi thay đổi được lưu ngay và áp dụng tức thì trên các tab YouTube đang mở.
+- **Số lần bấm tùy chọn 2 hoặc 3** cho từng hành động. Mặc định: mọi hành động bấm 2 lần, riêng Lịch sử bấm 3 lần. Phím đơn không được phép vì sẽ kích hoạt ngoài ý muốn khi đang lướt YouTube.
+- Đổi số lần bấm mà phím hiện tại bị trùng với hành động khác (ví dụ Lịch sử chuyển từ 3 → 2 lần khi Trang chủ cũng dùng <kbd>h</kbd> 2 lần): chỉ hành động đang sửa được tự chuyển sang một chữ cái còn trống, mọi phím tắt khác giữ nguyên. Thông báo ở chân trang cho biết phím mới.
+- **Hai hành động chỉ được dùng chung một phím khi số lần bấm khác nhau** (mặc định <kbd>h</kbd> <kbd>h</kbd> = Trang chủ, <kbd>h</kbd> <kbd>h</kbd> <kbd>h</kbd> = Lịch sử). Nhấn 2 lần rồi chờ 0,32 giây để chạy hành động 2 lần; nhấn tiếp lần 3 để chạy hành động 3 lần. Nếu không còn hành động 3 lần nào dùng phím đó, chuỗi 2 lần chạy ngay không cần chờ.
 - Chỉ dùng chữ cái `a–z`. Các phím YouTube đang dùng (`k`, `j`, `l`, `f`, `t`, `i`, `n`, `c`…) bị khoá hoàn toàn; riêng `m` và `p` vẫn chọn được vì tiện ích tự phát lại hành vi gốc (mute / video trước) khi bạn không nhấn tiếp.
-- Bàn phím tự **vô hiệu hoá** những chữ cái đã dùng cho hành động 2 lần khác, nên không thể tạo xung đột. Lịch sử được phép dùng chung phím với một hành động 2 lần: nhấn 2 lần rồi chờ 0,3 giây để chạy hành động 2 lần, nhấn 3 lần để mở Lịch sử.
-- Nếu dữ liệu lưu bị hỏng hoặc bị sửa tay, tiện ích tự chuẩn hoá về phím mặc định thay vì làm hỏng phím tắt.
+- Nếu dữ liệu lưu bị hỏng hoặc bị sửa tay, tiện ích tự chuẩn hoá về phím/số lần bấm mặc định thay vì làm hỏng phím tắt.
 
 - **Tối ưu tốc độ phản hồi:** Sử dụng cơ chế điều hướng nội bộ SPA của YouTube giúp chuyển trang ngay lập tức dưới 50ms, không tải lại toàn trang.
 - **Không xung đột phím native:** `<kbd>m</kbd>` (mute) và `<kbd>p</kbd>` (video trước) của YouTube trùng phím mở đầu chord, nên tiện ích chủ động "giữ" phím và **tự phát lại hành vi gốc** (click nút mute / nút previous của player) nếu sau 320ms không có phím thứ hai. Cả hai tính năng đều hoạt động.
-- **Cơ chế an toàn:** Tự động kiểm tra ngữ cảnh nhập liệu (`input`, `textarea`, `ytd-searchbox`, `ytd-comments`, `contenteditable`) để vô hiệu hóa phím tắt khi người dùng đang gõ; nhấn <kbd>Esc</kbd> để huỷ chuỗi phím đang chờ.
+- **Cơ chế an toàn:** Tự động kiểm tra ngữ cảnh nhập liệu (`input`, `textarea`, `ytd-searchbox`, `ytmusic-search-box`, `ytd-comments`, `contenteditable`) để vô hiệu hóa phím tắt khi người dùng đang gõ; nhấn <kbd>Esc</kbd> để huỷ chuỗi phím đang chờ.
 
 ### 9. Giao Diện & Bảng Cài Đặt (Options & Popup)
 - Thiết kế Dark mode tối giản, tinh gọn, hòa nhập 100% vào ngôn ngữ thiết kế của YouTube.

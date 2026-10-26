@@ -365,6 +365,63 @@
       border-top: 1px solid var(--yt-border);
     }
 
+    .keybind-taps {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .keybind-taps-label {
+      margin-right: 2px;
+      color: var(--yt-text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .keybind-tap {
+      min-width: 58px;
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--yt-border);
+      border-radius: 999px;
+      color: var(--yt-text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .keybind-tap:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--yt-text-primary);
+    }
+
+    .keybind-tap.is-active {
+      background: rgba(255, 0, 0, 0.12);
+      border-color: var(--yt-red);
+      color: var(--yt-text-primary);
+    }
+
+    .keybind-tap:focus-visible {
+      outline: 2px solid var(--yt-red);
+      outline-offset: 1px;
+    }
+
+    .keybind-taps-desc {
+      margin-left: auto;
+      color: var(--yt-text-muted);
+      font-size: 11.5px;
+    }
+
+    @media (max-width: 560px) {
+      .keybind-taps-desc {
+        margin-left: 0;
+        flex-basis: 100%;
+      }
+    }
+
     .keybind-keyboard {
       display: flex;
       flex-direction: column;
@@ -544,8 +601,8 @@
             <img src="icons/shortcuts.png" alt="Shortcuts" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Phím tắt đôi điều hướng nhanh</div>
-            <div class="toggle-desc">Mặc định ss, hh, hhh, pp, mm. Gán lại phím trực tiếp trên bàn phím thu nhỏ bên dưới.</div>
+            <div class="toggle-title">Phím tắt điều hướng nhanh</div>
+            <div class="toggle-desc">Mặc định ss, hh, hhh, pp, mm; bấm 2 hoặc 3 lần tùy chọn. Hoạt động cả trên YouTube Music.</div>
           </div>
         </div>
         <div class="switch">
@@ -562,7 +619,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title">Bộ nút Copy Title thông minh</div>
-            <div class="toggle-desc">Watch page: Copy Title, Copy + Search + Enter và mở tab mới. Sidebar: đầy đủ tiện ích. Feed/Home: 4 nút gọn hiện khi hover bất kỳ vị trí nào trên thẻ video (Tiêu đề, Tìm kiếm, Link, Ảnh bìa).</div>
+            <div class="toggle-desc">Watch page: Copy Title, Copy + Search + Enter và mở tab mới. Sidebar: đầy đủ tiện ích. Feed/Home: nút công cụ nhỏ ở góc dưới-phải mỗi thẻ video, bấm vào mở popover 4 nút (sao chép tiêu đề, copy + tìm kiếm, copy link sạch, tải ảnh bìa).</div>
           </div>
         </div>
         <div class="switch">
@@ -650,6 +707,13 @@
 
     <div class="keybind-card">
       <div class="keybind-actions" id="keybindActions" role="tablist" aria-label="Chọn hành động cần gán phím"></div>
+
+      <div class="keybind-taps" id="keybindTaps" role="group" aria-label="Số lần bấm liên tiếp">
+        <span class="keybind-taps-label">Số lần bấm</span>
+        <button type="button" class="keybind-tap" data-taps="2">2 lần</button>
+        <button type="button" class="keybind-tap" data-taps="3">3 lần</button>
+        <span class="keybind-taps-desc">Bấm liên tiếp trong 0,32 giây</span>
+      </div>
 
       <div class="keybind-keyboard-wrap">
         <div class="keybind-keyboard" id="keybindKeyboard" aria-label="Bàn phím chọn phím tắt"></div>
