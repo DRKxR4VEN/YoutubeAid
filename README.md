@@ -27,10 +27,11 @@ Tiêm tự động vào **Watch page (dưới tiêu đề)** và **Sidebar (vide
 - Bộ nhớ dự phòng này được chia sẻ giữa các tab và tự hết hạn sau 15 phút, nên không dán nhầm nội dung cũ.
 
 ### 4. Menu Tools (Tính Năng Phụ)
-Nút **Tools** nằm ngay bên phải nút **Auto Loop** trên thanh công cụ Watch page, mở dropdown tập hợp các tính năng phụ kèm công tắc bật/tắt:
+Nút **Tools** nằm ngay bên phải nút **Auto Loop** trên thanh công cụ Watch page, mở dropdown tập hợp các tính năng phụ kèm công tắc bật/tắt hoặc thanh trượt:
 - Tự động copy khi bôi đen
 - Tự động dán vào ô tìm kiếm
 - Thay nội dung đã dán trước đó (tắt để nối thêm, tự chèn khoảng trắng)
+- **Tăng âm lượng video:** thanh trượt **100–150%**, áp dụng tức thì cho video đang phát. Trên 100% tiện ích dùng Web Audio (gain + limiter) nên to hơn mức tối đa của YouTube mà ít bị rè; mức đã chọn được lưu và tự áp dụng lại khi chuyển video. Sau khi tải lại trang, mức tăng áp dụng ngay khi bạn tương tác lần đầu để tránh làm mất tiếng. Nếu tiện ích khác đã giữ âm thanh của video, mức tăng tự trả về 100% kèm thông báo. Audio Boost chỉ chạy trên YouTube thường, không can thiệp vào YouTube Music.
 
 Tính năng tải ảnh bìa và Clean Copy Link luôn hoạt động, không có công tắc bật/tắt.
 
@@ -42,6 +43,7 @@ Trạng thái được lưu vào `chrome.storage.local` và đồng bộ với t
 - **Trạng thái hiển thị rõ ràng:** nút Auto Loop có nền xanh lá + chữ `Auto Loop: ON` khi đang bật, nền đỏ nhẹ + chữ `Auto Loop: OFF` khi đang tắt.
 - **Việc tạm tắt khi có quảng cáo là hoàn toàn ngầm:** nút không đổi trạng thái, không hiện thông báo. Nếu bạn bật/tắt Auto Loop ngay trong lúc quảng cáo đang chạy, lựa chọn đó được ghi nhớ và áp dụng ngay khi quảng cáo kết thúc.
 - Tự động duy trì trạng thái lặp qua các lần chuyển video đơn trang (SPA Navigation).
+- **Không bị nhảy sang video kế tiếp trong playlist:** YouTube tự gỡ `loop` của thẻ video khi trạng thái trình phát thay đổi, và playlist sẽ chuyển bài khi video kết thúc. Tiện ích theo dõi trực tiếp thuộc tính `loop` để bật lại ngay lập tức, đồng thời tự tua về đầu video ngay trước khi video kết thúc — nên dù bạn bật thêm chế độ lặp của YouTube, video vẫn lặp lại chính nó.
 
 ### 6. Nút Clean Copy Link (URL Chuẩn Không Tracking)
 - Luôn hiển thị sẵn trên watch page, sidebar và thẻ video ở trang chủ / search feed (không có công tắc bật/tắt).

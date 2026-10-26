@@ -383,6 +383,38 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   color: var(--yta-text-muted);
 }
 
+.yt-aid-tools-boost {
+  cursor: default;
+}
+
+.yt-aid-tools-boost:hover {
+  background: transparent;
+}
+
+.yt-aid-boost {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.yt-aid-boost input[type="range"] {
+  width: 88px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--yta-brand-red);
+  cursor: pointer;
+}
+
+.yt-aid-boost-value {
+  min-width: 34px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--yta-text-primary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 /* ========================================================
    3c. THUMBNAIL CROP DIALOG
    ======================================================== */

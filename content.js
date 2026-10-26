@@ -44,6 +44,7 @@
     enableAutoPasteSearch: true,
     enableAutoPasteReplace: true,
     enableThumbnailDownload: true,
+    audioBoost: 100,
     shortcutKeys: { ...DEFAULT_SHORTCUT_KEYS },
     shortcutTaps: { ...DEFAULT_SHORTCUT_TAPS }
   };
@@ -93,6 +94,7 @@
         // Always-on features: ignore any stale disabled value from storage.
         settings.enableCleanLink = true;
         settings.enableThumbnailDownload = true;
+        settings.audioBoost = sanitizeAudioBoost(settings.audioBoost);
         if (record && !restoreLastCopied(record)) safeRemoveStorage(LAST_COPIED_KEY);
         initExtension();
       });
@@ -122,6 +124,12 @@
         if (key === 'shortcutTaps') {
           settings.shortcutTaps = sanitizeShortcutTaps(change.newValue);
           settingsChanged = true;
+          continue;
+        }
+        if (key === 'audioBoost') {
+          settings.audioBoost = sanitizeAudioBoost(change.newValue);
+          syncAudioBoost();
+          syncAudioBoostUi();
           continue;
         }
         if (!(key in DEFAULT_SETTINGS)) continue;
@@ -208,6 +216,8 @@
 
     closeHomeFlyout();
     if (IS_MUSIC_SITE) return;
+    syncAudioBoost();
+    syncAudioBoostUi();
     syncToolbarState();
     injectAllAreas();
   }
@@ -224,6 +234,7 @@
     }
 
     initVideoLoopMonitor();
+    initAudioBoost();
     initClipboardCopyTracking();
     rebuildShortcutKeymap();
     initShortcutSystem();
@@ -316,8 +327,14 @@
 
   let lastAdSeenAt = 0;
   let loopPlayerObserver = null;
+  let loopVideoObserver = null;
+  let observedLoopPlayer = null;
   let loopWatchdogTimer = null;
-  const observedLoopPlayers = new WeakSet();
+  let lastLoopTickAt = 0;
+  let loopGuardTimer = null;
+  let loopEndTimer = null;
+  let loopSyncFrame = 0;
+  let loopBtnState = null;
 
   function getPlayerElement() {
     return document.getElementById('movie_player') ||
@@ -361,14 +378,51 @@
 
   function observePlayerAdState() {
     const player = getPlayerElement();
-    if (!player || observedLoopPlayers.has(player)) return;
-    observedLoopPlayers.add(player);
+    if (!player || player === observedLoopPlayer) return;
+
     if (!loopPlayerObserver) {
-      loopPlayerObserver = new MutationObserver(() => ensureVideoLoop());
+      loopPlayerObserver = new MutationObserver(scheduleLoopSync);
+    } else {
+      // Only one player matters at a time; dropping the old target lets the
+      // detached player subtree be garbage collected after SPA navigation.
+      loopPlayerObserver.disconnect();
     }
+    observedLoopPlayer = player;
     loopPlayerObserver.observe(player, {
       attributes: true,
       attributeFilter: ['class']
+    });
+
+    // YouTube's own player writes media.loop (setLoop in its bundle) whenever
+    // its loop/playlist state changes. Restoring on the attribute change is
+    // synchronous with that write instead of waiting for the next watchdog
+    // tick: a write landing in the last 250ms of a video would otherwise let
+    // the playlist advance even with Auto Loop on.
+    if (!loopVideoObserver) {
+      loopVideoObserver = new MutationObserver(restoreLoopAfterYouTubeWrite);
+    } else {
+      loopVideoObserver.disconnect();
+    }
+    loopVideoObserver.observe(player, {
+      attributes: true,
+      attributeFilter: ['loop'],
+      subtree: true
+    });
+  }
+
+  function restoreLoopAfterYouTubeWrite() {
+    if (!settings.enableLoop || !window.location.pathname.startsWith('/watch')) return;
+    // Only the loop attribute triggers this, so a full check is cheap here.
+    ensureVideoLoop();
+  }
+
+  // The player rewrites its class list in bursts; coalesce those into one
+  // check per frame instead of running the ad probe on every mutation.
+  function scheduleLoopSync() {
+    if (loopSyncFrame) return;
+    loopSyncFrame = requestAnimationFrame(() => {
+      loopSyncFrame = 0;
+      ensureVideoLoop();
     });
   }
 
@@ -405,8 +459,15 @@
   // deliberately invisible: the user only tracks whether Auto Loop is on/off.
   function syncLoopButton() {
     const loopBtn = document.getElementById('yt-aid-btn-toggle-loop');
-    if (!loopBtn) return;
+    if (!loopBtn) {
+      loopBtnState = null;
+      return;
+    }
     const wanted = !!settings.enableLoop;
+    // The watchdog calls this four times a second; skip redundant DOM writes.
+    if (loopBtnState && loopBtnState.btn === loopBtn && loopBtnState.wanted === wanted) return;
+    loopBtnState = { btn: loopBtn, wanted };
+
     loopBtn.classList.toggle('active', wanted);
     loopBtn.setAttribute('aria-pressed', wanted ? 'true' : 'false');
     loopBtn.title = wanted ? 'Auto Loop đang bật' : 'Auto Loop đang tắt';
@@ -420,12 +481,85 @@
     loopWatchdogTimer = null;
   }
 
+  // Restart the video just before it ends. The element's own loop flag is
+  // normally enough, but YouTube clears it from its own player state and a
+  // playlist advances on `ended`, so the natural end is the one moment Auto
+  // Loop can still lose. Idle cost is two checks per second; the fast loop
+  // only runs during the final two seconds of the video.
+  const LOOP_END_MARGIN = 0.1;
+
+  function getActiveLoopVideo() {
+    const player = getPlayerElement();
+    if (!player) return null;
+    // A mid-roll ad pauses the main video; never seek while an ad plays.
+    // Only the cheap signals here: this runs on a timer.
+    if (AD_PLAYER_CLASSES.some((cls) => player.classList.contains(cls))) return null;
+    try {
+      if (typeof player.getAdState === 'function' && Number(player.getAdState()) > 0) return null;
+    } catch (e) { }
+    // The player can hold a second element for autoplay preloading; only the
+    // one actually playing is the video that is about to end.
+    const videos = player.querySelectorAll('video');
+    for (let i = 0; i < videos.length; i++) {
+      const video = videos[i];
+      if (!video.paused && video.readyState >= 2 && video.duration > 1) return video;
+    }
+    return null;
+  }
+
+  function startLoopGuard() {
+    if (loopGuardTimer) return;
+    loopGuardTimer = setInterval(() => {
+      const video = getActiveLoopVideo();
+      if (!video) {
+        stopLoopEndGuard();
+        return;
+      }
+      if (video.duration - video.currentTime <= 2) startLoopEndGuard();
+      else stopLoopEndGuard();
+    }, 500);
+  }
+
+  function startLoopEndGuard() {
+    if (loopEndTimer) return;
+    loopEndTimer = setInterval(() => {
+      const video = getActiveLoopVideo();
+      if (!video) {
+        stopLoopEndGuard();
+        return;
+      }
+      if (video.duration - video.currentTime <= LOOP_END_MARGIN) {
+        video.currentTime = 0;
+        stopLoopEndGuard();
+      }
+    }, 40);
+  }
+
+  function stopLoopEndGuard() {
+    if (!loopEndTimer) return;
+    clearInterval(loopEndTimer);
+    loopEndTimer = null;
+  }
+
+  function stopLoopGuard() {
+    stopLoopEndGuard();
+    if (!loopGuardTimer) return;
+    clearInterval(loopGuardTimer);
+    loopGuardTimer = null;
+  }
+
   // Ad markers can appear slightly after the ad element starts, so keep
   // re-checking while the user wants looping. This closes the short window
   // where loop=true could otherwise make a newly started ad replay itself.
   function startLoopWatchdog() {
     if (loopWatchdogTimer) return;
     loopWatchdogTimer = setInterval(() => {
+      // The ad probe reads layout/style, so in a background tab run it once a
+      // second instead of pausing: an ad break that ends while hidden must
+      // still release loop before the video reaches its end.
+      const now = Date.now();
+      if (document.visibilityState === 'hidden' && now - lastLoopTickAt < 1000) return;
+      lastLoopTickAt = now;
       if (!settings.enableLoop || !window.location.pathname.startsWith('/watch')) {
         stopLoopWatchdog();
         return;
@@ -448,6 +582,12 @@
     } else {
       stopLoopWatchdog();
     }
+
+    if (enabled) {
+      startLoopGuard();
+    } else {
+      stopLoopGuard();
+    }
   }
 
   function initVideoLoopMonitor() {
@@ -455,6 +595,218 @@
     window.addEventListener('yt-navigate-finish', ensureVideoLoop);
     document.addEventListener('yt-page-data-updated', ensureVideoLoop);
     window.addEventListener('spfdone', ensureVideoLoop);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'hidden') ensureVideoLoop();
+    });
+  }
+
+  // ==========================================
+  // 3B. AUDIO BOOST (gain above YouTube's 100%)
+  // ==========================================
+  const AUDIO_BOOST_MIN = 100;
+  const AUDIO_BOOST_MAX = 150;
+  const AUDIO_BOOST_STEP = 5;
+
+  let audioBoostState = null;
+  let audioBoostGestureArmed = false;
+  let audioBoostFailedVideo = null;
+
+  function sanitizeAudioBoost(value) {
+    const level = Math.round(Number(value));
+    if (!Number.isFinite(level)) return AUDIO_BOOST_MIN;
+    return Math.min(AUDIO_BOOST_MAX, Math.max(AUDIO_BOOST_MIN, level));
+  }
+
+  function audioBoostLevel() {
+    return sanitizeAudioBoost(settings.audioBoost);
+  }
+
+  function getBoostVideo() {
+    return document.querySelector('video.html5-main-video') ||
+      document.querySelector('#movie_player video');
+  }
+
+  function pageHasUserActivation() {
+    try {
+      return !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function audioBoostGain(state) {
+    const now = state.context.currentTime;
+    const boosting = state.level > AUDIO_BOOST_MIN;
+    const gain = Math.max(1, state.level / 100);
+
+    state.gain.gain.cancelScheduledValues(now);
+    state.gain.gain.setTargetAtTime(gain, now, 0.02);
+    // Unity gain stays transparent; the limiter only engages above 100% so
+    // louder material does not clip into harsh distortion.
+    state.limiter.ratio.cancelScheduledValues(now);
+    state.limiter.ratio.setTargetAtTime(boosting ? 20 : 1, now, 0.02);
+    state.limiter.threshold.cancelScheduledValues(now);
+    state.limiter.threshold.setTargetAtTime(boosting ? -1.5 : 0, now, 0.02);
+  }
+
+  function setAudioBoostLevel(state, level) {
+    state.level = level;
+    audioBoostGain(state);
+    if (level > AUDIO_BOOST_MIN && state.context.state === 'suspended') {
+      state.context.resume().catch(() => { });
+    }
+  }
+
+  function createAudioGraph(video) {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return null;
+
+    let context;
+    try {
+      context = new AudioCtor();
+    } catch (e) {
+      return null;
+    }
+
+    let source;
+    try {
+      // A media element can only ever have one source node. If another
+      // extension already claimed it this throws and we leave native audio be.
+      source = context.createMediaElementSource(video);
+    } catch (e) {
+      try { context.close(); } catch (closeError) { }
+      return null;
+    }
+
+    const gain = context.createGain();
+    gain.gain.value = 1;
+
+    const limiter = context.createDynamicsCompressor();
+    limiter.knee.value = 0;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.25;
+    limiter.ratio.value = 1;
+    limiter.threshold.value = 0;
+
+    source.connect(gain);
+    gain.connect(limiter);
+    limiter.connect(context.destination);
+
+    audioBoostState = { video, context, source, gain, limiter, level: AUDIO_BOOST_MIN };
+    return audioBoostState;
+  }
+
+  function releaseAudioGraph() {
+    const state = audioBoostState;
+    if (!state) return;
+    audioBoostState = null;
+    try { state.source.disconnect(); } catch (e) { }
+    try { state.gain.disconnect(); } catch (e) { }
+    try { state.limiter.disconnect(); } catch (e) { }
+    try { state.context.close(); } catch (e) { }
+  }
+
+  // Called from a real user gesture (slider) so the AudioContext is allowed to
+  // start. Returns null when the video cannot be routed through Web Audio.
+  function applyAudioBoostNow() {
+    const video = getBoostVideo();
+    if (!video) return null;
+    // The marked element belongs to a player YouTube already detached; keeping
+    // the reference would pin the old player tree in memory after navigation.
+    if (audioBoostFailedVideo && !audioBoostFailedVideo.isConnected) audioBoostFailedVideo = null;
+    if (audioBoostFailedVideo === video) return null;
+
+    const level = audioBoostLevel();
+    if (audioBoostState && audioBoostState.video !== video) {
+      // YouTube swapped the player element; the old one is out of the page.
+      releaseAudioGraph();
+    }
+
+    if (level <= AUDIO_BOOST_MIN) {
+      if (audioBoostState && audioBoostState.video === video) {
+        setAudioBoostLevel(audioBoostState, AUDIO_BOOST_MIN);
+      }
+      return audioBoostState;
+    }
+
+    const state = audioBoostState && audioBoostState.video === video
+      ? audioBoostState
+      : createAudioGraph(video);
+
+    if (!state) {
+      audioBoostFailedVideo = video;
+      showToast('Không tăng được âm lượng: trình duyệt hoặc tiện ích khác đang giữ âm thanh video.', 'warning', 3200);
+      return null;
+    }
+
+    setAudioBoostLevel(state, level);
+    return state;
+  }
+
+  // Prefer starting the context right away once the page already has a user
+  // gesture; otherwise wait for one so audio is never routed into a suspended
+  // context (which would leave the video silent).
+  function armAudioBoostGesture() {
+    if (audioBoostGestureArmed) return;
+    audioBoostGestureArmed = true;
+
+    const onGesture = () => {
+      audioBoostGestureArmed = false;
+      document.removeEventListener('pointerdown', onGesture, true);
+      document.removeEventListener('keydown', onGesture, true);
+      document.removeEventListener('touchstart', onGesture, true);
+      applyAudioBoostNow();
+    };
+
+    document.addEventListener('pointerdown', onGesture, true);
+    document.addEventListener('keydown', onGesture, true);
+    document.addEventListener('touchstart', onGesture, true);
+  }
+
+  function syncAudioBoost() {
+    if (IS_MUSIC_SITE) return;
+    // Nothing to route while the tab is in the background.
+    if (document.visibilityState === 'hidden') return;
+
+    const video = getBoostVideo();
+    if (!video) {
+      if (audioBoostState && !audioBoostState.video.isConnected) releaseAudioGraph();
+      return;
+    }
+
+    if (audioBoostState) {
+      if (audioBoostState.video === video) {
+        setAudioBoostLevel(audioBoostState, audioBoostLevel());
+        return;
+      }
+      // Player swapped while the level sits at 100%: nothing will call
+      // applyAudioBoostNow, so drop the stale graph here.
+      if (!audioBoostState.video.isConnected) releaseAudioGraph();
+    }
+
+    if (audioBoostLevel() <= AUDIO_BOOST_MIN) return;
+
+    if (pageHasUserActivation()) {
+      applyAudioBoostNow();
+    } else {
+      armAudioBoostGesture();
+    }
+  }
+
+  function syncAudioBoostUi() {
+    const range = document.getElementById('yt-aid-audio-boost');
+    if (!range) return;
+    const level = audioBoostLevel();
+    if (range.value !== String(level)) range.value = String(level);
+    const valueEl = document.getElementById('yt-aid-audio-boost-value');
+    if (valueEl) valueEl.textContent = `${level}%`;
+  }
+
+  function initAudioBoost() {
+    syncAudioBoost();
+    window.addEventListener('yt-navigate-finish', syncAudioBoost);
+    document.addEventListener('yt-page-data-updated', syncAudioBoost);
+    document.addEventListener('visibilitychange', syncAudioBoost);
   }
 
   // ==========================================
@@ -1828,7 +2180,6 @@
   // ==========================================
   function initDOMObserver() {
     injectAllAreas();
-    updateCachedShorts();
 
     // Throttle instead of debounce: YouTube mutates continuously while a video
     // plays, and a debounce would keep postponing injection forever.
@@ -1839,28 +2190,52 @@
       setTimeout(() => {
         injectionQueued = false;
         injectAllAreas();
-        updateCachedShorts();
       }, delay);
     };
 
     const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger';
+    // Everything this extension owns starts with yt-aid- (classes) or yt-aid-
+    // (ids). Mutations inside it must not schedule another page-wide scan.
+    const AID_UI_SCOPE = '[class*="yt-aid-"], [id^="yt-aid-"]';
+    // None of the injection targets live in these subtrees. They are also the
+    // biggest mutation sources (comments alone were ~78% on a watch page), so
+    // ignoring them keeps idle playback from re-scanning the page.
+    const IGNORED_SCOPES = '#movie_player, .html5-video-player, ytd-comments, #comments, ' +
+      'ytd-live-chat-frame, #chat, ytd-guide-renderer, ytd-mini-guide-renderer, ' +
+      '#masthead-container, ytd-popup-container, #a11y-announcements';
     const containsAidUi = (node) => node.nodeType === 1 &&
       (node.matches(AID_UI_SELECTOR) || !!node.querySelector(AID_UI_SELECTOR));
+    const insideAidUi = (node) => node.nodeType === 1 && !!node.closest(AID_UI_SCOPE);
+    const insideIgnoredScope = (node) => node.nodeType === 1 && !!node.closest(IGNORED_SCOPES);
 
     const observer = new MutationObserver((mutations) => {
       for (let i = 0; i < mutations.length; i++) {
-        const { addedNodes, removedNodes } = mutations[i];
-        if (addedNodes && addedNodes.length > 0) {
-          scheduleInjection();
-          return;
-        }
+        const { target, addedNodes, removedNodes } = mutations[i];
+
+        // Re-inject when YouTube re-renders a header and drops our bar.
         if (removedNodes && removedNodes.length > 0) {
           for (let j = 0; j < removedNodes.length; j++) {
-            // Re-inject when YouTube re-renders a header and drops our bar.
             if (containsAidUi(removedNodes[j])) {
               scheduleInjection();
               return;
             }
+          }
+        }
+
+        // Toasts, open menus, the crop dialog and freshly injected toolbars
+        // all fire mutations; re-scanning the page for them is pure overhead.
+        if (insideAidUi(target) || insideIgnoredScope(target)) continue;
+
+        if (addedNodes && addedNodes.length > 0) {
+          let relevant = false;
+          for (let j = 0; j < addedNodes.length; j++) {
+            if (insideAidUi(addedNodes[j])) continue;
+            relevant = true;
+            break;
+          }
+          if (relevant) {
+            scheduleInjection();
+            return;
           }
         }
       }
@@ -1872,7 +2247,6 @@
     });
 
     window.addEventListener('yt-navigate-finish', () => {
-      updateCachedShorts();
       ensureVideoLoop();
       closeHomeFlyout();
       closeDropdown();
@@ -1880,7 +2254,6 @@
     });
 
     document.addEventListener('yt-page-data-updated', () => {
-      updateCachedShorts();
       ensureVideoLoop();
       scheduleInjection(120);
     });
@@ -2093,10 +2466,28 @@
     document.body.appendChild(menu);
 
     const rect = btn.getBoundingClientRect();
-    const maxLeft = window.innerWidth - menu.offsetWidth - 12;
-    menu.style.top = `${Math.round(rect.bottom + 12)}px`;
-    menu.style.left = `${Math.round(Math.max(12, Math.min(rect.right - menu.offsetWidth, maxLeft)))}px`;
-    menu.style.maxHeight = `${Math.round(Math.max(160, window.innerHeight - rect.bottom - 24))}px`;
+    const gap = 12;
+    const edge = 6;
+    const menuWidth = menu.offsetWidth;
+    // offsetHeight is the full box height; maxHeight later clamps the content
+    // box, so reserve the menu's 6px padding + 1px border on each side.
+    const menuHeight = menu.offsetHeight;
+    const spaceBelow = window.innerHeight - rect.bottom - gap - edge;
+    const spaceAbove = rect.top - gap - edge;
+    // Keep the whole menu on screen: flip above the button when the space
+    // below would force the last row out of view.
+    const openUp = menuHeight > spaceBelow && spaceAbove > spaceBelow;
+
+    const maxLeft = window.innerWidth - menuWidth - 12;
+    menu.style.left = `${Math.round(Math.max(12, Math.min(rect.right - menuWidth, maxLeft)))}px`;
+
+    if (openUp) {
+      menu.style.maxHeight = `${Math.round(Math.max(160, spaceAbove - 14))}px`;
+      menu.style.top = `${Math.round(Math.max(edge, rect.top - gap - Math.min(menuHeight, spaceAbove)))}px`;
+    } else {
+      menu.style.maxHeight = `${Math.round(Math.max(160, spaceBelow - 14))}px`;
+      menu.style.top = `${Math.round(rect.bottom + gap)}px`;
+    }
 
     dropdownEl = menu;
     dropdownBtn = btn;
@@ -2162,6 +2553,17 @@
           <span class="yt-aid-switch-slider"></span>
         </span>
       </label>
+
+      <div class="yt-aid-tools-item yt-aid-tools-boost">
+        <span class="yt-aid-tools-text">
+          <span class="yt-aid-tools-name">Tăng âm lượng video</span>
+          <span class="yt-aid-tools-desc">Vượt 100% của YouTube, tối đa 150%</span>
+        </span>
+        <span class="yt-aid-boost">
+          <input type="range" id="yt-aid-audio-boost" min="${AUDIO_BOOST_MIN}" max="${AUDIO_BOOST_MAX}" step="${AUDIO_BOOST_STEP}" value="${audioBoostLevel()}" aria-label="Tăng âm lượng video">
+          <span class="yt-aid-boost-value" id="yt-aid-audio-boost-value">${audioBoostLevel()}%</span>
+        </span>
+      </div>
     `;
 
     menu.querySelector('#yt-aid-toggle-selection-copy').addEventListener('change', (e) => {
@@ -2172,6 +2574,28 @@
     });
     menu.querySelector('#yt-aid-toggle-auto-paste-replace').addEventListener('change', (e) => {
       updateSetting('enableAutoPasteReplace', e.target.checked);
+    });
+
+    const boostRange = menu.querySelector('#yt-aid-audio-boost');
+    const boostValue = menu.querySelector('#yt-aid-audio-boost-value');
+    boostRange.addEventListener('input', (e) => {
+      const level = sanitizeAudioBoost(e.target.value);
+      settings.audioBoost = level;
+      if (boostValue) boostValue.textContent = `${level}%`;
+
+      if (level <= AUDIO_BOOST_MIN) {
+        syncAudioBoost();
+        return;
+      }
+
+      if (!applyAudioBoostNow()) {
+        settings.audioBoost = AUDIO_BOOST_MIN;
+        boostRange.value = String(AUDIO_BOOST_MIN);
+        if (boostValue) boostValue.textContent = `${AUDIO_BOOST_MIN}%`;
+      }
+    });
+    boostRange.addEventListener('change', () => {
+      safeSetStorage({ audioBoost: settings.audioBoost });
     });
 
     return menu;
