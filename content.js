@@ -3687,8 +3687,21 @@
       rows.className = 'yt-aid-bm-rows';
       items.forEach((bm) => rows.appendChild(buildBookmarkRow(bm)));
       info.appendChild(rows);
+
+      const clearVideo = document.createElement('button');
+      clearVideo.type = 'button';
+      clearVideo.className = 'yt-aid-bm-danger-btn yt-aid-bm-video-clear';
+      clearVideo.title = 'Xóa tất cả bookmark của video này';
+      clearVideo.appendChild(svgIcon(TRASH_ICON));
+      const clearVideoText = document.createElement('span');
+      clearVideoText.textContent = `Xóa tất cả (${items.length})`;
+      clearVideo.appendChild(clearVideoText);
+      clearVideo.addEventListener('click', () => removeVideoBookmarks(group.id));
+      info.appendChild(clearVideo);
     }
     card.appendChild(info);
+
+    if (!compact) return card;
 
     const actions = document.createElement('div');
     actions.className = 'yt-aid-bm-actions';
@@ -4019,6 +4032,7 @@
     positionBookmarkPage();
     renderBookmarkPage();
     page.classList.add('yt-aid-bm-page-open');
+    document.documentElement.classList.add('yt-aid-bm-active');
     document.addEventListener('keydown', onBookmarkPageKeyDown, true);
     document.addEventListener('click', onBookmarkOutsideClick, true);
     window.addEventListener('resize', positionBookmarkPage);
@@ -4030,6 +4044,7 @@
     bookmarkPageOpen = false;
     const page = document.getElementById('yt-aid-bookmark-page');
     if (page) page.classList.remove('yt-aid-bm-page-open');
+    document.documentElement.classList.remove('yt-aid-bm-active');
     document.removeEventListener('keydown', onBookmarkPageKeyDown, true);
     document.removeEventListener('click', onBookmarkOutsideClick, true);
     window.removeEventListener('resize', positionBookmarkPage);

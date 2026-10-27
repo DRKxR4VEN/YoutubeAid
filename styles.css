@@ -1147,7 +1147,7 @@ html:not([dark]) .yt-aid-channel-btn:hover {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1999;
+  z-index: 2019;
   display: none;
   flex-direction: column;
   overflow-y: auto;
@@ -1475,4 +1475,35 @@ html:not([dark]) .yt-aid-channel-btn:hover {
 
 .yt-aid-bm-rows .yt-aid-bm-log-row {
   padding: 4px 6px;
+}
+
+/* --- Nút xóa tất cả bookmark của 1 video (trang Bookmark) --- */
+.yt-aid-bm-video-clear {
+  margin-top: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.yt-aid-bm-clear-all {
+  flex-shrink: 0;
+  background: rgba(255, 80, 80, 0.12);
+}
+
+
+/* Thanh tiêu đề trang Bookmark luôn hiện khi cuộn (giữ nút Xóa tất cả trong tầm nhìn) */
+.yt-aid-bm-page-header {
+  position: sticky;
+  top: -24px;
+  z-index: 2;
+  margin: -24px 0 16px;
+  padding: 24px 0 12px;
+  background: var(--yt-spec-base-background, var(--yta-bg-surface));
+}
+
+
+/* Khi trang Bookmark mở, ẩn thanh chip/bộ lọc sticky của YouTube để không đè lên tiêu đề */
+html.yt-aid-bm-active ytd-feed-filter-chip-bar-renderer,
+html.yt-aid-bm-active ytd-search-sub-menu-renderer,
+html.yt-aid-bm-active #chips-wrapper {
+  visibility: hidden !important;
 }
