@@ -102,6 +102,31 @@ Chi tiết kỹ thuật:
 
 ---
 
+### 10. Bookmark Mốc Thời Gian Trong Video
+
+Lưu những đoạn cần xem lại, đặt tên riêng và quản lý ngay trong popup của tiện ích. Một video có thể có nhiều bookmark. Tính năng này dành cho trang xem video YouTube thông thường.
+
+**Thêm bookmark:**
+1. Mở video và tới đoạn muốn lưu.
+2. Bấm **★ Lưu mốc thời gian** dưới tiêu đề video.
+3. Nhập tên (ví dụ “Công thức quan trọng”), rồi bấm **OK**. Nếu để trống, tên mặc định là mốc thời gian. Bấm **Cancel/Hủy** để không lưu.
+
+Tiện ích ghi nhận thời gian tại lúc bấm nút, kèm tiêu đề video và tên kênh. Không lưu mốc trong lúc quảng cáo đang chạy.
+
+**Xem và quản lý:**
+- Bấm biểu tượng YouTube Aid → **★ Bookmark đã lưu**. Danh sách hiện ngay trong popup, nhóm theo từng video và sắp xếp các mốc theo thời gian.
+- Gõ **tiêu đề video, tên kênh hoặc tên bookmark** vào ô tìm kiếm.
+- Bấm **Đổi tên** để sửa tên; bấm **Xóa** và xác nhận để xóa một mốc.
+- Bấm thời gian hoặc tên bookmark để xem lại. Nếu video đã mở trong một tab, tiện ích tua ngay trong tab đó; nếu chưa mở, tiện ích mở video trong tab mới tại đúng mốc. Với tab còn chạy bản tiện ích cũ, lần đầu có thể tải lại video để tới mốc.
+- Khi chuyển sang tab video, Chrome có thể đóng popup. Lần mở tiếp theo, tiện ích nhớ trang bookmark. Bấm **← Quay lại** để về bảng điều khiển.
+- Mục **Cách thêm bookmark** trong trang bookmark có hướng dẫn ngắn.
+
+**Dữ liệu:** Bookmark được lưu cục bộ bằng `chrome.storage.local`, không đồng bộ giữa các thiết bị. Bookmark cũ thiếu tên kênh sẽ được bổ sung khi bạn mở lại video. Hai bản tiện ích cài từ các thư mục khác nhau có thể có dữ liệu riêng.
+
+Để kiểm thử bản đang review, xem [HUONG-DAN-BOOKMARK.txt](HUONG-DAN-BOOKMARK.txt). Sau khi cập nhật tiện ích, bấm **Reload** trong trang quản lý extensions và tải lại các tab YouTube.
+
+---
+
 ## Cấu Trúc Dự Án
 
 ```
@@ -112,6 +137,10 @@ Youtube_Aid/
 ├── styles.css         # CSS toolbar, dropdown, sidebar, card buttons, channel actions, toast, hộp thoại cắt ảnh
 ├── options.html       # Giao diện bảng điều khiển & bàn phím tùy chỉnh phím tắt
 ├── options.js         # Logic lưu/khôi phục cài đặt và bàn phím gán phím tắt
+├── bookmarks.html    # Trang thư viện bookmark trong popup
+├── bookmarks.js      # Tìm kiếm, đổi tên, xóa và mở/tua tới bookmark
+├── bookmarks.css     # Giao diện thư viện bookmark
+├── HUONG-DAN-BOOKMARK.txt # Hướng dẫn kiểm thử tính năng bookmark
 ├── generate_icons.js  # Script sinh tự động logo và bộ icon trắng đen chuẩn
 ├── icons/             # Thư mục icon PNG (16x16, 48x48, 128x128 và monochrome icons)
 │   ├── icon16.png

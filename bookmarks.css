@@ -1,0 +1,24 @@
+:root{color-scheme:dark;font-family:Arial,sans-serif;background:#101012;color:#f4f4f5}*{box-sizing:border-box}body{margin:0}main{max-width:1040px;margin:0 auto;padding:42px 28px 80px}header{display:flex;align-items:center;justify-content:space-between;margin-bottom:64px}header span{color:#777780;font-size:11px;letter-spacing:2px}.brand{color:#fff;text-decoration:none;font-weight:700;font-size:20px}h1{font-size:44px;letter-spacing:-1.5px;margin:0 0 14px}.star{color:#ff5555;margin-left:16px}.intro{color:#9898a3;margin-bottom:34px}.tools{display:flex;align-items:center;gap:20px;margin-bottom:28px}input{font:inherit}#search{width:100%;max-width:560px;background:#1b1b20;color:#fff;border:1px solid #33333c;border-radius:12px;padding:15px 18px}#count{color:#9898a3;font-size:13px;white-space:nowrap}#status{color:#ffb5b5}.video{background:#19191e;border:1px solid #2b2b32;border-radius:18px;margin-bottom:22px;padding:22px}.video-head{display:flex;gap:18px;align-items:center;margin-bottom:18px}.thumbnail{width:144px;aspect-ratio:16/9;object-fit:cover;border-radius:9px;background:#27272d}h2{font-size:18px;margin:0 0 9px;line-height:1.4}.video-head a{color:#f5f5f6;text-decoration:none}.video-head a:hover{text-decoration:underline}.meta{font-size:13px;color:#92929d}.row{display:flex;gap:14px;align-items:center;border-top:1px solid #303038;padding:15px 0 0;margin-top:14px}.time{font-size:13px;font-variant-numeric:tabular-nums;text-decoration:none;background:#392226;color:#ff8b8b;border-radius:7px;padding:9px 11px;white-space:nowrap}.name{flex:1;color:#e0e0e5;text-decoration:none;overflow-wrap:anywhere}.name:hover{color:#ff8b8b}button{border:1px solid #3a3a44;border-radius:8px;background:transparent;color:#aaaab5;padding:8px 11px;cursor:pointer;font:inherit;font-size:12px}button:hover{color:#fff;border-color:#777}button.delete:hover{color:#ff8b8b;border-color:#ff8b8b}button:disabled{opacity:.5;cursor:wait}#empty{text-align:center;padding:65px 12px;color:#92929d}#empty h2{color:#eee}#empty p{line-height:1.8}#empty a{display:inline-block;margin-top:15px;color:#ff8b8b}.empty-icon{font-size:62px;color:#ff6868;margin-bottom:18px}:focus-visible{outline:2px solid #ff7777;outline-offset:4px}@media(max-width:600px){main{padding:26px 16px}header{margin-bottom:42px}header span{display:none}h1{font-size:32px}.tools{flex-direction:column;align-items:start}.video{padding:16px}.thumbnail{width:90px}.row{flex-wrap:wrap;gap:10px}.name{min-width:45%}}
+
+/* Keep the bookmark popup as wide as the settings popup. */
+html{min-width:480px;width:480px}
+body{width:480px;min-width:480px;min-height:560px;overflow-x:hidden}
+main{padding:22px 18px 32px}
+header{margin-bottom:26px}
+header span{display:block;font-size:12px;letter-spacing:0}
+.back{color:#eee;text-decoration:none;font-size:14px;padding:8px 0}
+.back:hover{color:#ff8b8b}
+h1{font-size:28px;letter-spacing:-.7px}
+.star{margin-left:10px}
+.intro{font-size:13px;line-height:1.6;margin-bottom:14px}
+.help{background:#1b1b20;border:1px solid #303038;border-radius:10px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#bdbdc7}
+.help summary{cursor:pointer;color:#eee}
+.help ol{padding-left:20px;margin-bottom:0;line-height:1.8}
+.tools{gap:10px;margin-bottom:16px;align-items:stretch}
+#search{padding:12px;font-size:13px}
+.video-head{gap:12px}
+h2{font-size:15px}
+#empty{padding:30px 8px}
+
+.video-head>div{min-width:0;flex:1}.thumbnail{flex-shrink:0}.video-head h2{overflow-wrap:anywhere}.tools{min-width:0}#search{min-width:0}
+.channel{color:#c4c4ce;font-size:13px;line-height:1.5;margin-bottom:6px;overflow-wrap:anywhere}

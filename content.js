@@ -33,6 +33,18 @@
   // script targets the www DOM / player stack and must stay off Music.
   const IS_MUSIC_SITE = window.location.hostname === 'music.youtube.com';
 
+  chrome.runtime.onMessage.addListener((message, sender, respond) => {
+    if (message.type !== 'ytAidSeekBookmark') return;
+    const video = document.querySelector('#movie_player video');
+    if (IS_MUSIC_SITE || message.videoId !== videoIdFromUrl(location.href) ||
+        !Number.isFinite(message.time) || message.time < 0 || !video ||
+        video.readyState < 1 || isAdPlaying()) {
+      respond({ ok: false }); return;
+    }
+    video.currentTime = Number.isFinite(video.duration) ? Math.min(message.time, video.duration) : message.time;
+    respond({ ok: true });
+  });
+
   // --- Configuration & Default Settings ---
   const DEFAULT_SETTINGS = {
     enableLoop: true,
@@ -2274,6 +2286,32 @@
     return !!document.querySelector('#page-header-banner, ytd-c4-tabbed-header-renderer');
   }
 
+  let bookmarkChannelPending = '';
+  const bookmarkChannelsSaved = new Map();
+  function getBookmarkChannelName() {
+    const channel = document.querySelector(
+      'ytd-watch-metadata #owner ytd-channel-name a, ' +
+      'ytd-watch-metadata #owner #channel-name a, ' +
+      '#upload-info #channel-name a'
+    );
+    return channel?.textContent.trim() || '';
+  }
+
+  async function updateBookmarkChannel() {
+    const videoId = videoIdFromUrl(location.href);
+    const channelName = getBookmarkChannelName();
+    if (!videoId || !channelName || isAdPlaying()) return;
+    const signature = videoId + ':' + channelName;
+    if (bookmarkChannelPending || bookmarkChannelsSaved.get(videoId) === channelName) return;
+    bookmarkChannelPending = signature;
+    try {
+      // Store metadata separately so updating older bookmarks cannot overwrite edits.
+      await chrome.storage.local.set({ ['ytAidChannel:' + videoId]: channelName });
+      bookmarkChannelsSaved.set(videoId, channelName);
+    } catch (error) { /* Retry on the next page update. */ }
+    finally { bookmarkChannelPending = ''; }
+  }
+
   function injectAllAreas() {
     const path = window.location.pathname;
     const hasCardTools = settings.enableCopyButtons || settings.enableCleanLink || settings.enableThumbnailDownload;
@@ -2281,6 +2319,7 @@
     if (!isHomeFeedPage()) closeHomeFlyout();
 
     if (path.startsWith('/watch')) {
+      updateBookmarkChannel();
       injectWatchPageToolbar();
       if (hasCardTools) injectSidebarButtons();
     } else if (path === '/' || path.startsWith('/results') || path.startsWith('/feed')) {
@@ -2369,6 +2408,34 @@
       </div>
     `;
 
+    const bookmarkBtn = document.createElement('button');
+    bookmarkBtn.className = 'yt-aid-pill-btn';
+    bookmarkBtn.id = 'yt-aid-btn-bookmark';
+    bookmarkBtn.textContent = '★ Lưu mốc thời gian';
+    bookmarkBtn.addEventListener('click', async () => {
+      const videoId = videoIdFromUrl(location.href);
+      const video = getPlayerElement()?.querySelector('video');
+      if (!videoId || !video || !Number.isFinite(video.currentTime)) {
+        showToast('Chưa lấy được thời gian video. Hãy thử lại.', 'error'); return;
+      }
+      if (isAdPlaying()) { showToast('Hãy đợi quảng cáo kết thúc để lưu bookmark.', 'info'); return; }
+      const time = Math.floor(video.currentTime);
+      const title = getWatchVideoTitle();
+      const stamp = new Date(time * 1000).toISOString().slice(time >= 3600 ? 11 : 14, 19);
+      const channelName = getBookmarkChannelName();
+      const name = window.prompt('Đặt tên bookmark tại ' + stamp + ':', 'Mốc ' + stamp);
+      if (name === null) return;
+      bookmarkBtn.disabled = true;
+      try {
+        const id = crypto.randomUUID();
+        await chrome.storage.local.set({ ['ytAidBookmark:' + id]: {
+          id, videoId, title, channelName, time, name: name.trim() || 'Mốc ' + stamp, createdAt: Date.now()
+        } });
+        showToast('Đã lưu bookmark tại ' + stamp, 'success');
+      } catch (error) { showToast('Không lưu được bookmark. Hãy tải lại trang rồi thử lại.', 'error'); }
+      finally { bookmarkBtn.disabled = false; }
+    });
+    toolbar.querySelector('.yt-aid-toolbar-left').appendChild(bookmarkBtn);
     titleContainer.appendChild(toolbar);
 
     // 1. Copy Pure
