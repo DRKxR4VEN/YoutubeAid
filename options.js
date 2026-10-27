@@ -148,12 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
       keybindKeyboard.appendChild(rowEl);
     });
 
-    if (keybindTapsEl) {
-      keybindTapsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
-        btn.addEventListener('click', () => handleTapPick(Number(btn.dataset.taps)));
-      });
-    }
-
     refreshKeybindState();
   }
 
@@ -334,6 +328,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!el) return;
     el.addEventListener('change', () => saveCurrentSettings());
   });
+
+  if (keybindTapsEl) {
+    keybindTapsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
+      btn.addEventListener('click', () => handleTapPick(Number(btn.dataset.taps)));
+    });
+  }
 
   btnReset.addEventListener('click', () => {
     if (confirm('Khôi phục tất cả cài đặt về mặc định ban đầu?')) {
