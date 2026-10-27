@@ -1142,6 +1142,8 @@ html:not([dark]) .yt-aid-channel-btn:hover {
 
 /* --- Bookmark page (overlay) --- */
 .yt-aid-bm-page {
+  overscroll-behavior: contain;
+  outline: none;
   position: fixed;
   top: 56px;
   left: 0;
@@ -1506,4 +1508,31 @@ html.yt-aid-bm-active ytd-feed-filter-chip-bar-renderer,
 html.yt-aid-bm-active ytd-search-sub-menu-renderer,
 html.yt-aid-bm-active #chips-wrapper {
   visibility: hidden !important;
+}
+
+
+/* Trang Bookmark thay thế hẳn nội dung phía sau: khóa cuộn nền và ẩn newfeed/trang đang xem */
+html.yt-aid-bm-active,
+html.yt-aid-bm-active body {
+  overflow: hidden !important;
+}
+
+html.yt-aid-bm-active {
+  scrollbar-gutter: stable;
+}
+
+html.yt-aid-bm-active ytd-page-manager {
+  visibility: hidden !important;
+}
+
+/* Bỏ highlight "Trang chủ" trong sidebar khi đang ở trang Bookmark (chỉ còn mục Bookmark sáng) */
+html.yt-aid-bm-active ytd-guide-entry-renderer[active] #endpoint,
+html.yt-aid-bm-active ytd-guide-entry-renderer[active] tp-yt-paper-item,
+html.yt-aid-bm-active ytd-mini-guide-entry-renderer[active] {
+  background: transparent !important;
+}
+
+html.yt-aid-bm-active ytd-guide-entry-renderer[active] .title,
+html.yt-aid-bm-active ytd-guide-entry-renderer[active] yt-formatted-string {
+  font-weight: 400 !important;
 }

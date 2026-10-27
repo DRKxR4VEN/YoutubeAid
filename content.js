@@ -4033,6 +4033,8 @@
     renderBookmarkPage();
     page.classList.add('yt-aid-bm-page-open');
     document.documentElement.classList.add('yt-aid-bm-active');
+    page.setAttribute('tabindex', '-1');
+    try { page.focus({ preventScroll: true }); } catch (e) { }
     document.addEventListener('keydown', onBookmarkPageKeyDown, true);
     document.addEventListener('click', onBookmarkOutsideClick, true);
     window.addEventListener('resize', positionBookmarkPage);
