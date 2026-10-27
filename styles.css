@@ -950,3 +950,529 @@ html:not([dark]) .yt-aid-channel-btn:hover {
   }
 }
 
+
+
+/* ========================================================
+   9. BOOKMARK (toolbar button, home shelf, sidebar entry, page)
+   ======================================================== */
+.yt-aid-bookmark-btn.active,
+.yt-aid-flyout-btn.yt-aid-bookmark.active {
+  color: var(--yta-brand-blue);
+}
+
+.yt-aid-bookmark-btn.active {
+  background: rgba(62, 166, 255, 0.16);
+}
+
+.yt-aid-bookmark-btn.active:hover {
+  background: rgba(62, 166, 255, 0.26);
+}
+
+/* --- Home feed shelf --- */
+.yt-aid-bm-shelf {
+  display: block;
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 12px 24px 4px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--yta-border-subtle);
+  font-family: var(--yta-font-family);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-bm-shelf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.yt-aid-bm-shelf-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.yt-aid-bm-shelf-title svg {
+  width: 20px;
+  height: 20px;
+  color: var(--yta-brand-blue);
+}
+
+.yt-aid-bm-link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--yta-brand-blue);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: var(--yta-radius-pill);
+  cursor: pointer;
+}
+
+.yt-aid-bm-link-btn:hover {
+  background: var(--yta-bg-hover);
+}
+
+.yt-aid-bm-shelf-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px 16px;
+  padding-bottom: 16px;
+}
+
+/* --- Cards (shelf + page) --- */
+.yt-aid-bm-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.yt-aid-bm-card-compact {
+  width: 100%;
+}
+
+.yt-aid-bm-thumb {
+  display: block;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--yta-bg-card);
+}
+
+.yt-aid-bm-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.yt-aid-bm-info {
+  min-width: 0;
+}
+
+.yt-aid-bm-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--yta-text-primary);
+  text-decoration: none;
+}
+
+.yt-aid-bm-channel {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--yta-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Left sidebar entries --- */
+.yt-aid-guide-entry {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 40px;
+  padding: 0 12px;
+  margin: 0;
+  box-sizing: border-box;
+  border-radius: 10px;
+  color: var(--yt-spec-text-primary, var(--yta-text-primary));
+  font-family: var(--yta-font-family);
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.yt-aid-guide-entry svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.yt-aid-guide-entry:hover {
+  background: var(--yta-bg-hover);
+}
+
+.yt-aid-guide-entry.active {
+  background: var(--yta-bg-active);
+  font-weight: 600;
+}
+
+.yt-aid-mini-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 74px;
+  padding: 16px 0 14px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  color: var(--yt-spec-text-primary, var(--yta-text-primary));
+  font-family: var(--yta-font-family);
+  font-size: 10px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.yt-aid-mini-entry svg {
+  width: 24px;
+  height: 24px;
+}
+
+.yt-aid-mini-entry:hover,
+.yt-aid-mini-entry.active {
+  background: var(--yta-bg-hover);
+}
+
+/* --- Bookmark page (overlay) --- */
+.yt-aid-bm-page {
+  position: fixed;
+  top: 56px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1999;
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 24px 32px 48px;
+  box-sizing: border-box;
+  background: var(--yt-spec-base-background, var(--yta-bg-surface));
+  color: var(--yta-text-primary);
+  font-family: var(--yta-font-family);
+}
+
+.yt-aid-bm-page.yt-aid-bm-page-open {
+  display: flex;
+}
+
+.yt-aid-bm-page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.yt-aid-bm-page-header h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.yt-aid-bm-page-header h2 svg {
+  width: 26px;
+  height: 26px;
+  color: var(--yta-brand-blue);
+}
+
+.yt-aid-bm-page-count {
+  font-size: 14px;
+  color: var(--yta-text-secondary);
+  flex: 1;
+}
+
+.yt-aid-bm-search {
+  width: 260px;
+  max-width: 40vw;
+  padding: 8px 14px;
+  border: 1px solid var(--yta-border);
+  border-radius: var(--yta-radius-pill);
+  background: transparent;
+  color: var(--yta-text-primary);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.yt-aid-bm-search:focus {
+  border-color: var(--yta-brand-blue);
+}
+
+.yt-aid-bm-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--yta-text-primary);
+  cursor: pointer;
+}
+
+.yt-aid-bm-close svg {
+  width: 22px;
+  height: 22px;
+}
+
+.yt-aid-bm-close:hover {
+  background: var(--yta-bg-hover);
+}
+
+.yt-aid-bm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px 16px;
+}
+
+.yt-aid-bm-empty {
+  grid-column: 1 / -1;
+  padding: 64px 0;
+  text-align: center;
+  font-size: 15px;
+  color: var(--yta-text-secondary);
+}
+
+
+/* --- Bookmark: mốc thời gian, đổi tên, xóa --- */
+.yt-aid-bm-time {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.yt-aid-bm-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.yt-aid-bm-card:hover .yt-aid-bm-actions,
+.yt-aid-bm-actions:focus-within {
+  opacity: 1;
+}
+
+.yt-aid-bm-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.yt-aid-bm-action svg {
+  width: 16px;
+  height: 16px;
+}
+
+.yt-aid-bm-action:hover {
+  background: var(--yta-brand-blue);
+}
+
+.yt-aid-bm-action-danger:hover {
+  background: var(--yta-brand-red);
+}
+
+.yt-aid-bm-rename-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 1px solid var(--yta-brand-blue);
+  border-radius: 6px;
+  background: var(--yta-bg-surface-elevated);
+  color: var(--yta-text-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.yt-aid-bm-danger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 80, 80, 0.5);
+  border-radius: var(--yta-radius-pill);
+  background: transparent;
+  color: #ff6b6b;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.yt-aid-bm-danger-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.yt-aid-bm-danger-btn:hover {
+  background: rgba(255, 80, 80, 0.16);
+}
+
+/* --- Log bookmark của video (dropdown) --- */
+.yt-aid-bm-log-menu {
+  width: 380px;
+  max-width: calc(100vw - 24px);
+}
+
+.yt-aid-bm-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.yt-aid-bm-log-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.yt-aid-bm-log-row:hover {
+  background: var(--yta-bg-hover);
+}
+
+.yt-aid-bm-log-time {
+  flex: 0 0 auto;
+  min-width: 56px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(62, 166, 255, 0.16);
+  color: var(--yta-brand-blue);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.yt-aid-bm-log-time:hover {
+  background: rgba(62, 166, 255, 0.3);
+}
+
+.yt-aid-bm-log-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--yta-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-aid-bm-log-row .yt-aid-bm-action {
+  background: transparent;
+  color: var(--yta-text-secondary);
+}
+
+.yt-aid-bm-log-row .yt-aid-bm-action:hover {
+  background: var(--yta-bg-active);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-bm-log-row .yt-aid-bm-action-danger:hover {
+  background: rgba(255, 80, 80, 0.2);
+  color: #ff6b6b;
+}
+
+.yt-aid-bm-log-empty {
+  padding: 12px 10px 14px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--yta-text-secondary);
+}
+
+.yt-aid-bm-log-clear {
+  margin: 6px 4px 2px;
+  justify-content: center;
+}
+
+
+/* --- Bookmark: gộp theo video --- */
+.yt-aid-bm-count {
+  left: 6px;
+  right: auto;
+  background: rgba(62, 166, 255, 0.92);
+  color: #0b0b0b;
+  font-weight: 600;
+}
+
+.yt-aid-bm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.yt-aid-bm-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(62, 166, 255, 0.16);
+  color: var(--yta-brand-blue);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.yt-aid-bm-chip:hover {
+  background: rgba(62, 166, 255, 0.3);
+}
+
+.yt-aid-bm-chip-more {
+  background: var(--yta-bg-hover);
+  color: var(--yta-text-secondary);
+}
+
+.yt-aid-bm-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+
+.yt-aid-bm-rows .yt-aid-bm-log-row {
+  padding: 4px 6px;
+}

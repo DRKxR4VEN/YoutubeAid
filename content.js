@@ -242,6 +242,7 @@
     initSearchAutoPaste();
     initDropdownDismiss();
     initDOMObserver();
+    initBookmarks();
     applySettingUpdates();
   }
 
@@ -2193,7 +2194,7 @@
       }, delay);
     };
 
-    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger';
+    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger, #yt-aid-bookmark-shelf';
     // Everything this extension owns starts with yt-aid- (classes) or yt-aid-
     // (ids). Mutations inside it must not schedule another page-wide scan.
     const AID_UI_SCOPE = '[class*="yt-aid-"], [id^="yt-aid-"]';
@@ -2279,6 +2280,7 @@
     const hasCardTools = settings.enableCopyButtons || settings.enableCleanLink || settings.enableThumbnailDownload;
 
     if (!isHomeFeedPage()) closeHomeFlyout();
+    injectBookmarkUi();
 
     if (path.startsWith('/watch')) {
       injectWatchPageToolbar();
@@ -2346,6 +2348,18 @@
           <span>Clean Link</span>
         </button>
 
+        <!-- Bookmark (lưu mốc thời gian hiện tại) + Log -->
+        <div class="yt-aid-split-group yt-aid-bookmark-group">
+          <button class="yt-aid-pill-btn yt-aid-bookmark-btn" id="yt-aid-btn-bookmark" title="Lưu bookmark tại thời điểm đang xem">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"/></svg>
+            <span>Bookmark</span>
+          </button>
+          <button class="yt-aid-pill-btn yt-aid-pill-sub yt-aid-bookmark-log-btn" id="yt-aid-btn-bookmark-log" title="Xem log bookmark của video này" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+            <span>Log</span>
+          </button>
+        </div>
+
         <!-- Downloads button (thumbnail crop) -->
         <button class="yt-aid-pill-btn yt-aid-downloads-btn" id="yt-aid-btn-downloads" title="Tải ảnh bìa thumbnail (có cắt ảnh)">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
@@ -2407,6 +2421,27 @@
       const cleanUrl = cleanYoutubeUrl(window.location.href);
       copyTextToClipboard(cleanUrl, `Đã chép liên kết sạch: ${cleanUrl}`);
     });
+
+    // Bookmark current video
+    const bookmarkBtn = toolbar.querySelector('#yt-aid-btn-bookmark');
+    bookmarkBtn.addEventListener('mouseenter', () => {
+      bookmarkBtn.title = `Lưu bookmark tại ${formatVideoTime(getCurrentVideoTime())}`;
+    });
+    bookmarkBtn.addEventListener('click', () => {
+      if (isAdPlaying()) {
+        showToast('Đang phát quảng cáo, hãy thử lại khi video chính chạy', 'warning');
+        return;
+      }
+      addBookmark(currentWatchBookmarkData(), getCurrentVideoTime());
+    });
+
+    const bookmarkLogBtn = toolbar.querySelector('#yt-aid-btn-bookmark-log');
+    bookmarkLogBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleDropdown(bookmarkLogBtn, buildBookmarkLogMenu);
+    });
+
+    syncBookmarkButtons();
 
     // Thumbnail download with crop dialog
     const downloadsBtn = toolbar.querySelector('#yt-aid-btn-downloads');
@@ -2611,7 +2646,9 @@
     }, true);
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && dropdownEl) closeDropdown();
+      if (e.key !== 'Escape' || !dropdownEl) return;
+      if (e.target && e.target.classList && e.target.classList.contains('yt-aid-bm-rename-input')) return;
+      closeDropdown();
     }, true);
 
     window.addEventListener('resize', closeDropdown);
@@ -2901,6 +2938,12 @@
       </button>
     `);
 
+    buttons.push(`
+      <button type="button" class="yt-aid-flyout-btn yt-aid-bookmark" title="Bookmark video" aria-label="Bookmark video">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"/></svg>
+      </button>
+    `);
+
     panel.innerHTML = buttons.join('');
     panel.dataset.ytAidConfig = homeFlyoutConfig();
 
@@ -2952,6 +2995,20 @@
         closeHomeFlyout();
         if (!clean) return;
         copyTextToClipboard(clean, `Đã chép liên kết: ${previewText(clean, 45)}`);
+      });
+    }
+
+    const bookmarkBtn = panel.querySelector('.yt-aid-bookmark');
+    if (bookmarkBtn) {
+      bookmarkBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const data = flyoutData();
+        const id = videoIdFromUrl(data.url);
+        closeHomeFlyout();
+        if (!id) return;
+        const isShort = /\/shorts\//.test(data.url);
+        toggleBookmark({ id, title: data.title, channel: '', isShort });
       });
     }
 
@@ -3056,6 +3113,7 @@
     if (!wasOpen) panel.classList.remove('yt-aid-flyout-open');
     positionHomeFlyout();
     panel.classList.add('yt-aid-flyout-open');
+    syncBookmarkButtons();
     attachHomeFlyoutListeners();
   }
 
@@ -3159,5 +3217,858 @@
     }
   }
 
+
+
+  // ==========================================
+  // 9. BOOKMARK (lưu mốc thời gian video, xem lại sau)
+  // ==========================================
+  // Mỗi bookmark = 1 mốc thời gian của 1 video:
+  // { uid, id (videoId), title, channel, isShort, time (giây), name (tên tự đặt), addedAt }
+  const BOOKMARKS_KEY = 'bookmarks';
+  const BOOKMARK_LIMIT = 2000;
+  const BOOKMARK_SHELF_MAX = 12;
+  const BOOKMARK_NAME_MAX = 200;
+  const BOOKMARK_ICON_OUTLINE = 'M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z';
+  const BOOKMARK_ICON_FILLED = 'M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z';
+  const CLOSE_ICON = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z';
+  const EDIT_ICON = 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z';
+  const TRASH_ICON = 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z';
+  const LOG_ICON = 'M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z';
+  const BM_LOG_MENU_ID = 'yt-aid-bm-log-menu';
+
+  let bookmarks = [];
+  let bookmarkPageOpen = false;
+  let bookmarkFilter = '';
+
+  function svgIcon(path, className) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    if (className) svg.setAttribute('class', className);
+    const p = document.createElementNS(ns, 'path');
+    p.setAttribute('fill', 'currentColor');
+    p.setAttribute('d', path);
+    svg.appendChild(p);
+    return svg;
+  }
+
+  function formatVideoTime(totalSeconds) {
+    const t = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const h = Math.floor(t / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const s = t % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+  }
+
+  function sanitizeBookmarks(raw) {
+    if (!Array.isArray(raw)) return [];
+    const usedUids = new Set();
+    const out = [];
+    for (const item of raw) {
+      if (!item || typeof item.id !== 'string' || !VIDEO_ID_RE.test(item.id)) continue;
+      const time = Math.max(0, Math.floor(Number(item.time) || 0));
+      const addedAt = Number(item.addedAt) || 0;
+      // Dữ liệu cũ (bản chưa có mốc thời gian) không có uid: tạo uid ổn định từ nội dung.
+      let uid = typeof item.uid === 'string' && item.uid ? item.uid : `${item.id}-${time}-${addedAt}`;
+      if (usedUids.has(uid)) {
+        let n = 2;
+        while (usedUids.has(`${uid}-${n}`)) n++;
+        uid = `${uid}-${n}`;
+      }
+      usedUids.add(uid);
+      out.push({
+        uid,
+        id: item.id,
+        title: typeof item.title === 'string' ? item.title : '',
+        channel: typeof item.channel === 'string' ? item.channel : '',
+        isShort: !!item.isShort,
+        time,
+        name: typeof item.name === 'string' ? item.name.slice(0, BOOKMARK_NAME_MAX) : '',
+        addedAt
+      });
+    }
+    return out;
+  }
+
+  function newBookmarkUid() {
+    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  function bookmarkDisplayName(bm) {
+    return bm.name || bm.title || bm.id;
+  }
+
+  function bookmarkUrl(bm) {
+    if (bm.isShort) return `https://www.youtube.com/shorts/${bm.id}`;
+    return `https://www.youtube.com/watch?v=${bm.id}${bm.time > 0 ? `&t=${bm.time}s` : ''}`;
+  }
+
+  function bookmarksOfVideo(id) {
+    return bookmarks
+      .filter((b) => b.id === id)
+      .sort((a, b) => a.time - b.time || a.addedAt - b.addedAt);
+  }
+
+  function saveBookmarks() {
+    safeSetStorage({ [BOOKMARKS_KEY]: bookmarks });
+  }
+
+  function getMainVideo() {
+    return document.querySelector('#movie_player video.html5-main-video') ||
+      document.querySelector('#movie_player video') ||
+      document.querySelector('video.html5-main-video');
+  }
+
+  function getCurrentVideoTime() {
+    const v = getMainVideo();
+    return v && isFinite(v.currentTime) ? Math.max(0, Math.floor(v.currentTime)) : 0;
+  }
+
+  function currentWatchBookmarkData() {
+    const id = videoIdFromUrl(window.location.href);
+    if (!id) return null;
+    const channelEl = document.querySelector(
+      'ytd-watch-metadata ytd-channel-name a, #owner ytd-channel-name a, ytd-video-owner-renderer ytd-channel-name a'
+    );
+    return {
+      id,
+      title: getWatchVideoTitle(),
+      channel: channelEl ? channelEl.textContent.trim() : '',
+      isShort: false
+    };
+  }
+
+  // --- Thao tác dữ liệu ---
+  function addBookmark(data, time) {
+    if (!data || !data.id) return false;
+    const t = Math.max(0, Math.floor(Number(time) || 0));
+    if (bookmarks.some((b) => b.id === data.id && b.time === t)) {
+      showToast(`Đã có bookmark tại ${formatVideoTime(t)}`, 'warning');
+      return false;
+    }
+    bookmarks = [{
+      uid: newBookmarkUid(),
+      id: data.id,
+      title: data.title || '',
+      channel: data.channel || '',
+      isShort: !!data.isShort,
+      time: t,
+      name: '',
+      addedAt: Date.now()
+    }, ...bookmarks].slice(0, BOOKMARK_LIMIT);
+    saveBookmarks();
+    syncBookmarkUi();
+    showToast(
+      t > 0
+        ? `Đã lưu bookmark tại ${formatVideoTime(t)}`
+        : `Đã thêm bookmark: "${previewText(data.title || data.id, 35)}"`,
+      'success'
+    );
+    return true;
+  }
+
+  // Dùng cho nút trên thẻ video ở Trang chủ (không biết mốc thời gian): bật/tắt bookmark ở 0:00.
+  function toggleBookmark(data) {
+    if (!data || !data.id) return;
+    const existing = bookmarks.find((b) => b.id === data.id && b.time === 0);
+    if (existing) {
+      removeBookmark(existing.uid);
+      return;
+    }
+    addBookmark(data, 0);
+  }
+
+  function removeBookmark(uid) {
+    const before = bookmarks.length;
+    bookmarks = bookmarks.filter((b) => b.uid !== uid);
+    if (bookmarks.length === before) return;
+    saveBookmarks();
+    syncBookmarkUi();
+    showToast('Đã xóa bookmark', 'info');
+  }
+
+  function renameBookmark(uid, rawName) {
+    let name = String(rawName || '').replace(/\s+/g, ' ').trim().slice(0, BOOKMARK_NAME_MAX);
+    const bm = bookmarks.find((b) => b.uid === uid);
+    if (!bm) return;
+    // Trùng tên gốc của video hoặc tên mặc định của log thì coi như không đặt tên riêng.
+    if (name === bm.title || name === `Bookmark tại ${formatVideoTime(bm.time)}`) name = '';
+    if (bm.name !== name) {
+      bm.name = name;
+      saveBookmarks();
+    }
+    syncBookmarkUi();
+  }
+
+  function removeVideoBookmarks(id) {
+    const count = bookmarks.filter((b) => b.id === id).length;
+    if (!count) return;
+    if (!window.confirm(`Xóa ${count} bookmark của video này?`)) return;
+    bookmarks = bookmarks.filter((b) => b.id !== id);
+    saveBookmarks();
+    syncBookmarkUi();
+    showToast(`Đã xóa ${count} bookmark của video`, 'info');
+  }
+
+  function clearAllBookmarks() {
+    if (!bookmarks.length) return;
+    if (!window.confirm(`Xóa TẤT CẢ ${bookmarks.length} bookmark? Hành động này không thể hoàn tác.`)) return;
+    bookmarks = [];
+    saveBookmarks();
+    syncBookmarkUi();
+    showToast('Đã xóa tất cả bookmark', 'info');
+  }
+
+  function loadBookmarks(done) {
+    try {
+      chrome.storage.local.get({ [BOOKMARKS_KEY]: [] }, (items) => {
+        void chrome.runtime?.lastError;
+        bookmarks = sanitizeBookmarks(items && items[BOOKMARKS_KEY]);
+        if (done) done();
+      });
+    } catch (e) {
+      if (done) done();
+    }
+  }
+
+  // --- Đổi tên ngay tại chỗ ---
+  function startInlineRename(nameEl, bm) {
+    if (!nameEl || nameEl.dataset.editing) return;
+    const parent = nameEl.parentNode;
+    if (!parent) return;
+    nameEl.dataset.editing = '1';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'yt-aid-bm-rename-input';
+    input.maxLength = BOOKMARK_NAME_MAX;
+    input.value = bookmarkDisplayName(bm);
+    input.placeholder = 'Tên bookmark';
+    parent.replaceChild(input, nameEl);
+    input.focus();
+    input.select();
+
+    let finished = false;
+    const finish = (save) => {
+      if (finished) return;
+      finished = true;
+      if (save) {
+        renameBookmark(bm.uid, input.value);
+      } else if (input.parentNode) {
+        input.parentNode.replaceChild(nameEl, input);
+        delete nameEl.dataset.editing;
+      }
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        finish(false);
+      }
+    });
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('click', (e) => e.stopPropagation());
+  }
+
+  // --- Trạng thái nút / giao diện ---
+  function syncBookmarkButtons() {
+    const watchId = window.location.pathname.startsWith('/watch') ? videoIdFromUrl(window.location.href) : null;
+    const count = watchId ? bookmarksOfVideo(watchId).length : 0;
+
+    const btn = document.getElementById('yt-aid-btn-bookmark');
+    if (btn) {
+      btn.classList.toggle('active', count > 0);
+      const path = btn.querySelector('path');
+      if (path) path.setAttribute('d', count > 0 ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE);
+    }
+
+    const logBtn = document.getElementById('yt-aid-btn-bookmark-log');
+    if (logBtn) {
+      const label = logBtn.querySelector('span');
+      if (label) label.textContent = count > 0 ? `Log (${count})` : 'Log';
+      logBtn.classList.toggle('active', count > 0);
+    }
+
+    const flyoutBtn = document.querySelector(`.${HOME_FLYOUT_CLASS} .yt-aid-bookmark`);
+    if (flyoutBtn && homeFlyout.data) {
+      const fid = videoIdFromUrl(homeFlyout.data.url);
+      const on = !!fid && bookmarks.some((b) => b.id === fid && b.time === 0);
+      flyoutBtn.classList.toggle('active', on);
+      const path = flyoutBtn.querySelector('path');
+      if (path) path.setAttribute('d', on ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE);
+    }
+  }
+
+  function syncBookmarkUi() {
+    syncBookmarkButtons();
+    renderBookmarkShelf();
+    refreshBookmarkLogMenu();
+    if (bookmarkPageOpen) renderBookmarkPage();
+  }
+
+  // --- Mở / tua tới bookmark ---
+  function seekCurrentVideo(time) {
+    const v = getMainVideo();
+    if (!v) return false;
+    try {
+      v.currentTime = Math.max(0, time);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function openBookmark(event, bm) {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1) return; // mở tab mới theo mặc định
+    event.preventDefault();
+    closeBookmarkPage();
+    closeDropdown();
+    const sameVideo = window.location.pathname.startsWith('/watch') &&
+      videoIdFromUrl(window.location.href) === bm.id && !bm.isShort;
+    if (sameVideo && seekCurrentVideo(bm.time)) return;
+    goToYoutubeTarget(bookmarkUrl(bm));
+  }
+
+  // --- Thẻ bookmark (dải Trang chủ + trang Bookmark) ---
+  function makeIconButton(className, title, iconPath, onClick) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = className;
+    b.title = title;
+    b.setAttribute('aria-label', title);
+    b.appendChild(svgIcon(iconPath));
+    b.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick(e);
+    });
+    return b;
+  }
+
+  // Gộp các bookmark cùng video thành 1 nhóm (giữ thứ tự: video có bookmark mới nhất lên đầu).
+  function groupBookmarksByVideo(list) {
+    const map = new Map();
+    for (const bm of list) {
+      let g = map.get(bm.id);
+      if (!g) {
+        g = { id: bm.id, title: bm.title, channel: bm.channel, isShort: bm.isShort, items: [] };
+        map.set(bm.id, g);
+      }
+      g.items.push(bm);
+      if (!g.title && bm.title) g.title = bm.title;
+      if (!g.channel && bm.channel) g.channel = bm.channel;
+    }
+    const groups = [...map.values()];
+    groups.forEach((g) => g.items.sort((a, b) => a.time - b.time || a.addedAt - b.addedAt));
+    return groups;
+  }
+
+  function defaultBookmarkLabel(bm) {
+    return `Bookmark tại ${formatVideoTime(bm.time)}`;
+  }
+
+  // 1 dòng bookmark: [mốc thời gian] [tên] [đổi tên] [xóa] — dùng ở Log và trang Bookmark.
+  function buildBookmarkRow(bm) {
+    const row = document.createElement('div');
+    row.className = 'yt-aid-bm-log-row';
+
+    const timeBtn = document.createElement('button');
+    timeBtn.type = 'button';
+    timeBtn.className = 'yt-aid-bm-log-time';
+    timeBtn.title = 'Tua tới mốc này';
+    timeBtn.textContent = formatVideoTime(bm.time);
+    timeBtn.addEventListener('click', (e) => openBookmark(e, bm));
+    row.appendChild(timeBtn);
+
+    const name = document.createElement('span');
+    name.className = 'yt-aid-bm-log-name';
+    name.textContent = bm.name || defaultBookmarkLabel(bm);
+    name.title = name.textContent;
+    row.appendChild(name);
+
+    // Ô nhập đổi tên bắt đầu từ tên đang hiển thị.
+    const editBm = { ...bm, name: bm.name || defaultBookmarkLabel(bm), title: '' };
+    row.appendChild(makeIconButton('yt-aid-bm-action', 'Đổi tên', EDIT_ICON, () => startInlineRename(name, editBm)));
+    row.appendChild(makeIconButton('yt-aid-bm-action yt-aid-bm-action-danger', 'Xóa bookmark', TRASH_ICON, () => removeBookmark(bm.uid)));
+    return row;
+  }
+
+  // Thẻ của 1 video (gộp tất cả bookmark của video đó).
+  function buildBookmarkGroupCard(group, compact) {
+    const items = group.items;
+    const multi = items.length > 1;
+    const single = multi ? null : items[0];
+    // Bấm vào ảnh/tiêu đề: mở bookmark được lưu gần nhất.
+    const primary = items.reduce((a, b) => (b.addedAt > a.addedAt ? b : a), items[0]);
+
+    const card = document.createElement('div');
+    card.className = compact ? 'yt-aid-bm-card yt-aid-bm-card-compact' : 'yt-aid-bm-card';
+    card.dataset.videoId = group.id;
+
+    const thumbLink = document.createElement('a');
+    thumbLink.className = 'yt-aid-bm-thumb';
+    thumbLink.href = bookmarkUrl(primary);
+    thumbLink.addEventListener('click', (e) => openBookmark(e, primary));
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.alt = '';
+    img.src = `https://i.ytimg.com/vi/${group.id}/mqdefault.jpg`;
+    thumbLink.appendChild(img);
+    if (multi || (single && single.time > 0)) {
+      const badge = document.createElement('span');
+      badge.className = multi ? 'yt-aid-bm-time yt-aid-bm-count' : 'yt-aid-bm-time';
+      badge.textContent = multi ? `${items.length} bookmark` : formatVideoTime(single.time);
+      thumbLink.appendChild(badge);
+    }
+    card.appendChild(thumbLink);
+
+    const info = document.createElement('div');
+    info.className = 'yt-aid-bm-info';
+    const useBookmarkName = compact && single;
+    const titleText = useBookmarkName ? bookmarkDisplayName(single) : (group.title || group.id);
+    const titleLink = document.createElement('a');
+    titleLink.className = 'yt-aid-bm-title';
+    titleLink.href = bookmarkUrl(primary);
+    titleLink.textContent = titleText;
+    titleLink.title = titleText;
+    titleLink.addEventListener('click', (e) => openBookmark(e, primary));
+    info.appendChild(titleLink);
+
+    if (useBookmarkName && single.name && single.title) {
+      const sub = document.createElement('div');
+      sub.className = 'yt-aid-bm-channel';
+      sub.textContent = single.title;
+      sub.title = single.title;
+      info.appendChild(sub);
+    }
+    if (group.channel) {
+      const ch = document.createElement('div');
+      ch.className = 'yt-aid-bm-channel';
+      ch.textContent = group.channel;
+      info.appendChild(ch);
+    }
+
+    if (compact && multi) {
+      // Dải Trang chủ: hiện các mốc thời gian dạng chip để nhảy thẳng tới mốc cần xem.
+      const chips = document.createElement('div');
+      chips.className = 'yt-aid-bm-chips';
+      const MAX_CHIPS = 5;
+      items.slice(0, MAX_CHIPS).forEach((bm) => {
+        const chip = document.createElement('a');
+        chip.className = 'yt-aid-bm-chip';
+        chip.href = bookmarkUrl(bm);
+        chip.textContent = formatVideoTime(bm.time);
+        chip.title = bm.name || defaultBookmarkLabel(bm);
+        chip.addEventListener('click', (e) => openBookmark(e, bm));
+        chips.appendChild(chip);
+      });
+      if (items.length > MAX_CHIPS) {
+        const more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'yt-aid-bm-chip yt-aid-bm-chip-more';
+        more.textContent = `+${items.length - MAX_CHIPS}`;
+        more.title = 'Xem tất cả bookmark';
+        more.addEventListener('click', (e) => {
+          e.preventDefault();
+          openBookmarkPage();
+        });
+        chips.appendChild(more);
+      }
+      info.appendChild(chips);
+    }
+
+    if (!compact) {
+      // Trang Bookmark: liệt kê từng bookmark của video để đổi tên / xóa.
+      const rows = document.createElement('div');
+      rows.className = 'yt-aid-bm-rows';
+      items.forEach((bm) => rows.appendChild(buildBookmarkRow(bm)));
+      info.appendChild(rows);
+    }
+    card.appendChild(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'yt-aid-bm-actions';
+    if (compact && single) {
+      actions.appendChild(makeIconButton('yt-aid-bm-action', 'Đổi tên bookmark', EDIT_ICON, () => startInlineRename(titleLink, single)));
+      actions.appendChild(makeIconButton('yt-aid-bm-action yt-aid-bm-action-danger', 'Xóa bookmark', CLOSE_ICON, () => removeBookmark(single.uid)));
+    } else {
+      actions.appendChild(makeIconButton(
+        'yt-aid-bm-action yt-aid-bm-action-danger',
+        multi ? `Xóa ${items.length} bookmark của video` : 'Xóa bookmark',
+        TRASH_ICON,
+        () => removeVideoBookmarks(group.id)
+      ));
+    }
+    card.appendChild(actions);
+    return card;
+  }
+
+  // --- Dải bookmark trên Trang chủ ---
+  function removeBookmarkShelf() {
+    document.querySelectorAll('#yt-aid-bookmark-shelf').forEach((el) => el.remove());
+  }
+
+  function renderBookmarkShelf() {
+    const shelf = document.getElementById('yt-aid-bookmark-shelf');
+    if (!shelf) return;
+    if (!bookmarks.length) {
+      shelf.remove();
+      return;
+    }
+
+    shelf.textContent = '';
+    const header = document.createElement('div');
+    header.className = 'yt-aid-bm-shelf-header';
+    const title = document.createElement('div');
+    title.className = 'yt-aid-bm-shelf-title';
+    title.appendChild(svgIcon(BOOKMARK_ICON_FILLED));
+    const titleText = document.createElement('span');
+    const shelfGroups = groupBookmarksByVideo(bookmarks);
+    titleText.textContent = shelfGroups.length === bookmarks.length
+      ? `Bookmark (${bookmarks.length})`
+      : `Bookmark (${shelfGroups.length} video · ${bookmarks.length} mốc)`;
+    title.appendChild(titleText);
+    header.appendChild(title);
+
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'yt-aid-bm-link-btn';
+    more.textContent = 'Xem tất cả';
+    more.addEventListener('click', openBookmarkPage);
+    header.appendChild(more);
+    shelf.appendChild(header);
+
+    const row = document.createElement('div');
+    row.className = 'yt-aid-bm-shelf-row';
+    shelfGroups.slice(0, BOOKMARK_SHELF_MAX).forEach((g) => row.appendChild(buildBookmarkGroupCard(g, true)));
+    shelf.appendChild(row);
+  }
+
+  function injectBookmarkShelf() {
+    if (window.location.pathname !== '/' || !bookmarks.length) {
+      removeBookmarkShelf();
+      return;
+    }
+    const grid = document.querySelector('ytd-browse[page-subtype="home"] ytd-rich-grid-renderer') ||
+      document.querySelector('ytd-rich-grid-renderer');
+    if (!grid) return;
+
+    let shelf = document.getElementById('yt-aid-bookmark-shelf');
+    if (shelf && shelf.parentElement === grid) return;
+    if (shelf) shelf.remove();
+
+    shelf = document.createElement('section');
+    shelf.id = 'yt-aid-bookmark-shelf';
+    shelf.className = 'yt-aid-bm-shelf';
+    const contents = grid.querySelector(':scope > #contents');
+    if (contents) grid.insertBefore(shelf, contents);
+    else grid.insertBefore(shelf, grid.firstChild);
+    renderBookmarkShelf();
+  }
+
+  // --- Log bookmark của 1 video (dropdown trên Watch page) ---
+  function fillBookmarkLogMenu(menu) {
+    const id = videoIdFromUrl(window.location.href);
+    const list = id ? bookmarksOfVideo(id) : [];
+    menu.textContent = '';
+
+    const title = document.createElement('div');
+    title.className = 'yt-aid-tools-title';
+    title.textContent = `Log bookmark · ${list.length}`;
+    menu.appendChild(title);
+
+    if (!list.length) {
+      const empty = document.createElement('div');
+      empty.className = 'yt-aid-bm-log-empty';
+      empty.textContent = 'Video này chưa có bookmark. Bấm nút Bookmark để lưu mốc thời gian hiện tại.';
+      menu.appendChild(empty);
+      return;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'yt-aid-bm-log-list';
+    list.forEach((bm) => wrap.appendChild(buildBookmarkRow(bm)));
+    menu.appendChild(wrap);
+
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'yt-aid-bm-danger-btn yt-aid-bm-log-clear';
+    clear.textContent = 'Xóa tất cả bookmark của video này';
+    clear.addEventListener('click', () => removeVideoBookmarks(id));
+    menu.appendChild(clear);
+  }
+
+  function buildBookmarkLogMenu() {
+    const menu = document.createElement('div');
+    menu.id = BM_LOG_MENU_ID;
+    menu.className = 'yt-aid-tools-menu yt-aid-bm-log-menu';
+    fillBookmarkLogMenu(menu);
+    return menu;
+  }
+
+  function refreshBookmarkLogMenu() {
+    const menu = document.getElementById(BM_LOG_MENU_ID);
+    if (menu && menu === dropdownEl) fillBookmarkLogMenu(menu);
+  }
+
+  // --- Mục Bookmark ở thanh bên trái ---
+  function openBookmarkFromGuide(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (bookmarkPageOpen) closeBookmarkPage();
+    else openBookmarkPage();
+  }
+
+  // Sao chép hình học của mục gốc (Trang chủ, Shorts…) để mục Bookmark thẳng hàng.
+  function alignGuideEntry(entry, items) {
+    const nat = items.querySelector('ytd-guide-entry-renderer a#endpoint, ytd-guide-entry-renderer #endpoint');
+    if (!nat) return;
+    const natRect = nat.getBoundingClientRect();
+    const itemsRect = items.getBoundingClientRect();
+    if (!natRect.width || !natRect.height) return;
+
+    const iconEl = nat.querySelector('yt-icon, yt-icon-shape, .guide-icon');
+    const textEl = nat.querySelector('yt-formatted-string, .title');
+    const iconRect = iconEl ? iconEl.getBoundingClientRect() : null;
+    const textRect = textEl ? textEl.getBoundingClientRect() : null;
+
+    entry.style.margin = '0';
+    entry.style.marginLeft = `${Math.round(natRect.left - itemsRect.left)}px`;
+    entry.style.width = `${Math.round(natRect.width)}px`;
+    entry.style.height = `${Math.round(natRect.height)}px`;
+    if (iconRect && iconRect.width) {
+      entry.style.paddingLeft = `${Math.max(0, Math.round(iconRect.left - natRect.left))}px`;
+      if (textRect && textRect.width) {
+        entry.style.gap = `${Math.max(0, Math.round(textRect.left - (iconRect.left + 24)))}px`;
+      }
+    }
+    if (textEl) {
+      const cs = getComputedStyle(textEl);
+      entry.style.fontSize = cs.fontSize;
+      entry.style.color = cs.color;
+    }
+  }
+
+  function injectGuideEntries() {
+    const items = document.querySelector('ytd-guide-renderer ytd-guide-section-renderer #items');
+    if (items && !items.querySelector('#yt-aid-guide-entry')) {
+      const entry = document.createElement('a');
+      entry.id = 'yt-aid-guide-entry';
+      entry.className = 'yt-aid-guide-entry';
+      entry.href = '#';
+      entry.appendChild(svgIcon(BOOKMARK_ICON_OUTLINE));
+      const label = document.createElement('span');
+      label.textContent = 'Bookmark';
+      entry.appendChild(label);
+      entry.addEventListener('click', openBookmarkFromGuide);
+      items.appendChild(entry);
+    }
+    const guideEntry = items && items.querySelector('#yt-aid-guide-entry');
+    if (guideEntry) alignGuideEntry(guideEntry, items);
+
+    const mini = document.querySelector('ytd-mini-guide-renderer #items');
+    if (mini && !mini.querySelector('#yt-aid-mini-entry')) {
+      const entry = document.createElement('a');
+      entry.id = 'yt-aid-mini-entry';
+      entry.className = 'yt-aid-mini-entry';
+      entry.href = '#';
+      entry.appendChild(svgIcon(BOOKMARK_ICON_OUTLINE));
+      const label = document.createElement('span');
+      label.textContent = 'Bookmark';
+      entry.appendChild(label);
+      entry.addEventListener('click', openBookmarkFromGuide);
+      mini.appendChild(entry);
+    }
+
+    document.querySelectorAll('#yt-aid-guide-entry, #yt-aid-mini-entry').forEach((el) => {
+      el.classList.toggle('active', bookmarkPageOpen);
+    });
+  }
+
+  // --- Trang Bookmark đầy đủ (overlay) ---
+  function positionBookmarkPage() {
+    const page = document.getElementById('yt-aid-bookmark-page');
+    if (!page) return;
+    const masthead = document.querySelector('#masthead-container');
+    const top = masthead ? Math.max(0, Math.round(masthead.getBoundingClientRect().bottom)) : 56;
+    let left = 0;
+    ['ytd-guide-renderer', 'ytd-mini-guide-renderer'].forEach((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.left >= 0 && r.right > left && r.right < window.innerWidth * 0.5) left = Math.round(r.right);
+    });
+    page.style.top = `${top}px`;
+    page.style.left = `${left}px`;
+  }
+
+  function renderBookmarkPage() {
+    const page = document.getElementById('yt-aid-bookmark-page');
+    if (!page) return;
+    const grid = page.querySelector('.yt-aid-bm-grid');
+    const count = page.querySelector('.yt-aid-bm-page-count');
+    const clearBtn = page.querySelector('.yt-aid-bm-clear-all');
+    if (!grid) return;
+
+    if (clearBtn) clearBtn.style.display = bookmarks.length ? '' : 'none';
+    grid.textContent = '';
+
+    const q = bookmarkFilter.trim().toLowerCase();
+    const list = q
+      ? bookmarks.filter((b) => `${b.name} ${b.title} ${b.channel}`.toLowerCase().includes(q))
+      : bookmarks;
+
+    if (!list.length) {
+      if (count) count.textContent = `0 video · ${bookmarks.length} bookmark`;
+      const empty = document.createElement('div');
+      empty.className = 'yt-aid-bm-empty';
+      empty.textContent = bookmarks.length
+        ? 'Không tìm thấy bookmark nào khớp.'
+        : 'Chưa có bookmark nào. Mở một video và bấm nút Bookmark để lưu mốc thời gian.';
+      grid.appendChild(empty);
+      return;
+    }
+    const groups = groupBookmarksByVideo(list);
+    if (count) count.textContent = `${groups.length} video · ${list.length} bookmark`;
+    groups.forEach((g) => grid.appendChild(buildBookmarkGroupCard(g, false)));
+  }
+
+  function onBookmarkPageKeyDown(event) {
+    if (event.key !== 'Escape' || !bookmarkPageOpen) return;
+    // Esc khi đang đổi tên chỉ hủy việc đổi tên, không đóng trang.
+    if (event.target && event.target.classList && event.target.classList.contains('yt-aid-bm-rename-input')) return;
+    event.stopPropagation();
+    closeBookmarkPage();
+  }
+
+  function onBookmarkOutsideClick(event) {
+    if (!bookmarkPageOpen) return;
+    const t = event.target;
+    if (!t || !t.closest) return;
+    if (t.closest('#yt-aid-bookmark-page, #yt-aid-guide-entry, #yt-aid-mini-entry')) return;
+    if (t.closest('a[href], ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer')) closeBookmarkPage();
+  }
+
+  function openBookmarkPage() {
+    if (bookmarkPageOpen) return;
+    let page = document.getElementById('yt-aid-bookmark-page');
+    if (!page) {
+      page = document.createElement('div');
+      page.id = 'yt-aid-bookmark-page';
+      page.className = 'yt-aid-bm-page';
+
+      const header = document.createElement('div');
+      header.className = 'yt-aid-bm-page-header';
+      const h = document.createElement('h2');
+      h.appendChild(svgIcon(BOOKMARK_ICON_FILLED));
+      const hText = document.createElement('span');
+      hText.textContent = 'Bookmark';
+      h.appendChild(hText);
+      header.appendChild(h);
+
+      const count = document.createElement('span');
+      count.className = 'yt-aid-bm-page-count';
+      header.appendChild(count);
+
+      const search = document.createElement('input');
+      search.type = 'search';
+      search.className = 'yt-aid-bm-search';
+      search.placeholder = 'Tìm trong bookmark…';
+      search.addEventListener('input', () => {
+        bookmarkFilter = search.value;
+        renderBookmarkPage();
+      });
+      header.appendChild(search);
+
+      const clearAll = document.createElement('button');
+      clearAll.type = 'button';
+      clearAll.className = 'yt-aid-bm-danger-btn yt-aid-bm-clear-all';
+      clearAll.title = 'Xóa tất cả bookmark';
+      clearAll.appendChild(svgIcon(TRASH_ICON));
+      const clearText = document.createElement('span');
+      clearText.textContent = 'Xóa tất cả';
+      clearAll.appendChild(clearText);
+      clearAll.addEventListener('click', clearAllBookmarks);
+      header.appendChild(clearAll);
+
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'yt-aid-bm-close';
+      closeBtn.title = 'Đóng (Esc)';
+      closeBtn.setAttribute('aria-label', 'Đóng');
+      closeBtn.appendChild(svgIcon(CLOSE_ICON));
+      closeBtn.addEventListener('click', closeBookmarkPage);
+      header.appendChild(closeBtn);
+
+      const grid = document.createElement('div');
+      grid.className = 'yt-aid-bm-grid';
+
+      page.appendChild(header);
+      page.appendChild(grid);
+      document.body.appendChild(page);
+    }
+
+    bookmarkFilter = '';
+    const search = page.querySelector('.yt-aid-bm-search');
+    if (search) search.value = '';
+    bookmarkPageOpen = true;
+    positionBookmarkPage();
+    renderBookmarkPage();
+    page.classList.add('yt-aid-bm-page-open');
+    document.addEventListener('keydown', onBookmarkPageKeyDown, true);
+    document.addEventListener('click', onBookmarkOutsideClick, true);
+    window.addEventListener('resize', positionBookmarkPage);
+    injectGuideEntries();
+  }
+
+  function closeBookmarkPage() {
+    if (!bookmarkPageOpen) return;
+    bookmarkPageOpen = false;
+    const page = document.getElementById('yt-aid-bookmark-page');
+    if (page) page.classList.remove('yt-aid-bm-page-open');
+    document.removeEventListener('keydown', onBookmarkPageKeyDown, true);
+    document.removeEventListener('click', onBookmarkOutsideClick, true);
+    window.removeEventListener('resize', positionBookmarkPage);
+    injectGuideEntries();
+  }
+
+  function injectBookmarkUi() {
+    injectGuideEntries();
+    injectBookmarkShelf();
+    syncBookmarkButtons();
+  }
+
+  function initBookmarks() {
+    loadBookmarks(() => {
+      injectBookmarkUi();
+      syncBookmarkUi();
+    });
+
+    try {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName !== 'local' || !changes[BOOKMARKS_KEY]) return;
+        bookmarks = sanitizeBookmarks(changes[BOOKMARKS_KEY].newValue);
+        injectBookmarkShelf();
+        syncBookmarkUi();
+      });
+    } catch (e) { }
+
+    window.addEventListener('yt-navigate-start', closeBookmarkPage);
+    window.addEventListener('yt-navigate-finish', () => {
+      closeBookmarkPage();
+      injectBookmarkUi();
+    });
+
+    // Sidebar render muộn và nằm trong vùng bị bỏ qua của MutationObserver,
+    // nên kiểm tra nhẹ định kỳ để mục Bookmark luôn có mặt.
+    setInterval(() => {
+      injectGuideEntries();
+      injectBookmarkShelf();
+    }, 1500);
+  }
 
 })();

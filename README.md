@@ -100,6 +100,14 @@ Chi tiết kỹ thuật:
 - Khu **Tùy chỉnh phím tắt** dùng thẻ hành động + bàn phím QWERTY thu nhỏ; phím hiện tại tô đỏ, phím bị khoá mờ đi.
 - Dữ liệu cài đặt được lưu trữ đồng bộ qua `chrome.storage.local` và áp dụng ngay lập tức, không cần tải lại tab.
 
+### 10. Bookmark Mốc Thời Gian (Xem Sau)
+- **Nút Bookmark** trên thanh công cụ Watch page lưu **đúng thời điểm đang xem** (giây). Mỗi video có thể có nhiều bookmark; không lưu khi đang phát quảng cáo.
+- **Nút Log** cạnh nút Bookmark: mở danh sách bookmark của video đang xem. Bấm vào mốc thời gian để tua tới ngay, có nút **đổi tên**, **xóa** từng bookmark và **xóa tất cả** bookmark của video.
+- **Dải Bookmark trên Trang chủ:** mỗi lần vào YouTube hoặc nhấn F5, các bookmark mới nhất hiện ở đầu newfeed (tối đa 12, tự trải thành lưới theo bề rộng). Thẻ hiển thị mốc thời gian; bấm vào để mở video đúng mốc đó.
+- **Mục Bookmark ở thanh bên trái** (mở rộng và thu gọn): trang lưu trữ đầy đủ có ô tìm kiếm, đổi tên / xóa từng bookmark (di chuột vào thẻ) và nút **Xóa tất cả**. Đóng bằng Esc, nút × hoặc khi chuyển trang.
+- Nút Bookmark trong popover thẻ video ở Trang chủ bật/tắt bookmark ở 0:00.
+- Dữ liệu lưu trong `chrome.storage.local` (khóa `bookmarks`), đồng bộ giữa các tab, tối đa 2000 bookmark. Bookmark của bản cũ (không có mốc thời gian) được giữ lại ở 0:00.
+
 ---
 
 ## Cấu Trúc Dự Án
