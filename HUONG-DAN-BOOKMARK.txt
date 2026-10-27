@@ -1,0 +1,21 @@
+# Kiểm thử bookmark (nhánh feature/bookmark-review)
+
+Đây là bản thử để review trước khi merge vào main.
+
+1. Tải nhánh này, giải nén và mở chrome://extensions.
+2. Bật Developer mode, chọn Load unpacked và chọn thư mục chứa manifest.json.
+3. Tắt bản YouTube Aid khác nếu có, rồi tải lại các tab YouTube.
+4. Mở video, tới đoạn cần lưu, bấm “★ Lưu mốc thời gian” dưới tiêu đề và đặt tên.
+5. Mở popup tiện ích → “★ Bookmark đã lưu”. Danh sách hiện ngay trong popup.
+6. Thử tìm theo tiêu đề video, tên kênh và tên bookmark; thử đổi tên và xóa.
+7. Bấm một mốc của video đang mở: video phải tua trong tab đó, không tạo tab trùng.
+8. Bấm mốc của video chưa mở: mở tab mới với đúng video và thời gian.
+9. Mở lại popup sau khi chọn mốc: vẫn ở trang bookmark. “← Quay lại” trở về bảng điều khiển.
+10. Kiểm tra các tính năng cũ: copy, phím tắt, Auto Loop và tải thumbnail.
+
+Bookmark cũ chưa có tên kênh: mở lại video để cập nhật.
+Dữ liệu chỉ lưu trên máy, trong chrome.storage.local của tiện ích đang cài.
+Hai bản tiện ích cài từ hai thư mục khác nhau có thể có dữ liệu riêng.
+
+Đã kiểm tra cú pháp JavaScript và logic điều hướng bằng kiểm tra tự động.
+Cần review và kiểm thử trực tiếp trên Chrome/YouTube trước khi merge.

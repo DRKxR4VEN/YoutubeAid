@@ -3,6 +3,11 @@
  * Handles settings persistence via chrome.storage.local
  */
 
+// Restore the last popup page after Chrome closes it on a tab switch.
+if (localStorage.getItem('ytAidPopupPage') === 'bookmarks') {
+  window.location.replace('bookmarks.html');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const SHORTCUTS = window.YtAidShortcuts;
   const FALLBACK_SHORTCUT_KEYS = {
@@ -346,4 +351,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   loadSettings();
+});
+
+document.getElementById('openBookmarks').addEventListener('click', () => {
+  window.location.href = 'bookmarks.html';
 });

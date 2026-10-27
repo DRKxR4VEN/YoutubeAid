@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bookmark đã lưu · YouTube Aid</title>
+  <link rel="stylesheet" href="bookmarks.css">
+</head>
+<body>
+  <main>
+    <header><a class="back" href="options.html">← Quay lại</a><span>YouTube Aid</span></header>
+    <h1>Bookmark đã lưu<span class="star">★</span></h1>
+    <p class="intro">Bấm vào mốc thời gian để xem lại đoạn đã lưu.</p>
+    <details class="help"><summary>Cách thêm bookmark</summary><ol><li>Mở một video trên YouTube.</li><li>Tới đoạn muốn lưu, bấm <strong>★ Lưu mốc thời gian</strong> dưới tiêu đề video.</li><li>Nhập tên rồi bấm OK. Mốc sẽ xuất hiện tại đây.</li></ol></details>
+    <div class="tools"><input type="search" id="search" placeholder="Tìm video, tên kênh hoặc bookmark…" aria-label="Tìm theo video, tên kênh hoặc bookmark"><span id="count" aria-live="polite"></span></div>
+    <p id="status" role="status"></p>
+    <div id="videos"></div>
+    <div id="empty" hidden><div class="empty-icon">☆</div><h2>Chưa có bookmark nào</h2><p>Mở video YouTube, bấm “★ Lưu mốc thời gian”<br>và đặt tên cho đoạn bạn muốn xem lại.</p><a href="https://www.youtube.com/" target="_blank" rel="noopener">Mở YouTube ↗</a></div>
+  </main>
+  <script src="bookmarks.js"></script>
+</body>
+</html>
