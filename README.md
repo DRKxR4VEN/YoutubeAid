@@ -101,12 +101,21 @@ Chi tiết kỹ thuật:
 - Dữ liệu cài đặt được lưu trữ đồng bộ qua `chrome.storage.local` và áp dụng ngay lập tức, không cần tải lại tab.
 
 ### 10. Bookmark Mốc Thời Gian (Xem Sau)
-- **Nút Bookmark** trên thanh công cụ Watch page lưu **đúng thời điểm đang xem** (giây). Mỗi video có thể có nhiều bookmark; không lưu khi đang phát quảng cáo.
+- **Nút Bookmark** trên thanh công cụ Watch page lưu **đúng thời điểm đang xem** (giây), rồi trở về giao diện trung tính để không gây nhầm với nút bật/tắt. Mỗi video có thể có nhiều bookmark; không lưu khi đang phát quảng cáo.
 - **Nút Log** cạnh nút Bookmark: mở danh sách bookmark của video đang xem. Bấm vào mốc thời gian để tua tới ngay, có nút **đổi tên**, **xóa** từng bookmark và **xóa tất cả** bookmark của video.
-- **Dải Bookmark trên Trang chủ:** mỗi lần vào YouTube hoặc nhấn F5, các bookmark mới nhất hiện ở đầu newfeed (tối đa 12, tự trải thành lưới theo bề rộng). Thẻ hiển thị mốc thời gian; bấm vào để mở video đúng mốc đó.
-- **Mục Bookmark ở thanh bên trái** (mở rộng và thu gọn): trang lưu trữ đầy đủ có ô tìm kiếm, đổi tên / xóa từng bookmark (di chuột vào thẻ) và nút **Xóa tất cả**. Đóng bằng Esc, nút × hoặc khi chuyển trang.
+- Mỗi bookmark có thể được **yêu thích** ngay bằng biểu tượng trái tim mặc định. **Chỉ sau khi yêu thích** mới hiện nút đổi giữa 7 biểu tượng: âm nhạc, học tập, trang phục, du lịch, ăn uống, đoạn phim hay và trái tim; bỏ yêu thích sẽ ẩn nút đổi biểu tượng.
+- **Dải Bookmark trên Trang chủ:** các bookmark mới nhất hiện ở đầu newfeed (tối đa 12, tự trải thành lưới theo bề rộng). Nút **Ẩn/Hiện** thu gọn video và ghi nhớ trạng thái sau khi tải lại trang.
+- **Mục Bookmark ở thanh bên trái** (mở rộng và thu gọn): trang lưu trữ đầy đủ có ô tìm kiếm, đổi tên / xóa từng bookmark và nút **Xóa tất cả**. Đóng bằng Esc, nút × hoặc khi chuyển trang.
+- Mọi thao tác xóa bookmark dùng hộp xác nhận riêng của tiện ích; không gọi hộp thoại mặc định của YouTube/trình duyệt.
 - Nút Bookmark trong popover thẻ video ở Trang chủ bật/tắt bookmark ở 0:00.
-- Dữ liệu lưu trong `chrome.storage.local` (khóa `bookmarks`), đồng bộ giữa các tab, tối đa 2000 bookmark. Bookmark của bản cũ (không có mốc thời gian) được giữ lại ở 0:00.
+- Dữ liệu lưu trong `chrome.storage.local` (khóa `bookmarks`), đồng bộ giữa các tab, tối đa 2000 bookmark. Bookmark của bản cũ được giữ lại và không bắt buộc có biểu tượng yêu thích.
+
+### 11. Video Ngẫu Nhiên
+- Nút **Video ngẫu nhiên** trên Trang chủ/feed và thanh công cụ Watch mở trực tiếp một video; nút lọc nhỏ liền bên cạnh mở ba checkbox **Video thường**, **Shorts**, **Video nhạc**. Bỏ chọn cả ba sẽ vô hiệu hóa nút mở video.
+- **Dựa vào FYP / feed — Bật:** chỉ chọn trong các thẻ feed đã tải; khi đang xem video thì lấy đề xuất từ Trang chủ bằng phiên đăng nhập hiện tại. Feed trống hoặc không có loại phù hợp sẽ thông báo, không tự chuyển sang nguồn công khai.
+- **Tắt:** lấy kết quả tìm kiếm công khai theo chủ đề ngẫu nhiên, không gửi cookie tài khoản và không dùng feed. Đây là khám phá ngẫu nhiên trong tập kết quả, **không phải lấy mẫu đều trên toàn bộ kho YouTube**; kết quả vẫn có thể phụ thuộc khu vực và xếp hạng tìm kiếm.
+- Video nhạc được xác nhận bằng danh mục **Music** của YouTube; Shorts được nhận diện từ loại thẻ/liên kết, không đoán bằng thời lượng. Bỏ qua video không phát được, livestream và video đang xem; hạn chế lặp video vừa chọn trong phiên trang hiện tại.
+- Bộ lọc được ghi nhớ qua tải lại trang và đồng bộ giữa các tab. Chỉ tải dữ liệu khi bấm nút, có thời hạn chờ và hủy khi chuyển trang/đổi bộ lọc; không thêm quyền hay dịch vụ bên ngoài, không thay đổi YouTube Music.
 
 ### 11. Tự Động Bỏ Qua Quảng Cáo
 - **Auto skip:** khi video đang phát quảng cáo, tiện ích tự tắt tiếng, tăng tốc, bấm nút "Bỏ qua" (nếu có) và tua tới cuối quảng cáo, rồi khôi phục âm lượng/tốc độ. Hoạt động cả khi bạn chuyển sang tab khác, vì dùng MutationObserver và sự kiện của thẻ video (không bị trình duyệt tạm dừng như timer).

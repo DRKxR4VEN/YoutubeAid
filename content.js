@@ -47,6 +47,7 @@
     enableAdSkip: true,
     enableHideAds: true,
     audioBoost: 100,
+    randomVideo: { video: true, shorts: true, music: true, feed: true },
     shortcutKeys: { ...DEFAULT_SHORTCUT_KEYS },
     shortcutTaps: { ...DEFAULT_SHORTCUT_TAPS }
   };
@@ -97,6 +98,7 @@
         settings.enableCleanLink = true;
         settings.enableThumbnailDownload = true;
         settings.audioBoost = sanitizeAudioBoost(settings.audioBoost);
+        settings.randomVideo = sanitizeRandomVideoOptions(settings.randomVideo);
         if (record && !restoreLastCopied(record)) safeRemoveStorage(LAST_COPIED_KEY);
         initExtension();
       });
@@ -112,7 +114,7 @@
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== 'local') return;
 
-      let settingsChanged = false;
+      const changedSettings = new Set();
       for (const [key, change] of Object.entries(changes)) {
         if (key === LAST_COPIED_KEY) {
           restoreLastCopied(change.newValue);
@@ -120,12 +122,12 @@
         }
         if (key === 'shortcutKeys') {
           settings.shortcutKeys = sanitizeShortcutKeys(change.newValue);
-          settingsChanged = true;
+          changedSettings.add(key);
           continue;
         }
         if (key === 'shortcutTaps') {
           settings.shortcutTaps = sanitizeShortcutTaps(change.newValue);
-          settingsChanged = true;
+          changedSettings.add(key);
           continue;
         }
         if (key === 'audioBoost') {
@@ -134,12 +136,19 @@
           syncAudioBoostUi();
           continue;
         }
+        if (key === 'randomVideo') {
+          const next = sanitizeRandomVideoOptions(change.newValue);
+          if (JSON.stringify(next) !== JSON.stringify(settings.randomVideo)) cancelRandomVideo();
+          settings.randomVideo = next;
+          syncRandomVideoUi();
+          continue;
+        }
         if (!(key in DEFAULT_SETTINGS)) continue;
         settings[key] = change.newValue === undefined ? DEFAULT_SETTINGS[key] : change.newValue;
-        settingsChanged = true;
+        changedSettings.add(key);
       }
 
-      if (settingsChanged) applySettingUpdates();
+      if (changedSettings.size) applySettingUpdates(changedSettings);
     });
   } catch (e) { }
 
@@ -199,32 +208,33 @@
     return action && key ? String(key).repeat(count).toUpperCase() : '';
   }
 
-  function applySettingUpdates() {
-    rebuildShortcutKeymap();
+  function applySettingUpdates(changedKeys = null) {
+    const changed = (key) => !changedKeys || changedKeys.has(key);
+    if (changed('shortcutKeys') || changed('shortcutTaps') || changed('enableShortcuts')) {
+      rebuildShortcutKeymap();
+    }
 
-    // Thumbnail downloads and clean links no longer have a UI toggle; force
-    // them on so stale stored "false" values cannot disable the features.
     settings.enableCleanLink = true;
     settings.enableThumbnailDownload = true;
-
-    // Also clears loop on every player video when the setting is turned off
-    if (!IS_MUSIC_SITE) ensureVideoLoop();
-
-    // Toggle button visibility via body class
-    document.body.classList.toggle('yt-aid-hide-copy-buttons', !settings.enableCopyButtons);
-    document.body.classList.remove('yt-aid-hide-clean-link', 'yt-aid-hide-thumb-btn');
+    if (IS_MUSIC_SITE) return;
 
     if (!settings.enableShortcuts) resetKeyBuffer();
-
-    closeHomeFlyout();
-    if (IS_MUSIC_SITE) return;
-    syncAdSkipSettings();
-    syncAudioBoost();
-    syncAudioBoostUi();
-    syncToolbarState();
-    injectAllAreas();
-  }
-
+    if (changed('enableAdSkip') || changed('enableHideAds')) syncAdSkipSettings();
+    if (changed('enableLoop')) ensureVideoLoop();
+    if (changed('enableCopyButtons')) {
+      document.body.classList.toggle('yt-aid-hide-copy-buttons', !settings.enableCopyButtons);
+      closeHomeFlyout();
+    }
+    if (!changedKeys) {
+      document.body.classList.remove('yt-aid-hide-clean-link', 'yt-aid-hide-thumb-btn');
+      syncAudioBoost();
+      syncAudioBoostUi();
+      injectAllAreas();
+    }
+    if (changed('enableLoop') || changed('enableSelectionCopy') ||
+        changed('enableAutoPasteSearch') || changed('enableAutoPasteReplace')) {
+      syncToolbarState();
+    }
   // --- Main Initializer ---
   function initExtension() {
     createToastContainer();
@@ -432,13 +442,11 @@
   }
 
   function collectPlayerVideos(includePageVideos) {
+    if (includePageVideos) return new Set(document.querySelectorAll('video'));
     const videos = new Set();
     const player = getPlayerElement();
     if (player) player.querySelectorAll('video').forEach((video) => videos.add(video));
     document.querySelectorAll('video.video-stream').forEach((video) => videos.add(video));
-    // Ad videos can live outside the main player, so disabling targets every
-    // media element on the page.
-    if (includePageVideos) document.querySelectorAll('video').forEach((video) => videos.add(video));
     if (!videos.size) {
       const fallback = document.querySelector('video');
       if (fallback) videos.add(fallback);
@@ -2186,22 +2194,35 @@
   function initDOMObserver() {
     injectAllAreas();
 
-    // Throttle instead of debounce: YouTube mutates continuously while a video
-    // plays, and a debounce would keep postponing injection forever.
     let injectionQueued = false;
-    const scheduleInjection = (delay = 200) => {
+    let fullScanNeeded = false;
+    const pendingCardRoots = new Set();
+    const scheduleInjection = (delay = 200, fullScan = false) => {
+      fullScanNeeded ||= fullScan;
+      if (document.visibilityState === 'hidden') {
+        fullScanNeeded = true;
+        pendingCardRoots.clear();
+        return;
+      }
       if (injectionQueued) return;
       injectionQueued = true;
       setTimeout(() => {
         injectionQueued = false;
-        injectAllAreas();
+        if (document.visibilityState === 'hidden') {
+          fullScanNeeded = true;
+          pendingCardRoots.clear();
+          return;
+        }
+        const roots = fullScanNeeded ? undefined : [...pendingCardRoots];
+        fullScanNeeded = false;
+        pendingCardRoots.clear();
+        injectAllAreas(roots);
       }, delay);
     };
 
-    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger, #yt-aid-bookmark-shelf';
-    // Everything this extension owns starts with yt-aid- (classes) or yt-aid-
-    // (ids). Mutations inside it must not schedule another page-wide scan.
-    const AID_UI_SCOPE = '[class*="yt-aid-"], [id^="yt-aid-"]';
+    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger, #yt-aid-bookmark-shelf, #yt-aid-random-home';
+    // Native hosts carry our layout classes but still need reinjection after rerenders.
+    const AID_UI_SCOPE = '[class*="yt-aid-"]:not(.yt-aid-home-card-host):not(.yt-aid-channel-actions-host):not(body):not(html), [id^="yt-aid-"]';
     // None of the injection targets live in these subtrees. They are also the
     // biggest mutation sources (comments alone were ~78% on a watch page), so
     // ignoring them keeps idle playback from re-scanning the page.
@@ -2213,37 +2234,31 @@
     const insideAidUi = (node) => node.nodeType === 1 && !!node.closest(AID_UI_SCOPE);
     const insideIgnoredScope = (node) => node.nodeType === 1 && !!node.closest(IGNORED_SCOPES);
 
+    const cardSelector = `${HOME_CARD_ITEM_SELECTOR}, ${SIDEBAR_CARD_SELECTOR}`;
     const observer = new MutationObserver((mutations) => {
-      for (let i = 0; i < mutations.length; i++) {
-        const { target, addedNodes, removedNodes } = mutations[i];
-
-        // Re-inject when YouTube re-renders a header and drops our bar.
-        if (removedNodes && removedNodes.length > 0) {
-          for (let j = 0; j < removedNodes.length; j++) {
-            if (containsAidUi(removedNodes[j])) {
-              scheduleInjection();
-              return;
-            }
-          }
-        }
-
-        // Toasts, open menus, the crop dialog and freshly injected toolbars
-        // all fire mutations; re-scanning the page for them is pure overhead.
+      if (document.visibilityState === 'hidden') {
+        fullScanNeeded = true;
+        pendingCardRoots.clear();
+        return;
+      }
+      let relevant = false;
+      for (const { target, addedNodes, removedNodes } of mutations) {
         if (insideAidUi(target) || insideIgnoredScope(target)) continue;
-
-        if (addedNodes && addedNodes.length > 0) {
-          let relevant = false;
-          for (let j = 0; j < addedNodes.length; j++) {
-            if (insideAidUi(addedNodes[j])) continue;
-            relevant = true;
-            break;
-          }
-          if (relevant) {
-            scheduleInjection();
-            return;
-          }
+        const card = target.nodeType === 1 ? target.closest(cardSelector) : target.parentElement?.closest(cardSelector);
+        for (const node of addedNodes) {
+          if (insideAidUi(node)) continue;
+          if (card) pendingCardRoots.add(card);
+          else if (node.nodeType === 1) pendingCardRoots.add(node);
+          relevant = true;
+        }
+        if (card && removedNodes.length) {
+          pendingCardRoots.add(card);
+          relevant = true;
+        } else if ([...removedNodes].some(containsAidUi)) {
+          relevant = true;
         }
       }
+      if (relevant) scheduleInjection();
     });
 
     observer.observe(document.body, {
@@ -2251,16 +2266,21 @@
       subtree: true
     });
 
+    window.addEventListener('yt-navigate-start', () => {
+      cancelRandomVideo();
+      closeDropdown();
+    });
+    window.addEventListener('pagehide', cancelRandomVideo);
     window.addEventListener('yt-navigate-finish', () => {
-      ensureVideoLoop();
+      cancelRandomVideo();
       closeHomeFlyout();
       closeDropdown();
-      scheduleInjection(80);
+      scheduleInjection(80, true);
     });
 
-    document.addEventListener('yt-page-data-updated', () => {
-      ensureVideoLoop();
-      scheduleInjection(120);
+    document.addEventListener('yt-page-data-updated', () => scheduleInjection(120, true));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'hidden') scheduleInjection(0, true);
     });
   }
 
@@ -2279,18 +2299,19 @@
     return !!document.querySelector('#page-header-banner, ytd-c4-tabbed-header-renderer');
   }
 
-  function injectAllAreas() {
+  function injectAllAreas(cardRoots) {
     const path = window.location.pathname;
     const hasCardTools = settings.enableCopyButtons || settings.enableCleanLink || settings.enableThumbnailDownload;
 
     if (!isHomeFeedPage()) closeHomeFlyout();
     injectBookmarkUi();
+    injectRandomHomeControl();
 
     if (path.startsWith('/watch')) {
       injectWatchPageToolbar();
-      if (hasCardTools) injectSidebarButtons();
+      if (hasCardTools) injectSidebarButtons(cardRoots);
     } else if (path === '/' || path.startsWith('/results') || path.startsWith('/feed')) {
-      if (hasCardTools) injectHomePageCards();
+      if (hasCardTools) injectHomePageCards(cardRoots);
     } else if (isChannelPage()) {
       injectChannelHeaderActions();
     }
@@ -2387,7 +2408,9 @@
       </div>
     `;
 
+    toolbar.querySelector('.yt-aid-toolbar-right').prepend(buildRandomVideoControl());
     titleContainer.appendChild(toolbar);
+    syncRandomVideoUi();
 
     // 1. Copy Pure
     toolbar.querySelector('#yt-aid-btn-copy-pure').addEventListener('click', () => {
@@ -2484,6 +2507,7 @@
   let dropdownBtn = null;
 
   function closeDropdown() {
+    closeFavoritePicker();
     if (dropdownBtn) dropdownBtn.setAttribute('aria-expanded', 'false');
     const menu = dropdownEl;
     dropdownEl = null;
@@ -2646,11 +2670,12 @@
       const target = e.target;
       if (target instanceof Node && dropdownEl.contains(target)) return;
       if (target instanceof Node && dropdownBtn && dropdownBtn.contains(target)) return;
+      if (target instanceof Element && target.closest('.yt-aid-bm-favorite-picker')) return;
       closeDropdown();
     }, true);
 
     document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || !dropdownEl) return;
+      if (e.key !== 'Escape' || !dropdownEl || favoritePickerEl || bookmarkConfirmEl) return;
       if (e.target && e.target.classList && e.target.classList.contains('yt-aid-bm-rename-input')) return;
       closeDropdown();
     }, true);
@@ -2734,14 +2759,21 @@
     return hasCurrent;
   }
 
-  function injectSidebarButtons() {
-    const sidebarItems = document.querySelectorAll(
-      'ytd-compact-video-renderer, ytd-compact-playlist-renderer, ' +
-      'ytd-watch-next-secondary-results-renderer yt-lockup-view-model, ' +
-      '#secondary yt-lockup-view-model'
-    );
+  const SIDEBAR_CARD_SELECTOR = 'ytd-compact-video-renderer, ytd-compact-playlist-renderer, ' +
+    'ytd-watch-next-secondary-results-renderer yt-lockup-view-model, #secondary yt-lockup-view-model';
 
-    sidebarItems.forEach(item => {
+  function findCardsInRoots(selector, roots = [document]) {
+    const cards = new Set();
+    for (const root of roots) {
+      if (!root.isConnected) continue;
+      if (root.nodeType === 1 && root.matches(selector)) cards.add(root);
+      root.querySelectorAll(selector).forEach((card) => cards.add(card));
+    }
+    return cards;
+  }
+
+  function injectSidebarButtons(roots) {
+    findCardsInRoots(SIDEBAR_CARD_SELECTOR, roots).forEach(item => {
       if (hasCurrentCardBar(item)) return;
       // YouTube now renders related videos as bare lockup view models
       const isLockup = item.matches('yt-lockup-view-model');
@@ -3186,13 +3218,13 @@
 
   document.addEventListener('click', onHomeTriggerClick, true);
 
-  function injectHomePageCards() {
+  function injectHomePageCards(roots) {
     if (!isHomeFeedPage()) {
       closeHomeFlyout();
       return;
     }
 
-    document.querySelectorAll(HOME_CARD_ITEM_SELECTOR).forEach((item) => {
+    findCardsInRoots(HOME_CARD_ITEM_SELECTOR, roots).forEach((item) => {
       if (!item.isConnected) return;
       const existing = item.querySelector(`:scope > .${HOME_TRIGGER_CLASS}`);
 
@@ -3223,12 +3255,307 @@
 
 
 
+  const RANDOM_TYPES = { video: 'Video thường', shorts: 'Shorts', music: 'Video nhạc' };
+  const RANDOM_TOPICS = {
+    video: ['khoa học', 'du lịch', 'ẩm thực', 'lịch sử', 'công nghệ', 'thiên nhiên', 'thể thao', 'nghệ thuật', 'science documentary', 'travel vlog', 'cooking', 'history', 'technology', 'wildlife', 'animation', 'photography', 'gaming', 'crafts', 'architecture', 'astronomy'],
+    shorts: ['du lịch', 'thú cưng', 'ẩm thực', 'khoa học', 'thể thao', 'travel', 'pets', 'cooking', 'science', 'sports', 'art', 'comedy'],
+    music: ['nhạc Việt', 'nhạc acoustic', 'nhạc không lời', 'V pop', 'jazz', 'classical music', 'indie music', 'rock music', 'K pop', 'J pop', 'lofi music', 'soul music', 'piano music', 'electronic music']
+  };
+  let randomRequest = null;
+  const randomRecentIds = [];
+
+  function sanitizeRandomVideoOptions(raw) {
+    return Object.fromEntries(Object.entries(DEFAULT_SETTINGS.randomVideo).map(([key, value]) =>
+      [key, typeof raw?.[key] === 'boolean' ? raw[key] : value]));
+  }
+
+  function syncRandomVideoUi() {
+    const options = settings.randomVideo;
+    const enabled = Object.keys(RANDOM_TYPES).some((key) => options[key]);
+    document.querySelectorAll('.yt-aid-random-go').forEach((button) => {
+      button.disabled = !!randomRequest || !enabled;
+      button.setAttribute('aria-busy', randomRequest ? 'true' : 'false');
+      button.querySelector('span').textContent = randomRequest ? 'Đang chọn…' : 'Video ngẫu nhiên';
+      button.title = !enabled ? 'Chọn ít nhất một loại video trong bộ lọc' :
+        options.feed ? 'Chọn ngẫu nhiên từ FYP / feed của bạn' : 'Khám phá từ tìm kiếm công khai, không dùng feed';
+    });
+    document.querySelectorAll('#yt-aid-random-menu input').forEach((input) => {
+      input.checked = options[input.dataset.randomKey];
+    });
+    const state = document.getElementById('yt-aid-random-feed-state');
+    if (state) state.textContent = options.feed ? 'Bật' : 'Tắt';
+  }
+
+  function buildRandomVideoControl() {
+    const group = document.createElement('div');
+    group.className = 'yt-aid-split-group yt-aid-random-control';
+    const go = makeIconButton('yt-aid-pill-btn yt-aid-random-go', 'Video ngẫu nhiên',
+      'M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z', openRandomVideo);
+    const label = document.createElement('span');
+    label.textContent = 'Video ngẫu nhiên';
+    go.appendChild(label);
+    group.appendChild(go);
+    const filter = makeIconButton('yt-aid-pill-btn yt-aid-random-filter', 'Lọc video ngẫu nhiên',
+      'M3 5h18v2H3V5zm3 6h12v2H6v-2zm4 6h4v2h-4v-2z', () => {
+        toggleDropdown(filter, buildRandomVideoMenu);
+        if (dropdownBtn === filter) dropdownEl.querySelector('input')?.focus({ preventScroll: true });
+      });
+    filter.setAttribute('aria-haspopup', 'dialog');
+    filter.setAttribute('aria-expanded', 'false');
+    group.appendChild(filter);
+    return group;
+  }
+
+  function buildRandomVideoMenu() {
+    const menu = document.createElement('div');
+    menu.id = 'yt-aid-random-menu';
+    menu.className = 'yt-aid-tools-menu yt-aid-random-menu';
+    menu.setAttribute('role', 'dialog');
+    menu.setAttribute('aria-label', 'Lọc video ngẫu nhiên');
+    const heading = document.createElement('div');
+    heading.className = 'yt-aid-tools-title';
+    heading.textContent = 'Chọn loại video';
+    menu.appendChild(heading);
+    for (const [key, label] of Object.entries({ ...RANDOM_TYPES, feed: 'Dựa vào FYP / feed' })) {
+      const row = document.createElement('label');
+      row.className = 'yt-aid-tools-item yt-aid-random-option';
+      const text = document.createElement('span');
+      text.className = 'yt-aid-tools-name';
+      text.textContent = label;
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.dataset.randomKey = key;
+      input.checked = settings.randomVideo[key];
+      if (key === 'feed') {
+        row.classList.add('yt-aid-random-source');
+        const state = document.createElement('span');
+        state.id = 'yt-aid-random-feed-state';
+        state.textContent = input.checked ? 'Bật' : 'Tắt';
+        text.appendChild(state);
+        const toggle = document.createElement('span');
+        toggle.className = 'yt-aid-switch';
+        input.setAttribute('role', 'switch');
+        toggle.appendChild(input);
+        const slider = document.createElement('span');
+        slider.className = 'yt-aid-switch-slider';
+        toggle.appendChild(slider);
+        row.append(text, toggle);
+      } else {
+        row.append(text, input);
+      }
+      input.addEventListener('change', () => {
+        const checked = input.checked;
+        cancelRandomVideo();
+        settings.randomVideo = { ...settings.randomVideo, [key]: checked };
+        safeSetStorage({ randomVideo: settings.randomVideo });
+        syncRandomVideoUi();
+      });
+      menu.appendChild(row);
+    }
+    const note = document.createElement('p');
+    note.className = 'yt-aid-tools-desc yt-aid-random-note';
+    note.textContent = 'Bật: chọn trong feed đã tải; ngoài feed sẽ lấy Trang chủ. Tắt: tìm kiếm công khai theo chủ đề ngẫu nhiên, không gửi cookie tài khoản; không phải toàn bộ kho YouTube. Video nhạc theo danh mục Music của YouTube. Chọn ít nhất một loại.';
+    menu.appendChild(note);
+    return menu;
+  }
+
+  function injectRandomHomeControl() {
+    const existing = document.getElementById('yt-aid-random-home');
+    if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/feed/')) {
+      if (existing) existing.remove();
+      return;
+    }
+    const browse = document.querySelector('ytd-browse:not([hidden])');
+    const grid = browse?.querySelector('ytd-rich-grid-renderer') || browse;
+    if (!grid || existing?.parentElement === grid) return;
+    if (existing) existing.remove();
+    const bar = document.createElement('div');
+    bar.id = 'yt-aid-random-home';
+    bar.appendChild(buildRandomVideoControl());
+    const contents = grid.querySelector(':scope > #contents');
+    grid.insertBefore(bar, contents || grid.firstChild);
+    syncRandomVideoUi();
+  }
+
+  function parseYoutubePageData(html, name) {
+    const marker = new RegExp('(?:var\\s+' + name + '|window\\["' + name + '"\\])\\s*=\\s*');
+    const match = marker.exec(html);
+    if (!match) throw new Error('Không đọc được dữ liệu YouTube. Hãy thử lại sau.');
+    const start = match.index + match[0].length;
+    let depth = 0;
+    let quoted = false;
+    let escaped = false;
+    for (let i = start; i < html.length; i++) {
+      const char = html[i];
+      if (quoted) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === '"') quoted = false;
+      } else if (char === '"') quoted = true;
+      else if (char === '{') depth++;
+      else if (char === '}' && --depth === 0) return JSON.parse(html.slice(start, i + 1));
+    }
+    throw new Error('Dữ liệu YouTube chưa đầy đủ. Hãy thử lại.');
+  }
+
+  async function fetchRandomPage(path, personalized, signal) {
+    const response = await fetch(path, {
+      credentials: personalized ? 'same-origin' : 'omit',
+      referrerPolicy: 'no-referrer', cache: 'no-store', signal
+    });
+    if (!response.ok) throw new Error('Không tải được dữ liệu YouTube. Hãy thử lại sau.');
+    return response.text();
+  }
+
+  function collectRandomCandidates(data) {
+    const candidates = new Map();
+    const visit = (node) => {
+      if (!node || typeof node !== 'object') return;
+      if (node.adSlotRenderer || node.promotedSparklesWebRenderer || node.adPlacementRenderer) return;
+      const short = node.shortsLockupViewModel || node.reelItemRenderer;
+      const video = node.videoRenderer || node.gridVideoRenderer || node.compactVideoRenderer;
+      const lockup = node.lockupViewModel;
+      if (short || video || lockup) {
+        const item = short || video || lockup;
+        const endpoint = short?.onTap?.innertubeCommand || item.navigationEndpoint;
+        const isShort = !!short || !!endpoint?.reelWatchEndpoint ||
+          endpoint?.commandMetadata?.webCommandMetadata?.webPageType === 'WEB_PAGE_TYPE_SHORTS';
+        const id = item.videoId || endpoint?.reelWatchEndpoint?.videoId || item.contentId;
+        if (typeof id === 'string' && VIDEO_ID_RE.test(id) &&
+            (!lockup || lockup.contentType === 'LOCKUP_CONTENT_TYPE_VIDEO')) {
+          const title = item.title?.simpleText || item.title?.runs?.map((run) => run.text).join('') ||
+            item.overlayMetadata?.primaryText?.content || item.metadata?.lockupMetadataViewModel?.title?.content || '';
+          const previous = candidates.get(id);
+          candidates.set(id, { id, title, isShort: isShort || !!previous?.isShort });
+        }
+        return;
+      }
+      for (const [key, value] of Object.entries(node)) {
+        if (!/adSlot|adPlacement|promoted|tracking|logging/i.test(key)) visit(value);
+      }
+    };
+    visit(data.contents);
+    return [...candidates.values()];
+  }
+
+  function randomFeedCandidates() {
+    if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/feed/')) return [];
+    const browse = document.querySelector('ytd-browse:not([hidden])');
+    if (!browse) return [];
+    const candidates = new Map();
+    browse.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, yt-lockup-view-model, ytd-reel-item-renderer, yt-shorts-lockup-view-model').forEach((card) => {
+      if (card.closest('[hidden], ytd-ad-slot-renderer') ||
+          card.querySelector('ytd-ad-slot-renderer, ytd-display-ad-renderer')) return;
+      const link = card.querySelector('a[href^="/watch?"], a[href^="/shorts/"]');
+      if (!link) return;
+      const id = videoIdFromUrl(link.href);
+      if (!id) return;
+      const previous = candidates.get(id);
+      candidates.set(id, { id, title: card.textContent || '', isShort: link.pathname.startsWith('/shorts/') || !!previous?.isShort });
+    });
+    return [...candidates.values()];
+  }
+
+  function shuffledRandomItems(items) {
+    const shuffled = [...items];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  async function chooseRandomCandidate(candidates, options, signal) {
+    const currentId = videoIdFromUrl(window.location.href);
+    let pool = shuffledRandomItems(candidates.filter((item) => item.id !== currentId &&
+      (item.isShort ? options.shorts : options.video || options.music)));
+    if (!options.video && options.music && !options.shorts) {
+      const musicHint = (item) => /\b(music|song|audio|lyrics?|vevo|jazz|lofi|piano)\b|âm nhạc|nhạc|bài hát/i.test(item.title);
+      pool.sort((a, b) => Number(musicHint(b)) - Number(musicHint(a)));
+    }
+    pool.sort((a, b) => Number(randomRecentIds.includes(a.id)) - Number(randomRecentIds.includes(b.id)));
+    for (const candidate of pool.slice(0, 8)) {
+      signal.throwIfAborted();
+      const html = await fetchRandomPage(`/watch?v=${candidate.id}`, options.feed, signal);
+      const player = parseYoutubePageData(html, 'ytInitialPlayerResponse');
+      if (player.videoDetails?.videoId !== candidate.id || player.playabilityStatus?.status !== 'OK' || player.videoDetails?.isLiveContent) continue;
+      if (candidate.isShort) return candidate;
+      const category = player.microformat?.playerMicroformatRenderer?.category;
+      if (!category) continue;
+      if (category === 'Music' ? options.music : options.video) return candidate;
+    }
+    return null;
+  }
+
+  function cancelRandomVideo() {
+    if (!randomRequest) return;
+    randomRequest.abort();
+    randomRequest = null;
+    syncRandomVideoUi();
+  }
+
+  async function openRandomVideo() {
+    const options = { ...settings.randomVideo };
+    const types = Object.keys(RANDOM_TYPES).filter((type) => options[type]);
+    if (randomRequest || !types.length) return;
+    closeDropdown();
+    const request = new AbortController();
+    randomRequest = request;
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(25000)]);
+    const startUrl = window.location.href;
+    syncRandomVideoUi();
+    try {
+      let selected = null;
+      if (options.feed) {
+        let candidates = randomFeedCandidates();
+        if (!candidates.length) {
+          const html = await fetchRandomPage('/', true, signal);
+          candidates = collectRandomCandidates(parseYoutubePageData(html, 'ytInitialData'));
+        }
+        selected = await chooseRandomCandidate(candidates, options, signal);
+      } else {
+        for (const type of shuffledRandomItems(types)) {
+          const topic = shuffledRandomItems(RANDOM_TOPICS[type])[0];
+          const query = type === 'shorts' ? `#shorts ${topic}` : type === 'music' ? `${topic} official audio` : topic;
+          const params = new URLSearchParams({ search_query: query });
+          if (type !== 'shorts') params.set('sp', 'EgIQAQ==');
+          const html = await fetchRandomPage(`/results?${params}`, false, signal);
+          const candidates = collectRandomCandidates(parseYoutubePageData(html, 'ytInitialData'));
+          selected = await chooseRandomCandidate(candidates, {
+            video: type === 'video', shorts: type === 'shorts', music: type === 'music', feed: false
+          }, signal);
+          if (selected) break;
+        }
+      }
+      signal.throwIfAborted();
+      if (randomRequest !== request || window.location.href !== startUrl) return;
+      if (!selected) {
+        showToast(options.feed ? 'Feed đã tải chưa có video phù hợp. Hãy tải thêm feed hoặc đổi bộ lọc.' :
+          'Chưa tìm được video phù hợp. Hãy thử lại hoặc đổi bộ lọc.', 'warning', 4000);
+        return;
+      }
+      randomRecentIds.push(selected.id);
+      if (randomRecentIds.length > 20) randomRecentIds.shift();
+      goToYoutubeTarget(selected.isShort ? `/shorts/${selected.id}` : `/watch?v=${selected.id}`);
+    } catch (error) {
+      if (request.signal.aborted) return;
+      showToast(signal.aborted ? 'YouTube phản hồi chậm. Hãy thử lại.' :
+        'Không lấy được video từ YouTube. Hãy kiểm tra kết nối rồi thử lại.', 'warning', 4000);
+    } finally {
+      if (randomRequest === request) {
+        randomRequest = null;
+        syncRandomVideoUi();
+      }
+    }
+  }
+
   // ==========================================
   // 9. BOOKMARK (lưu mốc thời gian video, xem lại sau)
   // ==========================================
   // Mỗi bookmark = 1 mốc thời gian của 1 video:
-  // { uid, id (videoId), title, channel, isShort, time (giây), name (tên tự đặt), addedAt }
+  // { uid, id, title, channel, isShort, time, name, favoriteIcon, addedAt }
   const BOOKMARKS_KEY = 'bookmarks';
+  const BOOKMARK_SHELF_COLLAPSED_KEY = 'bookmarkShelfCollapsed';
   const BOOKMARK_LIMIT = 2000;
   const BOOKMARK_SHELF_MAX = 12;
   const BOOKMARK_NAME_MAX = 200;
@@ -3238,11 +3565,32 @@
   const EDIT_ICON = 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z';
   const TRASH_ICON = 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z';
   const LOG_ICON = 'M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z';
+  const EYE_ICON = 'M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z';
+  const EYE_OFF_ICON = 'M2.1 3.51.69-.69 18.38 18.37-.69.69-3.45-3.45A11.74 11.74 0 0 1 12 19.5C7 19.5 2.73 16.39 1 12a12.77 12.77 0 0 1 4.11-5.3L2.1 3.51zM12 4.5c5 0 9.27 3.11 11 7.5a12.67 12.67 0 0 1-2.6 4.01l-3.1-3.1A5 5 0 0 0 11.09 6.7L9.13 4.74A12.1 12.1 0 0 1 12 4.5zm-.71 4.55 3.66 3.66A3 3 0 0 0 11.29 9.05z';
+  const CHEVRON_DOWN_ICON = 'M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z';
+  const HEART_OUTLINE_ICON = 'M12.1 21.35 10.55 19.94C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A6.03 6.03 0 0 1 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.45l-1.35 1.4z';
+  const FAVORITE_ICONS = {
+    music: { label: 'Âm nhạc', path: 'M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z' },
+    study: { label: 'Học tập', path: 'M12 3 1 9l4 2.18v6L12 21l7-3.82v-6L21 10v7h2V9L12 3zm5 12.99-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z' },
+    outfit: { label: 'Trang phục', path: 'M16 3h-2a2 2 0 0 1-4 0H8L2 7l3 4 2-1.33V21h10V9.67L19 11l3-4-6-4zm.5 4.85L15 6.86V19H9V6.86l-1.5.99L5.08 7 7.3 5.52A4 4 0 0 0 12 7a4 4 0 0 0 4.7-1.48L18.92 7 16.5 7.85z' },
+    travel: { label: 'Du lịch', path: 'M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z' },
+    food: { label: 'Ăn uống', path: 'M11 9H9V2H7v7H5V2H3v7a4 4 0 0 0 4 4v9h2v-9a4 4 0 0 0 4-4V2h-2v7zm5-3v8h2v8h2V2c-2.21 0-4 1.79-4 4z' },
+    scene: { label: 'Đoạn phim hay', path: 'M18 4l2 4h-3l-2-4h-3l2 4h-3L9 4H6l2 4H5L3 4H2v16h20V4h-4zm2 14H4v-8h16v8z' },
+    heart: { label: 'Yêu thích', path: 'M12 21.35 10.55 20C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A6.03 6.03 0 0 1 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.45L12 21.35z' }
+  };
+  const FAVORITE_ICON_KEYS = Object.keys(FAVORITE_ICONS);
   const BM_LOG_MENU_ID = 'yt-aid-bm-log-menu';
 
   let bookmarks = [];
+  let bookmarkShelfCollapsed = false;
   let bookmarkPageOpen = false;
   let bookmarkFilter = '';
+  const bookmarkPageCards = new Map();
+  const bookmarkSearchCache = new WeakMap();
+  let bookmarkConfirmEl = null;
+  let bookmarkConfirmResolve = null;
+  let bookmarkConfirmReturnFocus = null;
+  let favoritePickerEl = null;
 
   function svgIcon(path, className) {
     const ns = 'http://www.w3.org/2000/svg';
@@ -3290,6 +3638,7 @@
         isShort: !!item.isShort,
         time,
         name: typeof item.name === 'string' ? item.name.slice(0, BOOKMARK_NAME_MAX) : '',
+        favoriteIcon: FAVORITE_ICON_KEYS.includes(item.favoriteIcon) ? item.favoriteIcon : '',
         addedAt
       });
     }
@@ -3360,6 +3709,7 @@
       isShort: !!data.isShort,
       time: t,
       name: '',
+      favoriteIcon: '',
       addedAt: Date.now()
     }, ...bookmarks].slice(0, BOOKMARK_LIMIT);
     saveBookmarks();
@@ -3384,10 +3734,109 @@
     addBookmark(data, 0);
   }
 
-  function removeBookmark(uid) {
-    const before = bookmarks.length;
-    bookmarks = bookmarks.filter((b) => b.uid !== uid);
-    if (bookmarks.length === before) return;
+  function closeBookmarkConfirm(confirmed) {
+    if (!bookmarkConfirmEl) return;
+    const overlay = bookmarkConfirmEl;
+    bookmarkConfirmEl = null;
+    document.removeEventListener('keydown', overlay._keyHandler, true);
+    overlay.remove();
+    if (!confirmed && bookmarkConfirmReturnFocus && bookmarkConfirmReturnFocus.isConnected) {
+      bookmarkConfirmReturnFocus.focus({ preventScroll: true });
+    }
+    bookmarkConfirmReturnFocus = null;
+    const resolve = bookmarkConfirmResolve;
+    bookmarkConfirmResolve = null;
+    if (resolve) resolve(!!confirmed);
+  }
+
+  function confirmBookmarkAction(title, message, confirmLabel) {
+    closeBookmarkConfirm(false);
+    return new Promise((resolve) => {
+      bookmarkConfirmResolve = resolve;
+      bookmarkConfirmReturnFocus = document.activeElement;
+      const overlay = document.createElement('div');
+      overlay.className = 'yt-aid-bm-confirm-overlay';
+
+      const dialog = document.createElement('div');
+      dialog.className = 'yt-aid-bm-confirm';
+      dialog.setAttribute('role', 'dialog');
+      dialog.setAttribute('aria-modal', 'true');
+      dialog.setAttribute('aria-labelledby', 'yt-aid-bm-confirm-title');
+      dialog.setAttribute('aria-describedby', 'yt-aid-bm-confirm-message');
+
+      const icon = document.createElement('div');
+      icon.className = 'yt-aid-bm-confirm-icon';
+      icon.appendChild(svgIcon(TRASH_ICON));
+      dialog.appendChild(icon);
+
+      const content = document.createElement('div');
+      content.className = 'yt-aid-bm-confirm-content';
+      const heading = document.createElement('h3');
+      heading.id = 'yt-aid-bm-confirm-title';
+      heading.textContent = title;
+      content.appendChild(heading);
+      const text = document.createElement('p');
+      text.id = 'yt-aid-bm-confirm-message';
+      text.textContent = message;
+      content.appendChild(text);
+      dialog.appendChild(content);
+
+      const actions = document.createElement('div');
+      actions.className = 'yt-aid-bm-confirm-actions';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'yt-aid-bm-confirm-cancel';
+      cancel.textContent = 'Hủy';
+      cancel.addEventListener('click', () => closeBookmarkConfirm(false));
+      actions.appendChild(cancel);
+      const accept = document.createElement('button');
+      accept.type = 'button';
+      accept.className = 'yt-aid-bm-confirm-delete';
+      accept.textContent = confirmLabel || 'Xóa';
+      accept.addEventListener('click', () => closeBookmarkConfirm(true));
+      actions.appendChild(accept);
+      dialog.appendChild(actions);
+
+      overlay.appendChild(dialog);
+      overlay.addEventListener('mousedown', (event) => {
+        if (event.target === overlay) closeBookmarkConfirm(false);
+      });
+      overlay._keyHandler = (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          closeBookmarkConfirm(false);
+          return;
+        }
+        if (event.key !== 'Tab') return;
+        const first = cancel;
+        const last = accept;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      };
+      bookmarkConfirmEl = overlay;
+      document.body.appendChild(overlay);
+      document.addEventListener('keydown', overlay._keyHandler, true);
+      requestAnimationFrame(() => cancel.focus({ preventScroll: true }));
+    });
+  }
+
+  async function removeBookmark(uid) {
+    const bm = bookmarks.find((item) => item.uid === uid);
+    if (!bm) return;
+    const label = bm.name || bm.title || bm.id;
+    const confirmed = await confirmBookmarkAction(
+      'Xóa bookmark?',
+      `${previewText(label, 80)} · ${formatVideoTime(bm.time)}`,
+      'Xóa bookmark'
+    );
+    if (!confirmed || !bookmarks.some((item) => item.uid === uid)) return;
+    bookmarks = bookmarks.filter((item) => item.uid !== uid);
     saveBookmarks();
     syncBookmarkUi();
     showToast('Đã xóa bookmark', 'info');
@@ -3406,30 +3855,51 @@
     syncBookmarkUi();
   }
 
-  function removeVideoBookmarks(id) {
-    const count = bookmarks.filter((b) => b.id === id).length;
+  async function removeVideoBookmarks(id) {
+    const list = bookmarks.filter((b) => b.id === id);
+    if (!list.length) return;
+    const targetUids = new Set(list.map((b) => b.uid));
+    const title = list.find((b) => b.title)?.title || id;
+    const confirmed = await confirmBookmarkAction(
+      `Xóa ${list.length} bookmark?`,
+      previewText(title, 80),
+      'Xóa tất cả mốc'
+    );
+    if (!confirmed) return;
+    const before = bookmarks.length;
+    bookmarks = bookmarks.filter((b) => !targetUids.has(b.uid));
+    const count = before - bookmarks.length;
     if (!count) return;
-    if (!window.confirm(`Xóa ${count} bookmark của video này?`)) return;
-    bookmarks = bookmarks.filter((b) => b.id !== id);
     saveBookmarks();
     syncBookmarkUi();
     showToast(`Đã xóa ${count} bookmark của video`, 'info');
   }
 
-  function clearAllBookmarks() {
+  async function clearAllBookmarks() {
     if (!bookmarks.length) return;
-    if (!window.confirm(`Xóa TẤT CẢ ${bookmarks.length} bookmark? Hành động này không thể hoàn tác.`)) return;
-    bookmarks = [];
+    const targetUids = new Set(bookmarks.map((b) => b.uid));
+    const count = targetUids.size;
+    const confirmed = await confirmBookmarkAction(
+      'Xóa tất cả bookmark?',
+      `${count} bookmark sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.`,
+      'Xóa tất cả'
+    );
+    if (!confirmed) return;
+    const before = bookmarks.length;
+    bookmarks = bookmarks.filter((b) => !targetUids.has(b.uid));
+    const removed = before - bookmarks.length;
+    if (!removed) return;
     saveBookmarks();
     syncBookmarkUi();
-    showToast('Đã xóa tất cả bookmark', 'info');
+    showToast(`Đã xóa ${removed} bookmark`, 'info');
   }
 
   function loadBookmarks(done) {
     try {
-      chrome.storage.local.get({ [BOOKMARKS_KEY]: [] }, (items) => {
+      chrome.storage.local.get({ [BOOKMARKS_KEY]: [], [BOOKMARK_SHELF_COLLAPSED_KEY]: false }, (items) => {
         void chrome.runtime?.lastError;
         bookmarks = sanitizeBookmarks(items && items[BOOKMARKS_KEY]);
+        bookmarkShelfCollapsed = !!(items && items[BOOKMARK_SHELF_COLLAPSED_KEY]);
         if (done) done();
       });
     } catch (e) {
@@ -3458,12 +3928,11 @@
     const finish = (save) => {
       if (finished) return;
       finished = true;
-      if (save) {
-        renameBookmark(bm.uid, input.value);
-      } else if (input.parentNode) {
+      if (input.parentNode) {
         input.parentNode.replaceChild(nameEl, input);
         delete nameEl.dataset.editing;
       }
+      if (save) renameBookmark(bm.uid, input.value);
     };
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -3481,19 +3950,21 @@
   // --- Trạng thái nút / giao diện ---
   function syncBookmarkButtons() {
     const watchId = window.location.pathname.startsWith('/watch') ? videoIdFromUrl(window.location.href) : null;
-    const count = watchId ? bookmarksOfVideo(watchId).length : 0;
+    const count = watchId ? bookmarks.reduce((total, bm) => total + Number(bm.id === watchId), 0) : 0;
 
     const btn = document.getElementById('yt-aid-btn-bookmark');
     if (btn) {
-      btn.classList.toggle('active', count > 0);
+      btn.classList.remove('active');
+      if (btn.getAttribute('aria-pressed') !== 'false') btn.setAttribute('aria-pressed', 'false');
       const path = btn.querySelector('path');
-      if (path) path.setAttribute('d', count > 0 ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE);
+      if (path && path.getAttribute('d') !== BOOKMARK_ICON_OUTLINE) path.setAttribute('d', BOOKMARK_ICON_OUTLINE);
     }
 
     const logBtn = document.getElementById('yt-aid-btn-bookmark-log');
     if (logBtn) {
       const label = logBtn.querySelector('span');
-      if (label) label.textContent = count > 0 ? `Log (${count})` : 'Log';
+      const text = count > 0 ? `Log (${count})` : 'Log';
+      if (label && label.textContent !== text) label.textContent = text;
       logBtn.classList.toggle('active', count > 0);
     }
 
@@ -3507,11 +3978,18 @@
     }
   }
 
-  function syncBookmarkUi() {
-    syncBookmarkButtons();
-    renderBookmarkShelf();
+  function syncBookmarkUi(favoriteOnly = false) {
+    closeFavoritePicker();
+    if (!favoriteOnly) {
+      syncBookmarkButtons();
+      renderBookmarkShelf();
+    }
     refreshBookmarkLogMenu();
     if (bookmarkPageOpen) renderBookmarkPage();
+    else {
+      bookmarkPageCards.clear();
+      document.querySelector('#yt-aid-bookmark-page .yt-aid-bm-grid')?.replaceChildren();
+    }
   }
 
   // --- Mở / tua tới bookmark ---
@@ -3551,6 +4029,135 @@
       onClick(e);
     });
     return b;
+  }
+
+  function closeFavoritePicker() {
+    if (!favoritePickerEl) return;
+    const picker = favoritePickerEl;
+    favoritePickerEl = null;
+    clearTimeout(picker._outsideTimer);
+    document.removeEventListener('mousedown', picker._outsideHandler, true);
+    document.removeEventListener('keydown', picker._keyHandler, true);
+    window.removeEventListener('resize', closeFavoritePicker);
+    window.removeEventListener('scroll', closeFavoritePicker, true);
+    picker.remove();
+  }
+
+  function setBookmarkFavoriteIcon(uid, iconKey) {
+    const bm = bookmarks.find((item) => item.uid === uid);
+    if (!bm) return;
+    const next = FAVORITE_ICON_KEYS.includes(iconKey) ? iconKey : '';
+    if (bm.favoriteIcon === next) return;
+    bm.favoriteIcon = next;
+    closeFavoritePicker();
+    saveBookmarks();
+    syncBookmarkUi(true);
+    showToast(
+      next ? `Đã yêu thích · ${FAVORITE_ICONS[next].label}` : 'Đã bỏ yêu thích bookmark',
+      next ? 'success' : 'info'
+    );
+  }
+
+  function toggleBookmarkFavorite(uid) {
+    const bm = bookmarks.find((item) => item.uid === uid);
+    if (!bm) return;
+    setBookmarkFavoriteIcon(uid, bm.favoriteIcon ? '' : 'heart');
+  }
+
+  function openFavoritePicker(anchor, bm) {
+    closeFavoritePicker();
+    const picker = document.createElement('div');
+    picker.className = 'yt-aid-bm-favorite-picker';
+    picker.setAttribute('role', 'menu');
+    picker.setAttribute('aria-label', 'Chọn biểu tượng yêu thích');
+
+    FAVORITE_ICON_KEYS.forEach((key) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'yt-aid-bm-favorite-option';
+      option.classList.toggle('active', bm.favoriteIcon === key);
+      option.setAttribute('role', 'menuitemradio');
+      option.setAttribute('aria-checked', bm.favoriteIcon === key ? 'true' : 'false');
+      option.title = FAVORITE_ICONS[key].label;
+      option.appendChild(svgIcon(FAVORITE_ICONS[key].path));
+      const label = document.createElement('span');
+      label.textContent = FAVORITE_ICONS[key].label;
+      option.appendChild(label);
+      option.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setBookmarkFavoriteIcon(bm.uid, key);
+      });
+      picker.appendChild(option);
+    });
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'yt-aid-bm-favorite-remove';
+    remove.textContent = 'Bỏ yêu thích';
+    remove.disabled = !bm.favoriteIcon;
+    remove.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setBookmarkFavoriteIcon(bm.uid, '');
+    });
+    picker.appendChild(remove);
+
+    document.body.appendChild(picker);
+    const rect = anchor.getBoundingClientRect();
+    const pickerRect = picker.getBoundingClientRect();
+    const left = Math.max(8, Math.min(rect.right - pickerRect.width, window.innerWidth - pickerRect.width - 8));
+    const openAbove = rect.bottom + pickerRect.height + 8 > window.innerHeight && rect.top > pickerRect.height;
+    const top = openAbove ? rect.top - pickerRect.height - 6 : rect.bottom + 6;
+    picker.style.left = `${Math.round(left)}px`;
+    picker.style.top = `${Math.round(Math.max(8, top))}px`;
+
+    picker._outsideHandler = (event) => {
+      if (!picker.contains(event.target) && !anchor.contains(event.target)) closeFavoritePicker();
+    };
+    picker._keyHandler = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeFavoritePicker();
+      anchor.focus({ preventScroll: true });
+    };
+    favoritePickerEl = picker;
+    picker._outsideTimer = setTimeout(() => {
+      document.addEventListener('mousedown', picker._outsideHandler, true);
+    }, 0);
+    document.addEventListener('keydown', picker._keyHandler, true);
+    window.addEventListener('resize', closeFavoritePicker);
+    window.addEventListener('scroll', closeFavoritePicker, true);
+    const selected = picker.querySelector('.yt-aid-bm-favorite-option.active') || picker.querySelector('.yt-aid-bm-favorite-option');
+    if (selected) selected.focus({ preventScroll: true });
+  }
+
+  function buildBookmarkFavoriteControl(bm) {
+    const wrap = document.createElement('div');
+    wrap.className = 'yt-aid-bm-favorite-control';
+
+    const iconKey = FAVORITE_ICON_KEYS.includes(bm.favoriteIcon) ? bm.favoriteIcon : '';
+    const toggle = makeIconButton(
+      `yt-aid-bm-action yt-aid-bm-favorite${iconKey ? ' active' : ''}`,
+      iconKey ? `Bỏ yêu thích · ${FAVORITE_ICONS[iconKey].label}` : 'Yêu thích bookmark',
+      iconKey ? FAVORITE_ICONS[iconKey].path : HEART_OUTLINE_ICON,
+      () => toggleBookmarkFavorite(bm.uid)
+    );
+    toggle.setAttribute('aria-pressed', iconKey ? 'true' : 'false');
+    wrap.appendChild(toggle);
+
+    if (iconKey) {
+      const choose = makeIconButton(
+        'yt-aid-bm-action yt-aid-bm-favorite-choose',
+        'Đổi biểu tượng yêu thích',
+        CHEVRON_DOWN_ICON,
+        () => openFavoritePicker(choose, bm)
+      );
+      choose.setAttribute('aria-haspopup', 'menu');
+      wrap.appendChild(choose);
+    }
+    return wrap;
   }
 
   // Gộp các bookmark cùng video thành 1 nhóm (giữ thứ tự: video có bookmark mới nhất lên đầu).
@@ -3593,6 +4200,8 @@
     name.textContent = bm.name || defaultBookmarkLabel(bm);
     name.title = name.textContent;
     row.appendChild(name);
+
+    row.appendChild(buildBookmarkFavoriteControl(bm));
 
     // Ô nhập đổi tên bắt đầu từ tên đang hiển thị.
     const editBm = { ...bm, name: bm.name || defaultBookmarkLabel(bm), title: '' };
@@ -3729,6 +4338,26 @@
     document.querySelectorAll('#yt-aid-bookmark-shelf').forEach((el) => el.remove());
   }
 
+  function setBookmarkShelfCollapsed(collapsed) {
+    bookmarkShelfCollapsed = !!collapsed;
+    safeSetStorage({ [BOOKMARK_SHELF_COLLAPSED_KEY]: bookmarkShelfCollapsed });
+    syncBookmarkShelfVisibility();
+  }
+
+  function syncBookmarkShelfVisibility() {
+    const shelf = document.getElementById('yt-aid-bookmark-shelf');
+    if (!shelf) return;
+    const row = shelf.querySelector('.yt-aid-bm-shelf-row');
+    if (row) row.hidden = bookmarkShelfCollapsed;
+    shelf.classList.toggle('yt-aid-bm-shelf-collapsed', bookmarkShelfCollapsed);
+    const toggle = shelf.querySelector('.yt-aid-bm-shelf-toggle');
+    if (!toggle) return;
+    toggle.title = bookmarkShelfCollapsed ? 'Hiển thị video bookmark' : 'Ẩn video bookmark';
+    toggle.setAttribute('aria-expanded', bookmarkShelfCollapsed ? 'false' : 'true');
+    toggle.querySelector('path').setAttribute('d', bookmarkShelfCollapsed ? EYE_ICON : EYE_OFF_ICON);
+    toggle.querySelector('span').textContent = bookmarkShelfCollapsed ? 'Hiện' : 'Ẩn';
+  }
+
   function renderBookmarkShelf() {
     const shelf = document.getElementById('yt-aid-bookmark-shelf');
     if (!shelf) return;
@@ -3751,16 +4380,33 @@
     title.appendChild(titleText);
     header.appendChild(title);
 
+    const headerActions = document.createElement('div');
+    headerActions.className = 'yt-aid-bm-shelf-header-actions';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'yt-aid-bm-link-btn yt-aid-bm-shelf-toggle';
+    toggle.title = bookmarkShelfCollapsed ? 'Hiển thị video bookmark' : 'Ẩn video bookmark';
+    toggle.setAttribute('aria-expanded', bookmarkShelfCollapsed ? 'false' : 'true');
+    toggle.appendChild(svgIcon(bookmarkShelfCollapsed ? EYE_ICON : EYE_OFF_ICON));
+    const toggleText = document.createElement('span');
+    toggleText.textContent = bookmarkShelfCollapsed ? 'Hiện' : 'Ẩn';
+    toggle.appendChild(toggleText);
+    toggle.addEventListener('click', () => setBookmarkShelfCollapsed(!bookmarkShelfCollapsed));
+    headerActions.appendChild(toggle);
+
     const more = document.createElement('button');
     more.type = 'button';
     more.className = 'yt-aid-bm-link-btn';
     more.textContent = 'Xem tất cả';
     more.addEventListener('click', openBookmarkPage);
-    header.appendChild(more);
+    headerActions.appendChild(more);
+    header.appendChild(headerActions);
     shelf.appendChild(header);
 
     const row = document.createElement('div');
     row.className = 'yt-aid-bm-shelf-row';
+    row.hidden = bookmarkShelfCollapsed;
+    shelf.classList.toggle('yt-aid-bm-shelf-collapsed', bookmarkShelfCollapsed);
     shelfGroups.slice(0, BOOKMARK_SHELF_MAX).forEach((g) => row.appendChild(buildBookmarkGroupCard(g, true)));
     shelf.appendChild(row);
   }
@@ -3853,24 +4499,29 @@
     const iconRect = iconEl ? iconEl.getBoundingClientRect() : null;
     const textRect = textEl ? textEl.getBoundingClientRect() : null;
 
-    entry.style.margin = '0';
-    entry.style.marginLeft = `${Math.round(natRect.left - itemsRect.left)}px`;
-    entry.style.width = `${Math.round(natRect.width)}px`;
-    entry.style.height = `${Math.round(natRect.height)}px`;
+    const style = {
+      marginTop: '0px', marginRight: '0px', marginBottom: '0px',
+      marginLeft: `${Math.round(natRect.left - itemsRect.left)}px`,
+      width: `${Math.round(natRect.width)}px`,
+      height: `${Math.round(natRect.height)}px`
+    };
     if (iconRect && iconRect.width) {
-      entry.style.paddingLeft = `${Math.max(0, Math.round(iconRect.left - natRect.left))}px`;
+      style.paddingLeft = `${Math.max(0, Math.round(iconRect.left - natRect.left))}px`;
       if (textRect && textRect.width) {
-        entry.style.gap = `${Math.max(0, Math.round(textRect.left - (iconRect.left + 24)))}px`;
+        style.gap = `${Math.max(0, Math.round(textRect.left - (iconRect.left + 24)))}px`;
       }
     }
     if (textEl) {
       const cs = getComputedStyle(textEl);
-      entry.style.fontSize = cs.fontSize;
-      entry.style.color = cs.color;
+      style.fontSize = cs.fontSize;
+      style.color = cs.color;
+    }
+    for (const [key, value] of Object.entries(style)) {
+      if (entry.style[key] !== value) entry.style[key] = value;
     }
   }
 
-  function injectGuideEntries() {
+  function injectGuideEntries(align = false) {
     const items = document.querySelector('ytd-guide-renderer ytd-guide-section-renderer #items');
     if (items && !items.querySelector('#yt-aid-guide-entry')) {
       const entry = document.createElement('a');
@@ -3883,9 +4534,10 @@
       entry.appendChild(label);
       entry.addEventListener('click', openBookmarkFromGuide);
       items.appendChild(entry);
+      align = true;
     }
     const guideEntry = items && items.querySelector('#yt-aid-guide-entry');
-    if (guideEntry) alignGuideEntry(guideEntry, items);
+    if (guideEntry && align) alignGuideEntry(guideEntry, items);
 
     const mini = document.querySelector('ytd-mini-guide-renderer #items');
     if (mini && !mini.querySelector('#yt-aid-mini-entry')) {
@@ -3923,6 +4575,15 @@
     page.style.left = `${left}px`;
   }
 
+  function bookmarkSearchText(bm) {
+    const source = `${bm.name} ${bm.title} ${bm.channel}`;
+    const cached = bookmarkSearchCache.get(bm);
+    if (cached?.source === source) return cached.text;
+    const text = source.toLowerCase();
+    bookmarkSearchCache.set(bm, { source, text });
+    return text;
+  }
+
   function renderBookmarkPage() {
     const page = document.getElementById('yt-aid-bookmark-page');
     if (!page) return;
@@ -3932,12 +4593,12 @@
     if (!grid) return;
 
     if (clearBtn) clearBtn.style.display = bookmarks.length ? '' : 'none';
-    grid.textContent = '';
-
+    const ids = new Set(bookmarks.map((bm) => bm.id));
+    for (const id of bookmarkPageCards.keys()) {
+      if (!ids.has(id)) bookmarkPageCards.delete(id);
+    }
     const q = bookmarkFilter.trim().toLowerCase();
-    const list = q
-      ? bookmarks.filter((b) => `${b.name} ${b.title} ${b.channel}`.toLowerCase().includes(q))
-      : bookmarks;
+    const list = q ? bookmarks.filter((bm) => bookmarkSearchText(bm).includes(q)) : bookmarks;
 
     if (!list.length) {
       if (count) count.textContent = `0 video · ${bookmarks.length} bookmark`;
@@ -3946,16 +4607,38 @@
       empty.textContent = bookmarks.length
         ? 'Không tìm thấy bookmark nào khớp.'
         : 'Chưa có bookmark nào. Mở một video và bấm nút Bookmark để lưu mốc thời gian.';
-      grid.appendChild(empty);
+      grid.replaceChildren(empty);
       return;
     }
     const groups = groupBookmarksByVideo(list);
-    if (count) count.textContent = `${groups.length} video · ${list.length} bookmark`;
-    groups.forEach((g) => grid.appendChild(buildBookmarkGroupCard(g, false)));
+    const countText = `${groups.length} video · ${list.length} bookmark`;
+    if (count && count.textContent !== countText) count.textContent = countText;
+    const cards = groups.map((group) => {
+      const signature = JSON.stringify(group);
+      let cached = bookmarkPageCards.get(group.id);
+      if (!cached || cached.signature !== signature) {
+        cached = { signature, card: buildBookmarkGroupCard(group, false) };
+        bookmarkPageCards.set(group.id, cached);
+      }
+      return cached.card;
+    });
+    const visibleCards = new Set(cards);
+    for (const child of [...grid.children]) {
+      if (!visibleCards.has(child)) child.remove();
+    }
+    if (!grid.firstChild) {
+      grid.append(...cards);
+      return;
+    }
+    let cursor = grid.firstChild;
+    for (const card of cards) {
+      if (card !== cursor) grid.insertBefore(card, cursor);
+      else cursor = cursor.nextSibling;
+    }
   }
 
   function onBookmarkPageKeyDown(event) {
-    if (event.key !== 'Escape' || !bookmarkPageOpen) return;
+    if (event.key !== 'Escape' || !bookmarkPageOpen || bookmarkConfirmEl || favoritePickerEl) return;
     // Esc khi đang đổi tên chỉ hủy việc đổi tên, không đóng trang.
     if (event.target && event.target.classList && event.target.classList.contains('yt-aid-bm-rename-input')) return;
     event.stopPropagation();
@@ -4071,23 +4754,40 @@
 
     try {
       chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName !== 'local' || !changes[BOOKMARKS_KEY]) return;
-        bookmarks = sanitizeBookmarks(changes[BOOKMARKS_KEY].newValue);
-        injectBookmarkShelf();
-        syncBookmarkUi();
+        if (areaName !== 'local') return;
+        if (changes[BOOKMARKS_KEY]) {
+          const next = sanitizeBookmarks(changes[BOOKMARKS_KEY].newValue);
+          if (JSON.stringify(next) !== JSON.stringify(bookmarks)) {
+            bookmarks = next;
+            injectBookmarkShelf();
+            syncBookmarkUi();
+          }
+        }
+        if (changes[BOOKMARK_SHELF_COLLAPSED_KEY]) {
+          const next = !!changes[BOOKMARK_SHELF_COLLAPSED_KEY].newValue;
+          if (next !== bookmarkShelfCollapsed) {
+            bookmarkShelfCollapsed = next;
+            syncBookmarkShelfVisibility();
+          }
+        }
       });
     } catch (e) { }
 
-    window.addEventListener('yt-navigate-start', closeBookmarkPage);
+    window.addEventListener('yt-navigate-start', () => {
+      closeBookmarkPage();
+      closeBookmarkConfirm(false);
+      closeFavoritePicker();
+    });
     window.addEventListener('yt-navigate-finish', () => {
       closeBookmarkPage();
       injectBookmarkUi();
     });
 
-    // Sidebar render muộn và nằm trong vùng bị bỏ qua của MutationObserver,
-    // nên kiểm tra nhẹ định kỳ để mục Bookmark luôn có mặt.
+    window.addEventListener('resize', () => injectGuideEntries(true));
+    // The native guide is outside the main observer and can render late.
     setInterval(() => {
-      injectGuideEntries();
+      if (document.visibilityState === 'hidden') return;
+      injectGuideEntries(true);
       injectBookmarkShelf();
     }, 1500);
   }
