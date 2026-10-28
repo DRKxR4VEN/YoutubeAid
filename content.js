@@ -46,6 +46,8 @@
     enableThumbnailDownload: true,
     enableAdSkip: true,
     enableHideAds: true,
+    enableHideMix: true,
+    enableHideChips: true,
     audioBoost: 100,
     randomVideo: { video: true, shorts: true, music: true, feed: true },
     shortcutKeys: { ...DEFAULT_SHORTCUT_KEYS },
@@ -220,6 +222,8 @@
 
     if (!settings.enableShortcuts) resetKeyBuffer();
     if (changed('enableAdSkip') || changed('enableHideAds')) syncAdSkipSettings();
+    if (changed('enableHideMix')) syncMixState();
+    if (changed('enableHideChips')) syncChipBarState();
     if (changed('enableLoop')) ensureVideoLoop();
     if (changed('enableCopyButtons')) {
       document.body.classList.toggle('yt-aid-hide-copy-buttons', !settings.enableCopyButtons);
@@ -236,6 +240,7 @@
       syncToolbarState();
     }
   }
+
   // --- Main Initializer ---
   function initExtension() {
     createToastContainer();
@@ -247,18 +252,24 @@
       return;
     }
 
-    initVideoLoopMonitor();
-    initAudioBoost();
-    initClipboardCopyTracking();
-    rebuildShortcutKeymap();
-    initShortcutSystem();
-    initSelectionCopy();
-    initSearchAutoPaste();
-    initDropdownDismiss();
-    initDOMObserver();
-    initBookmarks();
-    initAdSkipper();
-    applySettingUpdates();
+    // Mỗi bước chạy riêng: một bước lỗi không làm mất các tính năng phía sau (nút random, v.v.).
+    [
+      initVideoLoopMonitor,
+      initAudioBoost,
+      initClipboardCopyTracking,
+      rebuildShortcutKeymap,
+      initShortcutSystem,
+      initSelectionCopy,
+      initSearchAutoPaste,
+      initDropdownDismiss,
+      initDOMObserver,
+      initBookmarks,
+      initAdSkipper,
+      initMixHider
+    ].forEach((fn) => {
+      try { fn(); } catch (e) { console.error('[YoutubeAid] init lỗi:', fn.name, e); }
+    });
+    try { applySettingUpdates(); } catch (e) { console.error('[YoutubeAid] applySettingUpdates lỗi:', e); }
   }
 
   // ==========================================
@@ -486,7 +497,7 @@
     loopBtn.setAttribute('aria-pressed', wanted ? 'true' : 'false');
     loopBtn.title = wanted ? 'Auto Loop đang bật' : 'Auto Loop đang tắt';
     const label = loopBtn.querySelector('span');
-    if (label) label.textContent = wanted ? 'Auto Loop: ON' : 'Auto Loop: OFF';
+    if (label) label.textContent = wanted ? 'Loop: ON' : 'Loop: OFF';
   }
 
   function stopLoopWatchdog() {
@@ -2355,7 +2366,7 @@
           </button>
 
           <!-- 2. Copy + Search + Enter -->
-          <button class="yt-aid-pill-btn yt-aid-pill-sub" id="yt-aid-btn-copy-enter" title="Copy & tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)">
+          <button class="yt-aid-pill-btn yt-aid-pill-sub yt-aid-icon-only" id="yt-aid-btn-copy-enter" title="Copy & tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)" aria-label="Copy và tìm kiếm trực tiếp">
             <svg viewBox="0 0 24 24">
               <path fill="currentColor" d="M3 2h7a2 2 0 0 1 2 2v1h-2V4H3v9h1v2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 4h6a2 2 0 0 1 2 2v1h-2V8H6v7h2v2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
               <path fill="currentColor" d="M17 2a3 3 0 1 0 2 5.2l2.3 2.3 1.4-1.4-2.3-2.3A3 3 0 0 0 17 2zm0 1.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
@@ -2369,7 +2380,7 @@
         </div>
 
         <!-- Clean Copy Link -->
-        <button class="yt-aid-pill-btn yt-aid-clean-link" id="yt-aid-btn-clean-link" title="Sao chép liên kết sạch không query tracking">
+        <button class="yt-aid-pill-btn yt-aid-clean-link yt-aid-icon-only" id="yt-aid-btn-clean-link" title="Clean Link: sao chép liên kết sạch không query tracking" aria-label="Clean Link">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
           <span>Clean Link</span>
         </button>
@@ -2380,14 +2391,14 @@
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"/></svg>
             <span>Bookmark</span>
           </button>
-          <button class="yt-aid-pill-btn yt-aid-pill-sub yt-aid-bookmark-log-btn" id="yt-aid-btn-bookmark-log" title="Xem log bookmark của video này" aria-haspopup="true" aria-expanded="false">
+          <button class="yt-aid-pill-btn yt-aid-pill-sub yt-aid-bookmark-log-btn" id="yt-aid-btn-bookmark-log" title="Xem log bookmark của video này" aria-label="Log bookmark của video này" aria-haspopup="true" aria-expanded="false">
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
-            <span>Log</span>
+            <span></span>
           </button>
         </div>
 
         <!-- Downloads button (thumbnail crop) -->
-        <button class="yt-aid-pill-btn yt-aid-downloads-btn" id="yt-aid-btn-downloads" title="Tải ảnh bìa thumbnail (có cắt ảnh)">
+        <button class="yt-aid-pill-btn yt-aid-downloads-btn yt-aid-icon-only" id="yt-aid-btn-downloads" title="Tải ảnh bìa thumbnail (có cắt ảnh)" aria-label="Tải thumbnail">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
           <span>Download Thumbnail</span>
         </button>
@@ -2397,11 +2408,11 @@
         <!-- Auto Loop Toggle Button -->
         <button class="yt-aid-pill-btn yt-aid-loop-indicator ${settings.enableLoop ? 'active' : ''}" id="yt-aid-btn-toggle-loop" title="${settings.enableLoop ? 'Auto Loop đang bật' : 'Auto Loop đang tắt'}">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
-          <span>Auto Loop: ${settings.enableLoop ? 'ON' : 'OFF'}</span>
+          <span>Loop: ${settings.enableLoop ? 'ON' : 'OFF'}</span>
         </button>
 
         <!-- Extra tools dropdown -->
-        <button class="yt-aid-pill-btn yt-aid-tools-btn" id="yt-aid-btn-tools" title="Tính năng phụ" aria-haspopup="true" aria-expanded="false">
+        <button class="yt-aid-pill-btn yt-aid-tools-btn yt-aid-icon-only" id="yt-aid-btn-tools" title="Tính năng phụ" aria-label="Tính năng phụ" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
           <span>Tools</span>
           <svg class="yt-aid-chevron" viewBox="0 0 24 24"><path fill="currentColor" d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
@@ -2618,6 +2629,28 @@
         </span>
       </label>
 
+      <label class="yt-aid-tools-item">
+        <span class="yt-aid-tools-text">
+          <span class="yt-aid-tools-name">Ẩn thanh chủ đề (Tất cả, Âm nhạc…)</span>
+          <span class="yt-aid-tools-desc">Ẩn dải chip lọc ở Trang chủ và dưới video đề xuất</span>
+        </span>
+        <span class="yt-aid-switch">
+          <input type="checkbox" id="yt-aid-toggle-hide-chips"${checked(settings.enableHideChips)}>
+          <span class="yt-aid-switch-slider"></span>
+        </span>
+      </label>
+
+      <label class="yt-aid-tools-item">
+        <span class="yt-aid-tools-text">
+          <span class="yt-aid-tools-name">Tắt Danh sách kết hợp (Mix)</span>
+          <span class="yt-aid-tools-desc">Ẩn Mix trong feed, video đề xuất và bỏ tự phát nối tiếp Mix</span>
+        </span>
+        <span class="yt-aid-switch">
+          <input type="checkbox" id="yt-aid-toggle-hide-mix"${checked(settings.enableHideMix)}>
+          <span class="yt-aid-switch-slider"></span>
+        </span>
+      </label>
+
       <div class="yt-aid-tools-item yt-aid-tools-boost">
         <span class="yt-aid-tools-text">
           <span class="yt-aid-tools-name">Tăng âm lượng video</span>
@@ -2638,6 +2671,15 @@
     });
     menu.querySelector('#yt-aid-toggle-auto-paste-replace').addEventListener('change', (e) => {
       updateSetting('enableAutoPasteReplace', e.target.checked);
+    });
+
+    menu.querySelector('#yt-aid-toggle-hide-chips').addEventListener('change', (e) => {
+      updateSetting('enableHideChips', e.target.checked);
+      syncChipBarState();
+    });
+    menu.querySelector('#yt-aid-toggle-hide-mix').addEventListener('change', (e) => {
+      updateSetting('enableHideMix', e.target.checked);
+      syncMixState();
     });
 
     const boostRange = menu.querySelector('#yt-aid-audio-boost');
@@ -3367,14 +3409,19 @@
       return;
     }
     const browse = document.querySelector('ytd-browse:not([hidden])');
-    const grid = browse?.querySelector('ytd-rich-grid-renderer') || browse;
-    if (!grid || existing?.parentElement === grid) return;
+    const grid = browse?.querySelector('ytd-rich-grid-renderer');
+    // Đặt thanh random NGOÀI lưới video (anh em của ytd-rich-grid-renderer) để không làm vỡ layout
+    // flex/grid nội bộ của YouTube (lỗi: mỗi hàng chỉ hiện 1 video, còn lại trống).
+    if (!grid || !grid.parentElement) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (existing && existing.nextElementSibling === grid) return;
     if (existing) existing.remove();
     const bar = document.createElement('div');
     bar.id = 'yt-aid-random-home';
     bar.appendChild(buildRandomVideoControl());
-    const contents = grid.querySelector(':scope > #contents');
-    grid.insertBefore(bar, contents || grid.firstChild);
+    grid.parentElement.insertBefore(bar, grid);
     syncRandomVideoUi();
   }
 
@@ -3457,6 +3504,16 @@
     return [...candidates.values()];
   }
 
+  // Dự phòng khi đang ở trang xem video: lấy video gợi ý đang hiện bên phải.
+  function randomRelatedCandidates() {
+    const candidates = new Map();
+    document.querySelectorAll('ytd-watch-next-secondary-results-renderer a[href^="/watch?"], #related a[href^="/watch?"], a.yt-lockup-view-model-wiz__content-image[href^="/watch?"]').forEach((link) => {
+      const id = videoIdFromUrl(link.href);
+      if (id) candidates.set(id, { id, title: link.textContent || '', isShort: false });
+    });
+    return [...candidates.values()];
+  }
+
   function shuffledRandomItems(items) {
     const shuffled = [...items];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -3476,7 +3533,7 @@
     }
     pool.sort((a, b) => Number(randomRecentIds.includes(a.id)) - Number(randomRecentIds.includes(b.id)));
     for (const candidate of pool.slice(0, 8)) {
-      signal.throwIfAborted();
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const html = await fetchRandomPage(`/watch?v=${candidate.id}`, options.feed, signal);
       const player = parseYoutubePageData(html, 'ytInitialPlayerResponse');
       if (player.videoDetails?.videoId !== candidate.id || player.playabilityStatus?.status !== 'OK' || player.videoDetails?.isLiveContent) continue;
@@ -3502,19 +3559,15 @@
     closeDropdown();
     const request = new AbortController();
     randomRequest = request;
-    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(25000)]);
+    let signal = request.signal;
+    try {
+      if (AbortSignal.any && AbortSignal.timeout) signal = AbortSignal.any([request.signal, AbortSignal.timeout(25000)]);
+    } catch (e) { signal = request.signal; }
     const startUrl = window.location.href;
     syncRandomVideoUi();
     try {
       let selected = null;
-      if (options.feed) {
-        let candidates = randomFeedCandidates();
-        if (!candidates.length) {
-          const html = await fetchRandomPage('/', true, signal);
-          candidates = collectRandomCandidates(parseYoutubePageData(html, 'ytInitialData'));
-        }
-        selected = await chooseRandomCandidate(candidates, options, signal);
-      } else {
+      const searchPick = async () => {
         for (const type of shuffledRandomItems(types)) {
           const topic = shuffledRandomItems(RANDOM_TOPICS[type])[0];
           const query = type === 'shorts' ? `#shorts ${topic}` : type === 'music' ? `${topic} official audio` : topic;
@@ -3522,13 +3575,33 @@
           if (type !== 'shorts') params.set('sp', 'EgIQAQ==');
           const html = await fetchRandomPage(`/results?${params}`, false, signal);
           const candidates = collectRandomCandidates(parseYoutubePageData(html, 'ytInitialData'));
-          selected = await chooseRandomCandidate(candidates, {
+          const pick = await chooseRandomCandidate(candidates, {
             video: type === 'video', shorts: type === 'shorts', music: type === 'music', feed: false
           }, signal);
-          if (selected) break;
+          if (pick) return pick;
         }
+        return null;
+      };
+      if (options.feed) {
+        try {
+          let candidates = randomFeedCandidates();
+          if (!candidates.length) {
+            try {
+              const html = await fetchRandomPage('/', true, signal);
+              candidates = collectRandomCandidates(parseYoutubePageData(html, 'ytInitialData'));
+            } catch (e) { console.warn('[YoutubeAid] random: không đọc được feed', e); }
+          }
+          if (!candidates.length) candidates = randomRelatedCandidates();
+          selected = await chooseRandomCandidate(candidates, options, signal);
+        } catch (e) {
+          if (request.signal.aborted) throw e;
+          console.warn('[YoutubeAid] random: feed lỗi, chuyển sang tìm kiếm công khai', e);
+        }
+        if (!selected) selected = await searchPick();
+      } else {
+        selected = await searchPick();
       }
-      signal.throwIfAborted();
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
       if (randomRequest !== request || window.location.href !== startUrl) return;
       if (!selected) {
         showToast(options.feed ? 'Feed đã tải chưa có video phù hợp. Hãy tải thêm feed hoặc đổi bộ lọc.' :
@@ -3539,6 +3612,7 @@
       if (randomRecentIds.length > 20) randomRecentIds.shift();
       goToYoutubeTarget(selected.isShort ? `/shorts/${selected.id}` : `/watch?v=${selected.id}`);
     } catch (error) {
+      console.error('[YoutubeAid] random lỗi:', error);
       if (request.signal.aborted) return;
       showToast(signal.aborted ? 'YouTube phản hồi chậm. Hãy thử lại.' :
         'Không lấy được video từ YouTube. Hãy kiểm tra kết nối rồi thử lại.', 'warning', 4000);
@@ -3964,8 +4038,10 @@
     const logBtn = document.getElementById('yt-aid-btn-bookmark-log');
     if (logBtn) {
       const label = logBtn.querySelector('span');
-      const text = count > 0 ? `Log (${count})` : 'Log';
+      const text = count > 0 ? String(count) : '';
       if (label && label.textContent !== text) label.textContent = text;
+      const logTitle = count > 0 ? `Xem log bookmark của video này (${count})` : 'Xem log bookmark của video này';
+      if (logBtn.title !== logTitle) logBtn.title = logTitle;
       logBtn.classList.toggle('active', count > 0);
     }
 
@@ -4809,7 +4885,8 @@
   ].join(', ');
   const AD_OVERLAY_CLOSE_SELECTORS = '.ytp-ad-overlay-close-button, .ytp-ad-overlay-close-container';
   const AD_MAX_SEEK_DURATION = 600; // chỉ tua tới cuối nếu "video" ngắn hơn 10 phút (tránh tua nhầm video chính)
-  const AD_SKIP_POLL_MS = 400;
+  const AD_SKIP_POLL_MS = 250;
+  const AD_FAST_POLL_MS = 80; // khi đang có quảng cáo: kiểm tra mỗi 80ms thay vì chờ timer 250ms
 
   let adSkipState = null; // { muted, rate } của video trước khi vào quảng cáo
   let adSkipObservedPlayer = null;
@@ -4850,8 +4927,8 @@
   let adHideSince = 0;
   let adAtEndSince = 0;
   let adStuckAttempts = 0;
-  const AD_HIDE_MAX_MS = 15000;   // sau 15s mà quảng cáo vẫn chưa hết: ngừng giấu để bạn tự thao tác được
-  const AD_STUCK_AFTER_MS = 400;  // quảng cáo đứng ở cuối quá 0,4s thì coi là kẹt
+  const AD_HIDE_MAX_MS = 1500;    // sau 15s mà quảng cáo vẫn chưa hết: ngừng giấu để bạn tự thao tác được
+  const AD_STUCK_AFTER_MS = 250;  // quảng cáo đứng ở cuối quá 0,4s thì coi là kẹt
   const AD_STUCK_MAX_TRIES = 20;
   const AD_WEAK_MAX_MS = 8000; // dấu hiệu "yếu" chỉ giấu tối đa 8 giây để không kẹt player đen
 
@@ -4885,6 +4962,20 @@
     if (bigPlay && video.paused) {
       try { bigPlay.click(); } catch (e) { }
     }
+  }
+
+  // Click "thật" hơn: YouTube mới nghe pointer/mouse event, .click() đơn thuần đôi khi bị bỏ qua.
+  function fireRealClick(el) {
+    try {
+      const r = el.getBoundingClientRect();
+      const opts = { bubbles: true, cancelable: true, composed: true, view: window,
+        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0 };
+      ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((type) => {
+        const Ctor = type.startsWith('pointer') ? PointerEvent : MouseEvent;
+        el.dispatchEvent(new Ctor(type, opts));
+      });
+    } catch (e) { }
+    try { el.click(); } catch (e) { }
   }
 
   function runAdSkip() {
@@ -4932,9 +5023,10 @@
     } catch (e) { }
 
     const skipBtn = player.querySelector(AD_SKIP_BUTTON_SELECTORS);
-    if (skipBtn) {
-      try { skipBtn.click(); } catch (e) { }
-    }
+    if (skipBtn) fireRealClick(skipBtn);
+
+    // Quảng cáo đang tải/đệm: ép phát để nó có dữ liệu sớm nhất có thể.
+    if (kind === 'strong' && video.paused) nudgeAdPlayback(player, video);
 
     // Tua tới cuối quảng cáo (cả loại không có nút bỏ qua). Chỉ tua khi chắc chắn là quảng cáo.
     const duration = video.duration;
@@ -4955,10 +5047,16 @@
         }
       }
     }
+    // Còn quảng cáo: chạy lại nhanh, không chờ timer 250ms.
+    scheduleAdSkip(AD_FAST_POLL_MS);
   }
 
-  function scheduleAdSkip() {
+  function scheduleAdSkip(delay) {
     if (adSkipRaf) return;
+    if (typeof delay === 'number' && delay > 0) {
+      adSkipRaf = setTimeout(runAdSkip, delay);
+      return;
+    }
     // requestAnimationFrame không chạy ở tab nền, nên dùng microtask/timeout ngắn.
     adSkipRaf = setTimeout(runAdSkip, 0);
   }
@@ -4973,7 +5071,7 @@
       adSkipObservedPlayer = player;
 
       // Class của player (ad-showing / ad-interrupting).
-      const classObserver = new MutationObserver(scheduleAdSkip);
+      const classObserver = new MutationObserver(() => scheduleAdSkip());
       classObserver.observe(player, { attributes: true, attributeFilter: ['class'] });
       adSkipObservers.push(classObserver);
 
@@ -4981,7 +5079,7 @@
       const adsLayer = player.querySelector('.video-ads');
       adSkipObservedLayer = adsLayer;
       if (adsLayer) {
-        const layerObserver = new MutationObserver(scheduleAdSkip);
+        const layerObserver = new MutationObserver(() => scheduleAdSkip());
         layerObserver.observe(adsLayer, {
           childList: true,
           subtree: true,
@@ -4995,8 +5093,8 @@
     const video = getAdVideo(player);
     if (video && video !== adSkipObservedVideo) {
       adSkipObservedVideo = video;
-      ['loadstart', 'emptied', 'loadedmetadata', 'durationchange', 'canplay', 'play', 'playing', 'pause', 'seeked', 'ended', 'timeupdate'].forEach((evt) => {
-        video.addEventListener(evt, scheduleAdSkip, { passive: true });
+      ['loadstart', 'emptied', 'loadedmetadata', 'durationchange', 'canplay', 'play', 'playing', 'pause', 'seeked', 'ended', 'timeupdate', 'waiting', 'progress', 'stalled'].forEach((evt) => {
+        video.addEventListener(evt, () => scheduleAdSkip(), { passive: true });
       });
     }
   }
@@ -5020,6 +5118,68 @@
       attachAdSkipObservers();
       runAdSkip();
     }, AD_SKIP_POLL_MS);
+  }
+
+  // ==========================================
+  // 11. TẮT DANH SÁCH KẾT HỢP (MIX)
+  // ==========================================
+  // Mix là playlist tự động của YouTube, có list=RD... trên URL. Khi bật:
+  //  - CSS ẩn khung Mix ở trang xem, thẻ Mix trong feed / đề xuất / tìm kiếm
+  //  - bỏ tham số của Mix khỏi URL để video không tự phát nối tiếp Mix
+  let mixStripKey = '';
+  let mixStripAt = 0;
+
+  function currentMixListId() {
+    try {
+      const url = new URL(window.location.href);
+      if (!url.pathname.startsWith('/watch')) return '';
+      const list = url.searchParams.get('list') || '';
+      return /^RD/.test(list) ? list : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function syncMixState() {
+    const root = document.documentElement;
+    if (IS_MUSIC_SITE || !settings.enableHideMix) {
+      root.removeAttribute('data-yt-aid-hide-mix');
+      root.removeAttribute('data-yt-aid-mix');
+      return;
+    }
+    root.setAttribute('data-yt-aid-hide-mix', '');
+    const list = currentMixListId();
+    if (!list) {
+      root.removeAttribute('data-yt-aid-mix');
+      return;
+    }
+    root.setAttribute('data-yt-aid-mix', '');
+
+    const id = videoIdFromUrl(window.location.href);
+    if (!id) return;
+    // Chỉ chuyển hướng 1 lần cho mỗi video để không bao giờ bị lặp.
+    const key = `${id}|${list}`;
+    if (key === mixStripKey && Date.now() - mixStripAt < 5000) return;
+    mixStripKey = key;
+    mixStripAt = Date.now();
+    const t = new URL(window.location.href).searchParams.get('t');
+    goToYoutubeTarget(`/watch?v=${id}${t ? `&t=${encodeURIComponent(t)}` : ''}`);
+  }
+
+  function initMixHider() {
+    if (IS_MUSIC_SITE) return;
+    window.addEventListener('yt-navigate-finish', syncMixState);
+    window.addEventListener('popstate', syncMixState);
+    syncMixState();
+  }
+
+  // ==========================================
+  // 12. ẨN THANH CHỦ ĐỀ (chip lọc: Tất cả, Âm nhạc, ...)
+  // ==========================================
+  function syncChipBarState() {
+    const root = document.documentElement;
+    if (IS_MUSIC_SITE || !settings.enableHideChips) root.removeAttribute('data-yt-aid-hide-chips');
+    else root.setAttribute('data-yt-aid-hide-chips', '');
   }
 
 })();

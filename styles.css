@@ -1873,3 +1873,107 @@ html[data-yt-aid-ad] .html5-video-player .video-ads {
 html[data-yt-aid-ad] .html5-video-player {
   background: #000 !important;
 }
+
+
+/* ========================================================
+   12. THANH CÔNG CỤ GỌN (trang xem video)
+   Nút phụ chỉ còn icon (rê chuột để xem tên), tiêu đề giữ nhãn chữ.
+   ======================================================== */
+.yt-aid-watch-toolbar {
+  gap: 6px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  padding: 4px 6px;
+}
+
+.yt-aid-watch-toolbar .yt-aid-toolbar-left,
+.yt-aid-watch-toolbar .yt-aid-toolbar-right {
+  gap: 6px;
+}
+
+.yt-aid-watch-toolbar .yt-aid-toolbar-right {
+  margin-left: auto;
+}
+
+.yt-aid-watch-toolbar .yt-aid-pill-btn {
+  padding: 5px 10px;
+}
+
+.yt-aid-watch-toolbar .yt-aid-icon-only,
+.yt-aid-watch-toolbar .yt-aid-random-go,
+.yt-aid-watch-toolbar .yt-aid-random-filter,
+.yt-aid-watch-toolbar .yt-aid-bookmark-log-btn {
+  padding: 6px 9px;
+  gap: 4px;
+}
+
+.yt-aid-watch-toolbar .yt-aid-icon-only > span,
+.yt-aid-watch-toolbar .yt-aid-random-go > span,
+.yt-aid-watch-toolbar .yt-aid-bookmark-log-btn > span:empty {
+  display: none;
+}
+
+.yt-aid-watch-toolbar .yt-aid-icon-only svg,
+.yt-aid-watch-toolbar .yt-aid-random-go svg,
+.yt-aid-watch-toolbar .yt-aid-random-filter svg,
+.yt-aid-watch-toolbar .yt-aid-bookmark-log-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.yt-aid-watch-toolbar .yt-aid-tools-btn .yt-aid-chevron {
+  width: 12px;
+  height: 12px;
+  margin-left: -2px;
+}
+
+.yt-aid-watch-toolbar .yt-aid-bookmark-log-btn > span {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ========================================================
+   13. ẨN DANH SÁCH KẾT HỢP (MIX) — bật bằng data-yt-aid-hide-mix trên <html>
+   ======================================================== */
+html[data-yt-aid-mix] ytd-playlist-panel-renderer,
+html[data-yt-aid-hide-mix] ytd-compact-radio-renderer,
+html[data-yt-aid-hide-mix] ytd-radio-renderer,
+html[data-yt-aid-hide-mix] ytd-grid-radio-renderer,
+html[data-yt-aid-hide-mix] ytd-rich-item-renderer:has(a[href*="list=RD"]),
+html[data-yt-aid-hide-mix] ytd-compact-video-renderer:has(a[href*="list=RD"]),
+html[data-yt-aid-hide-mix] ytd-video-renderer:has(a[href*="list=RD"]),
+html[data-yt-aid-hide-mix] yt-lockup-view-model:has(a[href*="list=RD"]) {
+  display: none !important;
+}
+
+
+/* ========================================================
+   14. ẨN THANH CHỦ ĐỀ — bật bằng data-yt-aid-hide-chips trên <html>
+   Chỉ ẩn dải chip ở Trang chủ / feed và dải chip dưới video đề xuất.
+   Bộ lọc của trang kết quả tìm kiếm được giữ nguyên.
+   ======================================================== */
+html[data-yt-aid-hide-chips] ytd-feed-filter-chip-bar-renderer,
+html[data-yt-aid-hide-chips] ytd-rich-grid-renderer > #header,
+html[data-yt-aid-hide-chips] ytd-browse #frosted-glass,
+html[data-yt-aid-hide-chips] yt-related-chip-cloud-renderer {
+  display: none !important;
+}
+
+/* Nút Random không bị ẩn/chặn bởi "Ẩn thanh chủ đề" */
+html[data-yt-aid-hide-chips] #yt-aid-random-home,
+html[data-yt-aid-hide-chips] .yt-aid-random-control {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 2;
+}
+
+/* Thanh random nằm ngoài lưới video, chiếm cả hàng và căn giữa */
+#yt-aid-random-home {
+  display: flex !important;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 8px 0 !important;
+}

@@ -123,6 +123,11 @@ Chi tiết kỹ thuật:
 - Khi quảng cáo xuất hiện, khung hình được giấu ngay (nền đen) và tắt tiếng, nên gần như không thấy quảng cáo nháy lên.
 - Bật/tắt từng tính năng trong trang cài đặt. Không chặn request mạng nên chỉ xử lý được những gì hiện trên giao diện; có thể cần cập nhật khi YouTube đổi cấu trúc trang.
 
+### 12. Tắt Danh Sách Kết Hợp (Mix) & Thanh Công Cụ Gọn
+- **Tắt Mix:** bật trong Options hoặc menu Tools. Ẩn khung "Danh sách kết hợp" ở trang xem, thẻ Mix trong feed / đề xuất / tìm kiếm, và bỏ tham số `list=RD...` khỏi URL để video không tự phát nối tiếp Mix. Không áp dụng cho YouTube Music.
+- **Ẩn thanh chủ đề:** ẩn dải chip lọc (Tất cả, Âm nhạc, Trò chơi…) ở Trang chủ và dưới video đề xuất; bật/tắt trong Options hoặc menu Tools. Bộ lọc ở trang tìm kiếm vẫn giữ.
+- **Thanh công cụ gọn:** các nút phụ (Copy + Search, Clean Link, Download Thumbnail, Video ngẫu nhiên, Tools) chỉ còn icon, rê chuột để xem tên; Log chỉ hiện số bookmark.
+
 ---
 
 ## Cấu Trúc Dự Án
