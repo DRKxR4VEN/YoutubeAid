@@ -235,6 +235,7 @@
         changed('enableAutoPasteSearch') || changed('enableAutoPasteReplace')) {
       syncToolbarState();
     }
+  }
   // --- Main Initializer ---
   function initExtension() {
     createToastContainer();
