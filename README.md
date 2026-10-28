@@ -108,6 +108,12 @@ Chi tiết kỹ thuật:
 - Nút Bookmark trong popover thẻ video ở Trang chủ bật/tắt bookmark ở 0:00.
 - Dữ liệu lưu trong `chrome.storage.local` (khóa `bookmarks`), đồng bộ giữa các tab, tối đa 2000 bookmark. Bookmark của bản cũ (không có mốc thời gian) được giữ lại ở 0:00.
 
+### 11. Tự Động Bỏ Qua Quảng Cáo
+- **Auto skip:** khi video đang phát quảng cáo, tiện ích tự tắt tiếng, tăng tốc, bấm nút "Bỏ qua" (nếu có) và tua tới cuối quảng cáo, rồi khôi phục âm lượng/tốc độ. Hoạt động cả khi bạn chuyển sang tab khác, vì dùng MutationObserver và sự kiện của thẻ video (không bị trình duyệt tạm dừng như timer).
+- **Ẩn khung quảng cáo:** ẩn quảng cáo trong newfeed, banner đầu trang, quảng cáo cạnh video và banner đè lên video.
+- Khi quảng cáo xuất hiện, khung hình được giấu ngay (nền đen) và tắt tiếng, nên gần như không thấy quảng cáo nháy lên.
+- Bật/tắt từng tính năng trong trang cài đặt. Không chặn request mạng nên chỉ xử lý được những gì hiện trên giao diện; có thể cần cập nhật khi YouTube đổi cấu trúc trang.
+
 ---
 
 ## Cấu Trúc Dự Án

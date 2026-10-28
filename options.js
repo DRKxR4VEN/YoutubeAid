@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     enableAutoPasteSearch: true,
     enableAutoPasteReplace: true,
     enableThumbnailDownload: true,
+    enableAdSkip: true,
+    enableHideAds: true,
     shortcutKeys: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_KEYS } : { ...FALLBACK_SHORTCUT_KEYS },
     shortcutTaps: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_TAPS } : { ...FALLBACK_SHORTCUT_TAPS }
   };
@@ -41,7 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
     enableToasts: document.getElementById('enableToasts'),
     enableSelectionCopy: document.getElementById('enableSelectionCopy'),
     enableAutoPasteSearch: document.getElementById('enableAutoPasteSearch'),
-    enableAutoPasteReplace: document.getElementById('enableAutoPasteReplace')
+    enableAutoPasteReplace: document.getElementById('enableAutoPasteReplace'),
+    enableAdSkip: document.getElementById('enableAdSkip'),
+    enableHideAds: document.getElementById('enableHideAds')
   };
 
   const statusMsg = document.getElementById('statusMsg');

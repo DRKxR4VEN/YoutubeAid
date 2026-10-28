@@ -44,6 +44,8 @@
     enableAutoPasteSearch: true,
     enableAutoPasteReplace: true,
     enableThumbnailDownload: true,
+    enableAdSkip: true,
+    enableHideAds: true,
     audioBoost: 100,
     shortcutKeys: { ...DEFAULT_SHORTCUT_KEYS },
     shortcutTaps: { ...DEFAULT_SHORTCUT_TAPS }
@@ -216,6 +218,7 @@
 
     closeHomeFlyout();
     if (IS_MUSIC_SITE) return;
+    syncAdSkipSettings();
     syncAudioBoost();
     syncAudioBoostUi();
     syncToolbarState();
@@ -243,6 +246,7 @@
     initDropdownDismiss();
     initDOMObserver();
     initBookmarks();
+    initAdSkipper();
     applySettingUpdates();
   }
 
@@ -4086,6 +4090,235 @@
       injectGuideEntries();
       injectBookmarkShelf();
     }, 1500);
+  }
+
+  // ==========================================
+  // 10. AUTO SKIP ADS (tự bỏ qua quảng cáo video, chạy được cả khi ở tab khác)
+  // ==========================================
+  // Cách hoạt động: khi player có class "ad-showing", tắt tiếng, tăng tốc, bấm nút
+  // "Bỏ qua" nếu có và tua thẳng tới cuối quảng cáo. Không chặn request mạng.
+  // Trigger bằng MutationObserver + sự kiện của <video> (không bị trình duyệt tạm
+  // dừng khi tab ở nền, khác với timer) kèm một timer dự phòng.
+  const AD_SKIP_BUTTON_SELECTORS = [
+    '.ytp-skip-ad-button',
+    '.ytp-ad-skip-button',
+    '.ytp-ad-skip-button-modern',
+    '.ytp-ad-skip-button-container button',
+    '.ytp-skip-ad button'
+  ].join(', ');
+  const AD_OVERLAY_CLOSE_SELECTORS = '.ytp-ad-overlay-close-button, .ytp-ad-overlay-close-container';
+  const AD_MAX_SEEK_DURATION = 600; // chỉ tua tới cuối nếu "video" ngắn hơn 10 phút (tránh tua nhầm video chính)
+  const AD_SKIP_POLL_MS = 400;
+
+  let adSkipState = null; // { muted, rate } của video trước khi vào quảng cáo
+  let adSkipObservedPlayer = null;
+  let adSkipObservedVideo = null;
+  let adSkipObservedLayer = null;
+  let adSkipObservers = [];
+  let adSkipRaf = 0;
+
+  function getAdVideo(player) {
+    return player.querySelector('video.html5-main-video') || player.querySelector('video');
+  }
+
+  // Nhận diện quảng cáo bằng nhiều dấu hiệu:
+  //  - 'strong': player có class ad-showing/ad-interrupting hoặc getAdState() > 0
+  //  - 'weak'  : chỉ thấy giao diện quảng cáo (badge, nút bỏ qua...) có layout
+  function detectAdKind(player) {
+    if (AD_PLAYER_CLASSES.some((cls) => player.classList.contains(cls))) return 'strong';
+    try {
+      if (typeof player.getAdState === 'function' && Number(player.getAdState()) > 0) return 'strong';
+    } catch (e) { }
+    for (const el of player.querySelectorAll(AD_UI_SELECTORS)) {
+      if (!el.hidden && el.getClientRects().length) return 'weak';
+    }
+    return null;
+  }
+
+  // Giấu hình quảng cáo bằng thuộc tính trên <html> (CSS ở styles.css), không phụ thuộc tên class của player.
+  function setAdHidden(on) {
+    const root = document.documentElement;
+    if (on) {
+      if (!root.hasAttribute('data-yt-aid-ad')) root.setAttribute('data-yt-aid-ad', '1');
+    } else if (root.hasAttribute('data-yt-aid-ad')) {
+      root.removeAttribute('data-yt-aid-ad');
+    }
+  }
+
+  let adWeakSince = 0;
+  let adHideSince = 0;
+  let adAtEndSince = 0;
+  let adStuckAttempts = 0;
+  const AD_HIDE_MAX_MS = 15000;   // sau 15s mà quảng cáo vẫn chưa hết: ngừng giấu để bạn tự thao tác được
+  const AD_STUCK_AFTER_MS = 400;  // quảng cáo đứng ở cuối quá 0,4s thì coi là kẹt
+  const AD_STUCK_MAX_TRIES = 20;
+  const AD_WEAK_MAX_MS = 8000; // dấu hiệu "yếu" chỉ giấu tối đa 8 giây để không kẹt player đen
+
+  function restoreAfterAd(player) {
+    setAdHidden(false);
+    adWeakSince = 0;
+    adHideSince = 0;
+    adAtEndSince = 0;
+    adStuckAttempts = 0;
+    if (!adSkipState) return;
+    const state = adSkipState;
+    adSkipState = null;
+    const video = player ? getAdVideo(player) : null;
+    if (!video) return;
+    try {
+      video.muted = state.muted;
+      video.playbackRate = state.rate || 1;
+    } catch (e) { }
+  }
+
+  // Cho quảng cáo chạy tiếp (nếu đang dừng) để player nhận sự kiện "kết thúc" và chuyển sang video chính.
+  function nudgeAdPlayback(player, video) {
+    try {
+      const p = video.play();
+      if (p && typeof p.catch === 'function') p.catch(() => { });
+    } catch (e) { }
+    try {
+      if (typeof player.playVideo === 'function') player.playVideo();
+    } catch (e) { }
+    const bigPlay = player.querySelector('.ytp-large-play-button');
+    if (bigPlay && video.paused) {
+      try { bigPlay.click(); } catch (e) { }
+    }
+  }
+
+  function runAdSkip() {
+    adSkipRaf = 0;
+    if (IS_MUSIC_SITE) return;
+    const player = getPlayerElement();
+    if (!player) return;
+
+    if (!settings.enableAdSkip) {
+      restoreAfterAd(player);
+      return;
+    }
+
+    // Banner quảng cáo đè lên video: đóng lại.
+    player.querySelectorAll(AD_OVERLAY_CLOSE_SELECTORS).forEach((btn) => {
+      try { btn.click(); } catch (e) { }
+    });
+
+    const kind = detectAdKind(player);
+    if (!kind) {
+      restoreAfterAd(player);
+      return;
+    }
+
+    if (kind === 'weak') {
+      if (!adWeakSince) adWeakSince = Date.now();
+      if (Date.now() - adWeakSince > AD_WEAK_MAX_MS) {
+        restoreAfterAd(player);
+        return;
+      }
+    } else {
+      adWeakSince = 0;
+    }
+
+    // Giấu hình + tắt tiếng ngay, rồi mới xử lý bỏ qua.
+    if (!adHideSince) adHideSince = Date.now();
+    setAdHidden(Date.now() - adHideSince < AD_HIDE_MAX_MS);
+    const video = getAdVideo(player);
+    if (!video) return;
+
+    if (!adSkipState) adSkipState = { muted: video.muted, rate: video.playbackRate };
+    try {
+      video.muted = true;
+      video.playbackRate = 16;
+    } catch (e) { }
+
+    const skipBtn = player.querySelector(AD_SKIP_BUTTON_SELECTORS);
+    if (skipBtn) {
+      try { skipBtn.click(); } catch (e) { }
+    }
+
+    // Tua tới cuối quảng cáo (cả loại không có nút bỏ qua). Chỉ tua khi chắc chắn là quảng cáo.
+    const duration = video.duration;
+    if (kind === 'strong' && isFinite(duration) && duration > 0 && duration <= AD_MAX_SEEK_DURATION) {
+      const atEnd = video.ended || video.currentTime >= duration - 0.1;
+      if (!atEnd) {
+        adAtEndSince = 0;
+        // Video đang dừng thì tua tới cuối sẽ không phát sinh sự kiện kết thúc: cho chạy trước.
+        if (video.paused) nudgeAdPlayback(player, video);
+        try { video.currentTime = duration; } catch (e) { }
+      } else {
+        // Đã ở cuối nhưng quảng cáo vẫn còn hiện (kẹt): lùi nhẹ rồi cho chạy lại để kích hoạt kết thúc.
+        if (!adAtEndSince) adAtEndSince = Date.now();
+        if (Date.now() - adAtEndSince > AD_STUCK_AFTER_MS && adStuckAttempts < AD_STUCK_MAX_TRIES) {
+          adStuckAttempts++;
+          try { video.currentTime = Math.max(0, duration - 0.3); } catch (e) { }
+          nudgeAdPlayback(player, video);
+        }
+      }
+    }
+  }
+
+  function scheduleAdSkip() {
+    if (adSkipRaf) return;
+    // requestAnimationFrame không chạy ở tab nền, nên dùng microtask/timeout ngắn.
+    adSkipRaf = setTimeout(runAdSkip, 0);
+  }
+
+  function attachAdSkipObservers() {
+    const player = getPlayerElement();
+    if (!player) return;
+
+    if (player !== adSkipObservedPlayer || player.querySelector('.video-ads') !== adSkipObservedLayer) {
+      adSkipObservers.forEach((o) => o.disconnect());
+      adSkipObservers = [];
+      adSkipObservedPlayer = player;
+
+      // Class của player (ad-showing / ad-interrupting).
+      const classObserver = new MutationObserver(scheduleAdSkip);
+      classObserver.observe(player, { attributes: true, attributeFilter: ['class'] });
+      adSkipObservers.push(classObserver);
+
+      // Nút "Bỏ qua" và banner xuất hiện trong .video-ads.
+      const adsLayer = player.querySelector('.video-ads');
+      adSkipObservedLayer = adsLayer;
+      if (adsLayer) {
+        const layerObserver = new MutationObserver(scheduleAdSkip);
+        layerObserver.observe(adsLayer, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['class', 'style', 'hidden']
+        });
+        adSkipObservers.push(layerObserver);
+      }
+    }
+
+    const video = getAdVideo(player);
+    if (video && video !== adSkipObservedVideo) {
+      adSkipObservedVideo = video;
+      ['loadstart', 'emptied', 'loadedmetadata', 'durationchange', 'canplay', 'play', 'playing', 'pause', 'seeked', 'ended', 'timeupdate'].forEach((evt) => {
+        video.addEventListener(evt, scheduleAdSkip, { passive: true });
+      });
+    }
+  }
+
+  function syncAdSkipSettings() {
+    document.body.classList.toggle('yt-aid-hide-ads', !!settings.enableHideAds);
+    if (IS_MUSIC_SITE) return;
+    attachAdSkipObservers();
+    scheduleAdSkip();
+  }
+
+  function initAdSkipper() {
+    if (IS_MUSIC_SITE) return;
+    attachAdSkipObservers();
+    window.addEventListener('yt-navigate-finish', () => {
+      attachAdSkipObservers();
+      scheduleAdSkip();
+    });
+    // Dự phòng: gắn lại observer khi player bị YouTube thay mới và quét định kỳ.
+    setInterval(() => {
+      attachAdSkipObservers();
+      runAdSkip();
+    }, AD_SKIP_POLL_MS);
   }
 
 })();
