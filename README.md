@@ -117,7 +117,7 @@ Chi tiết kỹ thuật:
 - Video nhạc được xác nhận bằng danh mục **Music** của YouTube; Shorts được nhận diện từ loại thẻ/liên kết, không đoán bằng thời lượng. Bỏ qua video không phát được, livestream và video đang xem; hạn chế lặp video vừa chọn trong phiên trang hiện tại.
 - Bộ lọc được ghi nhớ qua tải lại trang và đồng bộ giữa các tab. Chỉ tải dữ liệu khi bấm nút, có thời hạn chờ và hủy khi chuyển trang/đổi bộ lọc; không thêm quyền hay dịch vụ bên ngoài, không thay đổi YouTube Music.
 
-### 11. Tự Động Bỏ Qua Quảng Cáo
+### 12. Tự Động Bỏ Qua Quảng Cáo
 - **Auto skip:** khi video đang phát quảng cáo, tiện ích tự tắt tiếng, tăng tốc, bấm nút "Bỏ qua" (nếu có) và tua tới cuối quảng cáo, rồi khôi phục âm lượng/tốc độ. Hoạt động cả khi bạn chuyển sang tab khác, vì dùng MutationObserver và sự kiện của thẻ video (không bị trình duyệt tạm dừng như timer).
 - **Ẩn khung quảng cáo:** ẩn quảng cáo trong newfeed, banner đầu trang, quảng cáo cạnh video và banner đè lên video.
 - Khi quảng cáo xuất hiện, khung hình được giấu ngay (nền đen) và tắt tiếng, nên gần như không thấy quảng cáo nháy lên.
