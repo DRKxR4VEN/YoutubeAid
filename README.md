@@ -17,7 +17,7 @@ Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nh
 - **Phím tắt điều hướng:** Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music — tùy chỉnh phím a–z và 2/3 lần bấm; hoạt động cả trên YouTube Music.
 - **Bookmark mốc thời gian:** lưu/đổi tên/xóa/yêu thích bookmark, log theo video, dải bookmark trên Trang chủ, trang lưu trữ ở thanh bên và hoàn tác 5 giây khi xóa.
 - **Video ngẫu nhiên:** chọn từ feed hoặc tìm kiếm công khai, lọc Video thường / Shorts / Video nhạc.
-- **Quảng cáo & Mix:** tự bỏ qua quảng cáo video, ẩn khung quảng cáo, tắt Mix và tự phát nối tiếp.
+- **Quảng cáo:** tự bỏ qua quảng cáo video và ẩn khung quảng cáo.
 - **Giao diện:** dashboard 2 cột tinh gọn, chuyển đổi **Tiếng Việt / English** đồng bộ toàn bộ UI; ẩn/hiện tên nút trên thanh công cụ.
 
 ---
@@ -144,8 +144,7 @@ Chi tiết kỹ thuật:
 - Khi quảng cáo xuất hiện, khung hình được giấu ngay (nền đen) và tắt tiếng, nên gần như không thấy quảng cáo nháy lên.
 - Bật/tắt từng tính năng trong trang cài đặt. Không chặn request mạng nên chỉ xử lý được những gì hiện trên giao diện; có thể cần cập nhật khi YouTube đổi cấu trúc trang.
 
-### 13. Tắt Danh Sách Kết Hợp (Mix) & Tên Nút Trên Thanh Công Cụ
-- **Tắt Mix:** bật trong Options hoặc menu Tools. Ẩn khung "Danh sách kết hợp" ở trang xem, thẻ Mix trong feed / đề xuất / tìm kiếm, và bỏ tham số `list=RD...` khỏi URL để video không tự phát nối tiếp Mix. Không áp dụng cho YouTube Music.
+### 13. Tên Nút Trên Thanh Công Cụ
 - **Tên nút:** thanh công cụ Watch page mặc định hiện đủ tên từng nút (Random video, Autoloop, Quick Search, Copy Link, Thumbnail, Bookmark, Tools…). Bấm **Hide Button Name** để ẩn toàn bộ tên, chỉ còn icon — nút này đổi thành **Show Button Name** và giữ nguyên tên của chính nó; bấm lại để hiện tên. Lựa chọn được ghi nhớ qua tải lại trang. Log bookmark chỉ hiện số khi có bookmark.
 - **Tên nút theo ngôn ngữ:** khi chọn Tiếng Việt, các tên trên hiển thị là **Video ngẫu nhiên, Tự động lặp, Tìm nhanh, Sao chép liên kết, Ảnh bìa, Công cụ, Ẩn/Hiện tên nút**; khi chọn English là **Random video, Autoloop, Quick Search, Copy Link, Thumbnail, Tools, Hide/Show Button Name**.
 
@@ -166,7 +165,7 @@ Chi tiết kỹ thuật:
 - **Audio Boost:** giữ trần **150%**, dùng gain + limiter để hạn chế rè khi tăng âm lượng.
 
 ### Feed không còn ô trống
-- Khi đang ẩn quảng cáo hoặc Mix, số thẻ giữa hai dải rộng (Shorts...) có thể bị lẻ làm hàng cuối trống bên phải. Tiện ích chỉ đổi thứ tự hiển thị (CSS `order`), dời dải rộng xuống sau khi hàng dở được lấp đủ; không xóa hay di chuyển video nào.
+- Khi đang ẩn quảng cáo, số thẻ giữa hai dải rộng (Shorts...) có thể bị lẻ làm hàng cuối trống bên phải. Tiện ích chỉ đổi thứ tự hiển thị (CSS `order`), dời dải rộng xuống sau khi hàng dở được lấp đủ; không xóa hay di chuyển video nào.
 
 ---
 

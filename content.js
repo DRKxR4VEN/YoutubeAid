@@ -92,7 +92,6 @@
     enableThumbnailDownload: true,
     enableAdSkip: true,
     enableHideAds: true,
-    enableHideMix: true,
     hideButtonNames: false,
     audioBoost: 100,
     randomVideo: { video: true, shorts: true, music: true, feed: true },
@@ -274,8 +273,7 @@
 
     if (!settings.enableShortcuts) resetKeyBuffer();
     if (changed('enableAdSkip') || changed('enableHideAds')) syncAdSkipSettings();
-    if (changed('enableHideMix')) syncMixState();
-    if (changed('enableHideAds') || changed('enableHideMix')) {
+    if (changed('enableHideAds')) {
       feedReflowSig = '';
       scheduleFeedReflow(0);
     }
@@ -344,7 +342,6 @@
       initDOMObserver,
       initBookmarks,
       initAdSkipper,
-      initMixHider,
       initFeedReflow
     ].forEach((fn) => {
       try { fn(); } catch (e) { console.error('[YoutubeAid] init lỗi:', fn.name, e); }
@@ -2766,17 +2763,6 @@
         </span>
       </label>
 
-      <label class="yt-aid-tools-item">
-        <span class="yt-aid-tools-text">
-          <span class="yt-aid-tools-name">Tắt Danh sách kết hợp (Mix)</span>
-          <span class="yt-aid-tools-desc">Ẩn Mix trong feed, video đề xuất và bỏ tự phát nối tiếp Mix</span>
-        </span>
-        <span class="yt-aid-switch">
-          <input type="checkbox" id="yt-aid-toggle-hide-mix"${checked(settings.enableHideMix)}>
-          <span class="yt-aid-switch-slider"></span>
-        </span>
-      </label>
-
       <div class="yt-aid-tools-item yt-aid-tools-boost">
         <span class="yt-aid-tools-text">
           <span class="yt-aid-tools-name">Tăng âm lượng video</span>
@@ -2797,11 +2783,6 @@
     });
     menu.querySelector('#yt-aid-toggle-auto-paste-replace').addEventListener('change', (e) => {
       updateSetting('enableAutoPasteReplace', e.target.checked);
-    });
-
-    menu.querySelector('#yt-aid-toggle-hide-mix').addEventListener('change', (e) => {
-      updateSetting('enableHideMix', e.target.checked);
-      syncMixState();
     });
 
     const boostRange = menu.querySelector('#yt-aid-audio-boost');
@@ -5277,60 +5258,7 @@
   }
 
   // ==========================================
-  // 11. TẮT DANH SÁCH KẾT HỢP (MIX)
-  // ==========================================
-  // Mix là playlist tự động của YouTube, có list=RD... trên URL. Khi bật:
-  //  - CSS ẩn khung Mix ở trang xem, thẻ Mix trong feed / đề xuất / tìm kiếm
-  //  - bỏ tham số của Mix khỏi URL để video không tự phát nối tiếp Mix
-  let mixStripKey = '';
-  let mixStripAt = 0;
-
-  function currentMixListId() {
-    try {
-      const url = new URL(window.location.href);
-      if (!url.pathname.startsWith('/watch')) return '';
-      const list = url.searchParams.get('list') || '';
-      return /^RD/.test(list) ? list : '';
-    } catch (e) {
-      return '';
-    }
-  }
-
-  function syncMixState() {
-    const root = document.documentElement;
-    if (IS_MUSIC_SITE || !settings.enableHideMix) {
-      root.removeAttribute('data-yt-aid-hide-mix');
-      root.removeAttribute('data-yt-aid-mix');
-      return;
-    }
-    root.setAttribute('data-yt-aid-hide-mix', '');
-    const list = currentMixListId();
-    if (!list) {
-      root.removeAttribute('data-yt-aid-mix');
-      return;
-    }
-    root.setAttribute('data-yt-aid-mix', '');
-
-    const id = videoIdFromUrl(window.location.href);
-    if (!id) return;
-    // Chỉ chuyển hướng 1 lần cho mỗi video để không bao giờ bị lặp.
-    const key = `${id}|${list}`;
-    if (key === mixStripKey && Date.now() - mixStripAt < 5000) return;
-    mixStripKey = key;
-    mixStripAt = Date.now();
-    const t = new URL(window.location.href).searchParams.get('t');
-    goToYoutubeTarget(`/watch?v=${id}${t ? `&t=${encodeURIComponent(t)}` : ''}`);
-  }
-
-  function initMixHider() {
-    if (IS_MUSIC_SITE) return;
-    window.addEventListener('yt-navigate-finish', syncMixState);
-    window.addEventListener('popstate', syncMixState);
-    syncMixState();
-  }
-
-  // ==========================================
-  // FEED GRID: lấp chỗ trống do ẩn quảng cáo / Mix
+  // FEED GRID: lấp chỗ trống do ẩn quảng cáo
   // ==========================================
   // Thẻ video và các dải rộng cả hàng (Shorts...) là con trực tiếp của một khung flex-wrap.
   // Ẩn bớt thẻ làm số thẻ giữa hai dải bị lẻ, hàng cuối trước dải còn trống bên phải.
@@ -5373,7 +5301,7 @@
       feedReflowObserver.observe(container, { childList: true });
     }
 
-    if (!settings.enableHideAds && !settings.enableHideMix) {
+    if (!settings.enableHideAds) {
       clearFeedReflow(container);
       feedReflowSig = '';
       return;
@@ -5428,7 +5356,7 @@
     window.addEventListener('yt-navigate-finish', () => scheduleFeedReflow(200));
     document.addEventListener('yt-page-data-updated', () => scheduleFeedReflow(200));
     document.addEventListener('visibilitychange', () => scheduleFeedReflow(0));
-    // Thẻ quảng cáo/Mix chỉ bị ẩn sau khi nội dung của chúng render xong, nên quét nhẹ định kỳ.
+    // Thẻ quảng cáo chỉ bị ẩn sau khi nội dung của chúng render xong, nên quét nhẹ định kỳ.
     setInterval(() => {
       if (document.visibilityState === 'hidden' || !isFeedPage()) return;
       scheduleFeedReflow(0);

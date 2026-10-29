@@ -1957,20 +1957,6 @@ html[data-yt-aid-ad] .html5-video-player {
   height: 15px;
 }
 
-/* ========================================================
-   13. ẨN DANH SÁCH KẾT HỢP (MIX) — bật bằng data-yt-aid-hide-mix trên <html>
-   ======================================================== */
-html[data-yt-aid-mix] ytd-playlist-panel-renderer,
-html[data-yt-aid-hide-mix] ytd-compact-radio-renderer,
-html[data-yt-aid-hide-mix] ytd-radio-renderer,
-html[data-yt-aid-hide-mix] ytd-grid-radio-renderer,
-html[data-yt-aid-hide-mix] ytd-rich-item-renderer:has(a[href*="list=RD"]),
-html[data-yt-aid-hide-mix] ytd-compact-video-renderer:has(a[href*="list=RD"]),
-html[data-yt-aid-hide-mix] ytd-video-renderer:has(a[href*="list=RD"]),
-html[data-yt-aid-hide-mix] yt-lockup-view-model:has(a[href*="list=RD"]) {
-  display: none !important;
-}
-
 
 /* Thanh random nằm ngoài lưới video, chiếm cả hàng và căn giữa */
 #yt-aid-random-home {

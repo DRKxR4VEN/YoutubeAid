@@ -54,8 +54,6 @@
     ['Tự bấm Bỏ qua và tua nhanh quảng cáo, kể cả ở tab khác.', 'Clicks Skip and fast-forwards ads, even in background tabs.'],
     ['Ẩn khung quảng cáo', 'Hide ad surfaces'],
     ['Ẩn quảng cáo ở feed, banner đầu trang và cạnh video.', 'Hides ads in the feed, the masthead banner and beside the video.'],
-    ['Tắt Danh sách kết hợp (Mix)', 'Disable Mix playlists'],
-    ['Ẩn Mix và bỏ tự phát nối tiếp các bài trong Mix.', 'Hides Mix and stops auto-playing the rest of a Mix.'],
     ['Phím tắt điều hướng', 'Navigation shortcuts'],
     ['Bấm 2–3 lần một phím để mở Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music.', 'Double or triple tap a key to open Shorts, Home, History, Playlists or YouTube Music.'],
     ['Bộ nút sao chép thông minh', 'Smart copy buttons'],
@@ -171,7 +169,6 @@
     ['Bôi xanh đoạn text để sao chép ngay', 'Highlight any text to copy it instantly'],
     ['Click ô tìm kiếm để dán nội dung bạn vừa copy', 'Click the search box to paste what you just copied'],
     ['Copy nội dung mới sẽ thay nội dung cũ; tắt để nối thêm vào sau', 'A new copy replaces the old text; turn off to append after it'],
-    ['Ẩn Mix trong feed, video đề xuất và bỏ tự phát nối tiếp Mix', 'Hide Mix in the feed and related videos, and stop auto-playing a Mix'],
     ['Tăng âm lượng video', 'Boost video volume'],
     ['Vượt 100% của YouTube, tối đa 150%', 'Above YouTube 100%, up to 150%'],
 
