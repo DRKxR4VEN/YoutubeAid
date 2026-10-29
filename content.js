@@ -275,6 +275,10 @@
     if (!settings.enableShortcuts) resetKeyBuffer();
     if (changed('enableAdSkip') || changed('enableHideAds')) syncAdSkipSettings();
     if (changed('enableHideMix')) syncMixState();
+    if (changed('enableHideAds') || changed('enableHideMix')) {
+      feedReflowSig = '';
+      scheduleFeedReflow(0);
+    }
     if (changed('hideButtonNames')) syncButtonNamesUi();
     if (changed('enableLoop')) ensureVideoLoop();
     if (changed('enableCopyButtons')) {
@@ -340,7 +344,8 @@
       initDOMObserver,
       initBookmarks,
       initAdSkipper,
-      initMixHider
+      initMixHider,
+      initFeedReflow
     ].forEach((fn) => {
       try { fn(); } catch (e) { console.error('[YoutubeAid] init lỗi:', fn.name, e); }
     });
@@ -5322,6 +5327,113 @@
     window.addEventListener('yt-navigate-finish', syncMixState);
     window.addEventListener('popstate', syncMixState);
     syncMixState();
+  }
+
+  // ==========================================
+  // FEED GRID: lấp chỗ trống do ẩn quảng cáo / Mix
+  // ==========================================
+  // Thẻ video và các dải rộng cả hàng (Shorts...) là con trực tiếp của một khung flex-wrap.
+  // Ẩn bớt thẻ làm số thẻ giữa hai dải bị lẻ, hàng cuối trước dải còn trống bên phải.
+  // Ta chỉ đổi thứ tự hiển thị bằng CSS "order" (không di chuyển phần tử trong DOM): dải rộng
+  // được dời xuống sau khi hàng đang dở được lấp đủ, nên mọi video vẫn giữ nguyên.
+  const FEED_ORDER_BASE = -1000000; // thẻ mới chưa xếp (order 0) tự nằm cuối, đúng chỗ của chúng
+  let feedReflowTimer = 0;
+  let feedReflowSig = '';
+  let feedReflowContainer = null;
+  let feedReflowObserver = null;
+
+  function feedGridContents() {
+    return document.querySelector('ytd-browse:not([hidden]) ytd-rich-grid-renderer > #contents');
+  }
+
+  function isFeedPage() {
+    const path = window.location.pathname;
+    return path === '/' || path.startsWith('/feed/');
+  }
+
+  function clearFeedReflow(container) {
+    if (!container) return;
+    container.querySelectorAll(':scope > [data-yt-aid-order]').forEach((el) => {
+      el.style.removeProperty('order');
+      el.removeAttribute('data-yt-aid-order');
+    });
+  }
+
+  function reflowFeedGrid() {
+    feedReflowTimer = 0;
+    if (IS_MUSIC_SITE || !isFeedPage() || document.visibilityState === 'hidden') return;
+    const container = feedGridContents();
+    if (!container) return;
+
+    if (container !== feedReflowContainer) {
+      if (feedReflowObserver) feedReflowObserver.disconnect();
+      feedReflowContainer = container;
+      feedReflowSig = '';
+      feedReflowObserver = new MutationObserver(() => scheduleFeedReflow(60));
+      feedReflowObserver.observe(container, { childList: true });
+    }
+
+    if (!settings.enableHideAds && !settings.enableHideMix) {
+      clearFeedReflow(container);
+      feedReflowSig = '';
+      return;
+    }
+
+    const children = [...container.children];
+    const firstItem = children.find((c) => c.tagName === 'YTD-RICH-ITEM-RENDERER' && c.getAttribute('items-per-row'));
+    const perRow = Math.max(1, parseInt(firstItem && firstItem.getAttribute('items-per-row'), 10) || 1);
+    const visible = children.map((c) => getComputedStyle(c).display !== 'none');
+    const sig = `${perRow}|${visible.map((v) => (v ? 1 : 0)).join('')}`;
+    if (sig === feedReflowSig) return;
+    feedReflowSig = sig;
+
+    const sequence = [];
+    const pending = []; // dải rộng đang chờ hàng dở được lấp đủ
+    let rowCount = 0;
+    children.forEach((child, i) => {
+      if (!visible[i]) return;
+      if (child.tagName === 'YTD-RICH-ITEM-RENDERER') {
+        sequence.push(child);
+        rowCount = (rowCount + 1) % perRow;
+        if (rowCount === 0 && pending.length) sequence.push(...pending.splice(0));
+      } else if (rowCount === 0) {
+        sequence.push(child);
+      } else {
+        pending.push(child);
+      }
+    });
+    sequence.push(...pending);
+
+    const orderOf = new Map(sequence.map((el, i) => [el, String(FEED_ORDER_BASE + i)]));
+    children.forEach((child) => {
+      const order = orderOf.get(child);
+      if (order !== undefined) {
+        if (child.style.order !== order) child.style.order = order;
+        child.setAttribute('data-yt-aid-order', '');
+      } else if (child.hasAttribute('data-yt-aid-order')) {
+        child.style.removeProperty('order');
+        child.removeAttribute('data-yt-aid-order');
+      }
+    });
+  }
+
+  function scheduleFeedReflow(delay = 80) {
+    if (feedReflowTimer) return;
+    feedReflowTimer = setTimeout(reflowFeedGrid, delay);
+  }
+
+  function initFeedReflow() {
+    if (IS_MUSIC_SITE) return;
+    window.addEventListener('resize', () => scheduleFeedReflow(150));
+    window.addEventListener('yt-navigate-finish', () => scheduleFeedReflow(200));
+    document.addEventListener('yt-page-data-updated', () => scheduleFeedReflow(200));
+    document.addEventListener('visibilitychange', () => scheduleFeedReflow(0));
+    // Thẻ quảng cáo/Mix chỉ bị ẩn sau khi nội dung của chúng render xong, nên quét nhẹ định kỳ.
+    setInterval(() => {
+      if (document.visibilityState === 'hidden' || !isFeedPage()) return;
+      scheduleFeedReflow(0);
+    }, 1200);
+    scheduleFeedReflow(300);
   }
 
 })();

@@ -165,6 +165,9 @@ Chi tiết kỹ thuật:
 - **Bookmark chỉ theo mốc thời gian:** bỏ nút bookmark trên thẻ video Trang chủ/feed và bỏ khả năng bookmark nguyên video ở 0:00; vẫn giữ bookmark thời điểm trong video, log, yêu thích, dải bookmark và trang lưu trữ.
 - **Audio Boost:** giữ trần **150%**, dùng gain + limiter để hạn chế rè khi tăng âm lượng.
 
+### Feed không còn ô trống
+- Khi đang ẩn quảng cáo hoặc Mix, số thẻ giữa hai dải rộng (Shorts...) có thể bị lẻ làm hàng cuối trống bên phải. Tiện ích chỉ đổi thứ tự hiển thị (CSS `order`), dời dải rộng xuống sau khi hàng dở được lấp đủ; không xóa hay di chuyển video nào.
+
 ---
 
 ## Cấu Trúc Dự Án
