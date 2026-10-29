@@ -124,6 +124,30 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   word-break: break-word;
 }
 
+.yt-aid-toast-action {
+  margin-left: 4px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.yt-aid-toast-action:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.yt-aid-toast-action:focus-visible {
+  outline: 2px solid var(--yta-brand-blue);
+  outline-offset: 2px;
+}
+
 /* ========================================================
    3. WATCH PAGE TOOLBAR
    ======================================================== */

@@ -2,7 +2,7 @@
 
 Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm (thay thế hoặc nối thêm nội dung cũ), clean link không query tracking, tải ảnh bìa thumbnail/avatar/banner có cắt ảnh tuỳ ý, hệ thống phím tắt điều hướng tức thì (SPA) có thể tùy chỉnh số lần bấm và tự động lặp lại video (Auto Loop, không lặp quảng cáo). Phím tắt cũng hoạt động trên **music.youtube.com**. Toàn bộ giao diện có thể chuyển đổi giữa **Tiếng Việt** và **English**.
 
-**Phiên bản hiện tại:** 1.15.0
+**Phiên bản hiện tại:** 1.16.0
 
 ---
 
@@ -15,7 +15,7 @@ Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nh
 - **Audio Boost:** tăng âm lượng video **100–150%** bằng Web Audio (gain + limiter), tự áp dụng lại khi chuyển video.
 - **Auto Loop:** tự lặp video, không lặp quảng cáo, không nhảy sang video kế tiếp trong playlist.
 - **Phím tắt điều hướng:** Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music — tùy chỉnh phím a–z và 2/3 lần bấm; hoạt động cả trên YouTube Music.
-- **Bookmark mốc thời gian:** lưu/đổi tên/xóa/yêu thích bookmark, log theo video, dải bookmark trên Trang chủ và trang lưu trữ ở thanh bên.
+- **Bookmark mốc thời gian:** lưu/đổi tên/xóa/yêu thích bookmark, log theo video, dải bookmark trên Trang chủ, trang lưu trữ ở thanh bên và hoàn tác 5 giây khi xóa.
 - **Video ngẫu nhiên:** chọn từ feed hoặc tìm kiếm công khai, lọc Video thường / Shorts / Video nhạc.
 - **Quảng cáo & Mix:** tự bỏ qua quảng cáo video, ẩn khung quảng cáo, tắt Mix và tự phát nối tiếp.
 - **Giao diện:** dashboard 2 cột tinh gọn, chuyển đổi **Tiếng Việt / English** đồng bộ toàn bộ UI; ẩn/hiện tên nút trên thanh công cụ.
@@ -127,7 +127,7 @@ Chi tiết kỹ thuật:
 - Mỗi bookmark có thể được **yêu thích** ngay bằng biểu tượng trái tim mặc định. **Chỉ sau khi yêu thích** mới hiện nút đổi giữa 7 biểu tượng: âm nhạc, học tập, trang phục, du lịch, ăn uống, đoạn phim hay và trái tim; bỏ yêu thích sẽ ẩn nút đổi biểu tượng.
 - **Dải Bookmark trên Trang chủ:** các bookmark mới nhất hiện ở đầu newfeed (tối đa 12, tự trải thành lưới theo bề rộng). Nút **Ẩn/Hiện** thu gọn video và ghi nhớ trạng thái sau khi tải lại trang.
 - **Mục Bookmark ở thanh bên trái** (mở rộng và thu gọn): trang lưu trữ đầy đủ có ô tìm kiếm, đổi tên / xóa từng bookmark và nút **Xóa tất cả**. Đóng bằng Esc, nút × hoặc khi chuyển trang.
-- Mọi thao tác xóa bookmark dùng hộp xác nhận riêng của tiện ích; không gọi hộp thoại mặc định của YouTube/trình duyệt.
+- **Xóa bookmark:** xóa từng bookmark diễn ra ngay, không hỏi xác nhận; chỉ **xóa tất cả** mới hiện hộp xác nhận riêng của tiện ích (không dùng hộp thoại của YouTube/trình duyệt). Cả hai thao tác đều có toast **Hoàn tác** trong **5 giây** để khôi phục bookmark về đúng vị trí cũ.
 - Chỉ bookmark được **mốc thời gian trong video** (qua nút Bookmark trên thanh công cụ Watch page). Thẻ video ở Trang chủ/feed không còn nút bookmark và không thể bookmark nguyên một video ở 0:00.
 - Dữ liệu lưu trong `chrome.storage.local` (khóa `bookmarks`), đồng bộ giữa các tab, tối đa 2000 bookmark. Bookmark của bản cũ được giữ lại và không bắt buộc có biểu tượng yêu thích.
 
@@ -152,6 +152,10 @@ Chi tiết kỹ thuật:
 ---
 
 ## Thay Đổi Gần Đây
+
+### v1.16.0
+- **Hoàn tác khi xóa bookmark:** xóa một bookmark không còn hộp xác nhận; xóa tất cả vẫn xác nhận. Cả hai hiện toast **Hoàn tác** 5 giây, khôi phục bookmark đúng thứ tự cũ.
+- **Tối ưu hiệu năng toàn tiện ích:** bỏ đo đạc layout lặp lại mỗi 1,5 giây ở mục Bookmark thanh bên (chỉ căn lại khi cần và khi đổi kích thước cửa sổ), so sánh bookmark đồng bộ bằng vòng lặp thay vì `JSON.stringify`, gộp các lần vẽ lại bookmark khi chuyển trang, và ngừng quét nhận diện quảng cáo trên mỗi sự kiện `timeupdate`/`progress` khi video đang phát bình thường.
 
 ### v1.15.0
 - **Song ngữ Việt / Anh:** thêm `i18n.js` và nút chuyển ngôn ngữ trong dashboard; dịch toàn bộ giao diện (dashboard, toolbar, menu Tools, toast, bookmark, hộp thoại cắt ảnh, tooltip) và áp dụng ngay cho mọi tab đang mở.

@@ -285,7 +285,6 @@
       document.body.classList.remove('yt-aid-hide-clean-link', 'yt-aid-hide-thumb-btn');
       syncAudioBoost();
       syncAudioBoostUi();
-      injectAllAreas();
     }
     if (changed('enableLoop') || changed('enableSelectionCopy') ||
         changed('enableAutoPasteSearch') || changed('enableAutoPasteReplace')) {
@@ -361,8 +360,9 @@
     document.body.appendChild(toastContainer);
   }
 
-  function showToast(message, type = 'info', duration = 2400) {
-    if (!settings.enableToasts) return;
+  function showToast(message, type = 'info', duration = 2400, action = null) {
+    // An action toast (Undo) must appear even when regular toasts are off.
+    if (!settings.enableToasts && !action) return;
     message = T(message);
     if (!toastContainer) createToastContainer();
 
@@ -383,6 +383,32 @@
       <div class="yt-aid-toast-message">${escapeHtml(message)}</div>
     `;
 
+    let hideTimer = 0;
+    let removeTimer = 0;
+    let dismissed = false;
+    function dismiss() {
+      if (dismissed) return;
+      dismissed = true;
+      clearTimeout(hideTimer);
+      clearTimeout(removeTimer);
+      if (!toast.isConnected) return;
+      toast.classList.remove('yt-aid-toast-show');
+      toast.classList.add('yt-aid-toast-hide');
+      removeTimer = setTimeout(() => toast.remove(), 250);
+    }
+
+    if (action) {
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = 'yt-aid-toast-action';
+      actionBtn.textContent = T(action.label);
+      actionBtn.addEventListener('click', () => {
+        dismiss();
+        try { action.onClick(); } catch (e) { console.error('[YoutubeAid] undo lỗi:', e); }
+      });
+      toast.appendChild(actionBtn);
+    }
+
     // Keep the stack readable when actions fire in quick succession
     while (toastContainer.children.length >= 4) {
       toastContainer.removeChild(toastContainer.firstElementChild);
@@ -391,16 +417,10 @@
     toastContainer.appendChild(toast);
 
     requestAnimationFrame(() => {
-      toast.classList.add('yt-aid-toast-show');
+      if (!dismissed) toast.classList.add('yt-aid-toast-show');
     });
 
-    setTimeout(() => {
-      toast.classList.remove('yt-aid-toast-show');
-      toast.classList.add('yt-aid-toast-hide');
-      setTimeout(() => {
-        if (toast.parentNode) toast.parentNode.removeChild(toast);
-      }, 250);
-    }, duration);
+    hideTimer = setTimeout(dismiss, duration);
   }
 
   function escapeHtml(str) {
@@ -2344,8 +2364,10 @@
         if (card && removedNodes.length) {
           pendingCardRoots.add(card);
           relevant = true;
-        } else if ([...removedNodes].some(containsAidUi)) {
-          relevant = true;
+        } else {
+          for (const node of removedNodes) {
+            if (containsAidUi(node)) { relevant = true; break; }
+          }
         }
       }
       if (relevant) scheduleInjection();
@@ -3270,7 +3292,6 @@
     if (!wasOpen) panel.classList.remove('yt-aid-flyout-open');
     positionHomeFlyout();
     panel.classList.add('yt-aid-flyout-open');
-    syncBookmarkButtons();
     attachHomeFlyoutListeners();
   }
 
@@ -3818,6 +3839,20 @@
       .sort((a, b) => a.time - b.time || a.addedAt - b.addedAt);
   }
 
+  // Cheap exact comparison used to ignore our own storage write echoes.
+  function sameBookmarks(a, b) {
+    if (a === b) return true;
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      const x = a[i];
+      const y = b[i];
+      if (x.uid !== y.uid || x.id !== y.id || x.name !== y.name ||
+          x.favoriteIcon !== y.favoriteIcon || x.time !== y.time ||
+          x.title !== y.title || x.channel !== y.channel) return false;
+    }
+    return true;
+  }
+
   function saveBookmarks() {
     safeSetStorage({ [BOOKMARKS_KEY]: bookmarks });
   }
@@ -3969,20 +4004,52 @@
     });
   }
 
-  async function removeBookmark(uid) {
-    const bm = bookmarks.find((item) => item.uid === uid);
-    if (!bm) return;
-    const label = bm.name || bm.title || bm.id;
-    const confirmed = await confirmBookmarkAction(
-      T('Xóa bookmark?'),
-      `${previewText(label, 80)} · ${formatVideoTime(bm.time)}`,
-      T('Xóa bookmark')
-    );
-    if (!confirmed || !bookmarks.some((item) => item.uid === uid)) return;
+  const BOOKMARK_UNDO_MS = 5000;
+
+  // Removed entries remember their position so Undo restores the exact order.
+  function snapshotBookmarks(predicate) {
+    const entries = [];
+    bookmarks.forEach((item, index) => {
+      if (!predicate || predicate(item)) entries.push({ item, index });
+    });
+    return entries;
+  }
+
+  function restoreBookmarks(entries) {
+    if (!entries || !entries.length) return 0;
+    const existing = new Set(bookmarks.map((b) => b.uid));
+    const pending = entries
+      .filter(({ item }) => item && !existing.has(item.uid))
+      .sort((a, b) => a.index - b.index);
+    if (!pending.length) return 0;
+    const merged = bookmarks.slice();
+    for (const { item, index } of pending) {
+      merged.splice(Math.min(index, merged.length), 0, item);
+    }
+    bookmarks = merged.slice(0, BOOKMARK_LIMIT);
+    saveBookmarks();
+    syncBookmarkUi();
+    injectBookmarkShelf();
+    return pending.length;
+  }
+
+  function showUndoToast(message, entries, restoredMessage) {
+    showToast(message, 'info', BOOKMARK_UNDO_MS, {
+      label: 'Hoàn tác',
+      onClick: () => {
+        if (restoreBookmarks(entries)) showToast(restoredMessage, 'success');
+      }
+    });
+  }
+
+  function removeBookmark(uid) {
+    const index = bookmarks.findIndex((item) => item.uid === uid);
+    if (index < 0) return;
+    const bm = bookmarks[index];
     bookmarks = bookmarks.filter((item) => item.uid !== uid);
     saveBookmarks();
     syncBookmarkUi();
-    showToast('Đã xóa bookmark', 'info');
+    showUndoToast('Đã xóa bookmark', [{ item: bm, index }], 'Đã khôi phục bookmark');
   }
 
   function renameBookmark(uid, rawName) {
@@ -4000,42 +4067,49 @@
   }
 
   async function removeVideoBookmarks(id) {
-    const list = bookmarks.filter((b) => b.id === id);
-    if (!list.length) return;
-    const targetUids = new Set(list.map((b) => b.uid));
-    const title = list.find((b) => b.title)?.title || id;
+    const entries = snapshotBookmarks((b) => b.id === id);
+    if (!entries.length) return;
+    const title = entries.find(({ item }) => item.title)?.item.title || id;
     const confirmed = await confirmBookmarkAction(
-      T('Xóa {0} bookmark?', [list.length]),
+      T('Xóa {0} bookmark?', [entries.length]),
       previewText(title, 80),
       T('Xóa tất cả mốc')
     );
     if (!confirmed) return;
-    const before = bookmarks.length;
+    // Drop only entries still present: another tab may have deleted some.
+    const liveUids = new Set(bookmarks.map((b) => b.uid));
+    const removed = entries.filter(({ item }) => liveUids.has(item.uid));
+    if (!removed.length) return;
+    const targetUids = new Set(removed.map(({ item }) => item.uid));
     bookmarks = bookmarks.filter((b) => !targetUids.has(b.uid));
-    const count = before - bookmarks.length;
-    if (!count) return;
     saveBookmarks();
     syncBookmarkUi();
-    showToast(T('Đã xóa {0} bookmark của video', [count]), 'info');
+    showUndoToast(
+      T('Đã xóa {0} bookmark của video', [removed.length]),
+      removed,
+      T('Đã khôi phục {0} bookmark', [removed.length])
+    );
   }
 
   async function clearAllBookmarks() {
     if (!bookmarks.length) return;
-    const targetUids = new Set(bookmarks.map((b) => b.uid));
-    const count = targetUids.size;
+    const count = bookmarks.length;
     const confirmed = await confirmBookmarkAction(
       T('Xóa tất cả bookmark?'),
-      T('{0} bookmark sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.', [count]),
+      T('{0} bookmark sẽ bị xóa. Bạn có 5 giây để hoàn tác.', [count]),
       T('Xóa tất cả')
     );
     if (!confirmed) return;
-    const before = bookmarks.length;
-    bookmarks = bookmarks.filter((b) => !targetUids.has(b.uid));
-    const removed = before - bookmarks.length;
-    if (!removed) return;
+    const removed = snapshotBookmarks();
+    if (!removed.length) return;
+    bookmarks = [];
     saveBookmarks();
     syncBookmarkUi();
-    showToast(T('Đã xóa {0} bookmark', [removed]), 'info');
+    showUndoToast(
+      T('Đã xóa {0} bookmark', [removed.length]),
+      removed,
+      T('Đã khôi phục {0} bookmark', [removed.length])
+    );
   }
 
   function loadBookmarks(done) {
@@ -4626,12 +4700,13 @@
   }
 
   // Sao chép hình học của mục gốc (Trang chủ, Shorts…) để mục Bookmark thẳng hàng.
+  // Trả về false khi mục gốc chưa có kích thước (guide render muộn) để lần sau thử lại.
   function alignGuideEntry(entry, items) {
     const nat = items.querySelector('ytd-guide-entry-renderer a#endpoint, ytd-guide-entry-renderer #endpoint');
-    if (!nat) return;
+    if (!nat) return false;
     const natRect = nat.getBoundingClientRect();
     const itemsRect = items.getBoundingClientRect();
-    if (!natRect.width || !natRect.height) return;
+    if (!natRect.width || !natRect.height) return false;
 
     const iconEl = nat.querySelector('yt-icon, yt-icon-shape, .guide-icon');
     const textEl = nat.querySelector('yt-formatted-string, .title');
@@ -4658,6 +4733,8 @@
     for (const [key, value] of Object.entries(style)) {
       if (entry.style[key] !== value) entry.style[key] = value;
     }
+    entry.dataset.aligned = '1';
+    return true;
   }
 
   function injectGuideEntries(align = false) {
@@ -4676,7 +4753,9 @@
       align = true;
     }
     const guideEntry = items && items.querySelector('#yt-aid-guide-entry');
-    if (guideEntry && align) alignGuideEntry(guideEntry, items);
+    // Layout reads only until the first successful alignment; the marker is
+    // cleared on resize so the entry follows a changed sidebar width.
+    if (guideEntry && align && !guideEntry.dataset.aligned) alignGuideEntry(guideEntry, items);
 
     const mini = document.querySelector('ytd-mini-guide-renderer #items');
     if (mini && !mini.querySelector('#yt-aid-mini-entry')) {
@@ -4886,20 +4965,17 @@
   }
 
   function initBookmarks() {
-    loadBookmarks(() => {
-      injectBookmarkUi();
-      syncBookmarkUi();
-    });
+    loadBookmarks(() => injectBookmarkUi());
 
     try {
       chrome.storage.onChanged.addListener((changes, areaName) => {
         if (areaName !== 'local') return;
         if (changes[BOOKMARKS_KEY]) {
           const next = sanitizeBookmarks(changes[BOOKMARKS_KEY].newValue);
-          if (JSON.stringify(next) !== JSON.stringify(bookmarks)) {
+          if (!sameBookmarks(next, bookmarks)) {
             bookmarks = next;
-            injectBookmarkShelf();
             syncBookmarkUi();
+            injectBookmarkShelf();
           }
         }
         if (changes[BOOKMARK_SHELF_COLLAPSED_KEY]) {
@@ -4917,12 +4993,16 @@
       closeBookmarkConfirm(false);
       closeFavoritePicker();
     });
-    window.addEventListener('yt-navigate-finish', () => {
-      closeBookmarkPage();
-      injectBookmarkUi();
-    });
+    window.addEventListener('yt-navigate-finish', closeBookmarkPage);
 
-    window.addEventListener('resize', () => injectGuideEntries(true));
+    let guideAlignTimer = 0;
+    window.addEventListener('resize', () => {
+      clearTimeout(guideAlignTimer);
+      guideAlignTimer = setTimeout(() => {
+        document.querySelectorAll('#yt-aid-guide-entry').forEach((el) => delete el.dataset.aligned);
+        injectGuideEntries(true);
+      }, 120);
+    }, { passive: true });
     // The native guide is outside the main observer and can render late.
     setInterval(() => {
       if (document.visibilityState === 'hidden') return;
@@ -5114,6 +5194,8 @@
   }
 
   function scheduleAdSkip(delay) {
+    // Nothing to detect while the feature is off; observers may still fire.
+    if (!settings.enableAdSkip) return;
     if (adSkipRaf) return;
     if (typeof delay === 'number' && delay > 0) {
       adSkipRaf = setTimeout(runAdSkip, delay);
@@ -5155,7 +5237,7 @@
     const video = getAdVideo(player);
     if (video && video !== adSkipObservedVideo) {
       adSkipObservedVideo = video;
-      ['loadstart', 'emptied', 'loadedmetadata', 'durationchange', 'canplay', 'play', 'playing', 'pause', 'seeked', 'ended', 'timeupdate', 'waiting', 'progress', 'stalled'].forEach((evt) => {
+      ['loadstart', 'emptied', 'loadedmetadata', 'durationchange', 'canplay', 'play', 'playing', 'pause', 'seeked', 'ended', 'waiting', 'stalled'].forEach((evt) => {
         video.addEventListener(evt, () => scheduleAdSkip(), { passive: true });
       });
     }
@@ -5164,6 +5246,12 @@
   function syncAdSkipSettings() {
     document.body.classList.toggle('yt-aid-hide-ads', !!settings.enableHideAds);
     if (IS_MUSIC_SITE) return;
+    if (!settings.enableAdSkip) {
+      const player = getPlayerElement();
+      if (player) restoreAfterAd(player);
+      else setAdHidden(false);
+      return;
+    }
     attachAdSkipObservers();
     scheduleAdSkip();
   }
@@ -5177,6 +5265,7 @@
     });
     // Dự phòng: gắn lại observer khi player bị YouTube thay mới và quét định kỳ.
     setInterval(() => {
+      if (!settings.enableAdSkip) return;
       attachAdSkipObservers();
       runAdSkip();
     }, AD_SKIP_POLL_MS);
