@@ -33,9 +33,9 @@
       color: var(--yt-text-primary);
       font-family: var(--yt-font);
       line-height: 1.45;
-      padding: 20px 24px;
-      min-width: 480px;
-      max-width: 720px;
+      padding: 18px 22px;
+      min-width: 560px;
+      max-width: 860px;
       margin: 0 auto;
       user-select: none;
     }
@@ -45,9 +45,66 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-bottom: 16px;
-      margin-bottom: 22px;
+      gap: 16px;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
       border-bottom: 1px solid var(--yt-border);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    /* Language switcher */
+    .lang-switch {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--yt-border);
+      border-radius: var(--yt-radius-pill);
+    }
+
+    .lang-btn {
+      padding: 5px 12px;
+      border: none;
+      border-radius: var(--yt-radius-pill);
+      background: transparent;
+      color: var(--yt-text-secondary);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .lang-btn:hover {
+      color: var(--yt-text-primary);
+    }
+
+    .lang-btn.is-active {
+      background: var(--yt-red);
+      color: #ffffff;
+    }
+
+    .lang-label {
+      font-size: 11.5px;
+      color: var(--yt-text-muted);
+    }
+
+    @media (max-width: 660px) {
+      .lang-label {
+        display: none;
+      }
+    }
+
+    .lang-btn:focus-visible {
+      outline: 2px solid var(--yt-red);
+      outline-offset: 2px;
     }
 
     .brand-wrap {
@@ -79,16 +136,16 @@
 
     /* Section */
     section {
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     .section-title {
-      font-size: 13.5px;
+      font-size: 12.5px;
       font-weight: 600;
       color: var(--yt-text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -102,20 +159,28 @@
     }
 
     /* Toggle Cards */
+    /* Main features: two compact columns */
     .card-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    @media (max-width: 660px) {
+      .card-list {
+        grid-template-columns: 1fr;
+      }
     }
 
     .toggle-card {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
       background: var(--yt-surface);
       border: 1px solid var(--yt-border);
       border-radius: var(--yt-radius-md);
-      padding: 12px 16px;
+      padding: 10px 12px;
       transition: background-color 0.15s ease, border-color 0.15s ease;
       cursor: pointer;
     }
@@ -128,14 +193,15 @@
     .toggle-main {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
       flex: 1;
-      padding-right: 16px;
+      min-width: 0;
+      padding-right: 4px;
     }
 
     .toggle-icon-wrap {
-      width: 32px;
-      height: 32px;
+      width: 28px;
+      height: 28px;
       border-radius: var(--yt-radius-sm);
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.06);
@@ -151,8 +217,8 @@
     }
 
     .toggle-icon-wrap img {
-      width: 18px;
-      height: 18px;
+      width: 16px;
+      height: 16px;
       opacity: 0.95;
       display: block;
     }
@@ -164,23 +230,23 @@
     }
 
     .toggle-title {
-      font-size: 13.5px;
+      font-size: 12.5px;
       font-weight: 500;
       color: var(--yt-text-primary);
     }
 
     .toggle-desc {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--yt-text-secondary);
-      line-height: 1.4;
+      line-height: 1.35;
     }
 
     /* Switch - Red when active */
     .switch {
       position: relative;
       display: inline-block;
-      width: 40px;
-      height: 22px;
+      width: 36px;
+      height: 20px;
       flex-shrink: 0;
     }
 
@@ -202,8 +268,8 @@
     .slider:before {
       position: absolute;
       content: "";
-      height: 16px;
-      width: 16px;
+      height: 14px;
+      width: 14px;
       left: 3px;
       bottom: 3px;
       background-color: #ffffff;
@@ -217,7 +283,7 @@
     }
 
     input:checked + .slider:before {
-      transform: translateX(18px);
+      transform: translateX(16px);
     }
 
     /* Shortcut Table */
@@ -569,7 +635,14 @@
       <img src="icons/youtube_aid.png" alt="YouTube Aid Logo" class="brand-logo-img" />
       <div class="brand-text">
         <h1>YouTube Aid</h1>
-        <p>Bảng điều khiển & Phím tắt nhanh</p>
+        <p data-i18n="Bảng điều khiển &amp; Phím tắt nhanh">Bảng điều khiển &amp; Phím tắt nhanh</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="lang-label" data-i18n="Ngôn ngữ">Ngôn ngữ</span>
+      <div class="lang-switch" role="group">
+        <button type="button" class="lang-btn" data-lang="vi" lang="vi">Tiếng Việt</button>
+        <button type="button" class="lang-btn" data-lang="en" lang="en">English</button>
       </div>
     </div>
   </header>
@@ -578,7 +651,7 @@
   <section>
     <div class="section-title">
       <img src="icons/shortcuts.png" alt="" />
-      <span>Tính năng chính</span>
+      <span data-i18n="Tính năng chính">Tính năng chính</span>
     </div>
 
     <div class="card-list">
@@ -586,11 +659,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <img src="icons/loop.png" alt="Loop" />
+            <img src="icons/loop.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Tự động lặp lại video (Auto Loop)</div>
-            <div class="toggle-desc">Tự động kích hoạt lặp lại khi xem video trên YouTube.</div>
+            <div class="toggle-title" data-i18n="Tự động lặp lại video">Tự động lặp lại video</div>
+            <div class="toggle-desc" data-i18n="Video tự phát lại khi kết thúc, không lặp quảng cáo.">Video tự phát lại khi kết thúc, không lặp quảng cáo.</div>
           </div>
         </div>
         <div class="switch">
@@ -603,11 +676,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Tự động bỏ qua quảng cáo video</div>
-            <div class="toggle-desc">Tự bấm "Bỏ qua" và tua nhanh quảng cáo trong video, kể cả khi bạn đang ở tab khác. Có thể ngưng hoạt động nếu YouTube đổi giao diện.</div>
+            <div class="toggle-title" data-i18n="Tự động bỏ qua quảng cáo">Tự động bỏ qua quảng cáo</div>
+            <div class="toggle-desc" data-i18n="Tự bấm Bỏ qua và tua nhanh quảng cáo, kể cả ở tab khác.">Tự bấm Bỏ qua và tua nhanh quảng cáo, kể cả ở tab khác.</div>
           </div>
         </div>
         <div class="switch">
@@ -620,11 +693,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.8 11.8 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.8 11.8 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Ẩn khung quảng cáo trên giao diện</div>
-            <div class="toggle-desc">Ẩn quảng cáo trong newfeed, banner đầu trang và quảng cáo bên cạnh video.</div>
+            <div class="toggle-title" data-i18n="Ẩn khung quảng cáo">Ẩn khung quảng cáo</div>
+            <div class="toggle-desc" data-i18n="Ẩn quảng cáo ở feed, banner đầu trang và cạnh video.">Ẩn quảng cáo ở feed, banner đầu trang và cạnh video.</div>
           </div>
         </div>
         <div class="switch">
@@ -637,11 +710,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 10h12v2H4v-2zm0-4h12v2H4V6zm0 8h8v2H4v-2zm13 0v6l5-3-5-3z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 10h12v2H4v-2zm0-4h12v2H4V6zm0 8h8v2H4v-2zm13 0v6l5-3-5-3z"/></svg>
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Tắt Danh sách kết hợp (Mix)</div>
-            <div class="toggle-desc">Ẩn Mix trong feed, video đề xuất và khung Mix ở trang xem, đồng thời bỏ tự phát nối tiếp Mix.</div>
+            <div class="toggle-title" data-i18n="Tắt Danh sách kết hợp (Mix)">Tắt Danh sách kết hợp (Mix)</div>
+            <div class="toggle-desc" data-i18n="Ẩn Mix và bỏ tự phát nối tiếp các bài trong Mix.">Ẩn Mix và bỏ tự phát nối tiếp các bài trong Mix.</div>
           </div>
         </div>
         <div class="switch">
@@ -650,32 +723,15 @@
         </div>
       </label>
 
-      <!-- Hide chip bar -->
-      <label class="toggle-card">
-        <div class="toggle-main">
-          <div class="toggle-icon-wrap">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5h18v2H3V5zm0 6h12v2H3v-2zm0 6h18v2H3v-2z"/></svg>
-          </div>
-          <div class="toggle-info">
-            <div class="toggle-title">Ẩn thanh chủ đề</div>
-            <div class="toggle-desc">Ẩn dải chip lọc (Tất cả, Âm nhạc, Trò chơi…) ở Trang chủ và dưới video đề xuất. Bộ lọc trang tìm kiếm vẫn giữ.</div>
-          </div>
-        </div>
-        <div class="switch">
-          <input type="checkbox" id="enableHideChips">
-          <span class="slider"></span>
-        </div>
-      </label>
-
       <!-- Shortcuts -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <img src="icons/shortcuts.png" alt="Shortcuts" />
+            <img src="icons/shortcuts.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Phím tắt điều hướng nhanh</div>
-            <div class="toggle-desc">Mặc định ss, hh, hhh, pp, mm; bấm 2 hoặc 3 lần tùy chọn. Hoạt động cả trên YouTube Music.</div>
+            <div class="toggle-title" data-i18n="Phím tắt điều hướng">Phím tắt điều hướng</div>
+            <div class="toggle-desc" data-i18n="Bấm 2–3 lần một phím để mở Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music.">Bấm 2–3 lần một phím để mở Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music.</div>
           </div>
         </div>
         <div class="switch">
@@ -688,11 +744,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <img src="icons/copy.png" alt="Copy Title" />
+            <img src="icons/copy.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Bộ nút Copy Title thông minh</div>
-            <div class="toggle-desc">Watch page: Copy Title, Copy + Search + Enter và mở tab mới. Sidebar: đầy đủ tiện ích. Feed/Home: nút công cụ nhỏ ở góc dưới-phải mỗi thẻ video, bấm vào mở popover 4 nút (sao chép tiêu đề, copy + tìm kiếm, copy link sạch, tải ảnh bìa).</div>
+            <div class="toggle-title" data-i18n="Bộ nút sao chép thông minh">Bộ nút sao chép thông minh</div>
+            <div class="toggle-desc" data-i18n="Sao chép tiêu đề, tìm kiếm nhanh và thêm nút copy trên mỗi thẻ video.">Sao chép tiêu đề, tìm kiếm nhanh và thêm nút copy trên mỗi thẻ video.</div>
           </div>
         </div>
         <div class="switch">
@@ -705,11 +761,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <img src="icons/copy.png" alt="Copy khi bôi đen" />
+            <img src="icons/copy.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Tự động copy khi bôi đen</div>
-            <div class="toggle-desc">Giữ chuột kéo bôi xanh một đoạn text bất kỳ để sao chép ngay, kèm thông báo xác nhận.</div>
+            <div class="toggle-title" data-i18n="Sao chép khi bôi đen">Sao chép khi bôi đen</div>
+            <div class="toggle-desc" data-i18n="Bôi xanh đoạn text là sao chép ngay.">Bôi xanh đoạn text là sao chép ngay.</div>
           </div>
         </div>
         <div class="switch">
@@ -722,11 +778,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <img src="icons/paste.png" alt="Auto paste" />
+            <img src="icons/paste.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Tự động dán vào ô tìm kiếm</div>
-            <div class="toggle-desc">Click vào ô tìm kiếm để dán ngay nội dung bạn vừa copy — kể cả khi copy thủ công hoặc copy từ tab/ứng dụng khác. Copy nội dung mới rồi click lại vẫn dán được.</div>
+            <div class="toggle-title" data-i18n="Tự dán vào ô tìm kiếm">Tự dán vào ô tìm kiếm</div>
+            <div class="toggle-desc" data-i18n="Click ô tìm kiếm là nội dung vừa copy được dán vào.">Click ô tìm kiếm là nội dung vừa copy được dán vào.</div>
           </div>
         </div>
         <div class="switch">
@@ -739,11 +795,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <img src="icons/paste.png" alt="Replace pasted text" />
+            <img src="icons/paste.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Thay nội dung đã dán trước đó</div>
-            <div class="toggle-desc">Bật: nội dung mới thay thế nội dung đã tự động dán trước đó. Tắt: nối thêm vào sau, tự chèn một khoảng trắng giữa hai nội dung.</div>
+            <div class="toggle-title" data-i18n="Thay nội dung đã dán">Thay nội dung đã dán</div>
+            <div class="toggle-desc" data-i18n="Bật: thay nội dung cũ. Tắt: nối thêm vào sau.">Bật: thay nội dung cũ. Tắt: nối thêm vào sau.</div>
           </div>
         </div>
         <div class="switch">
@@ -756,11 +812,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <img src="icons/bell.png" alt="Toast" />
+            <img src="icons/bell.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title">Thông báo nổi Toast</div>
-            <div class="toggle-desc">Hiển thị thông báo nhỏ ở góc màn hình khi thực thi thao tác thành công.</div>
+            <div class="toggle-title" data-i18n="Thông báo nổi (Toast)">Thông báo nổi (Toast)</div>
+            <div class="toggle-desc" data-i18n="Hiện thông báo nhỏ khi thao tác thành công.">Hiện thông báo nhỏ khi thao tác thành công.</div>
           </div>
         </div>
         <div class="switch">
@@ -775,21 +831,21 @@
   <section id="keybindSection">
     <div class="section-title">
       <img src="icons/shortcuts.png" alt="" />
-      <span>Tùy chỉnh phím tắt</span>
+      <span data-i18n="Tùy chỉnh phím tắt">Tùy chỉnh phím tắt</span>
     </div>
 
     <div class="keybind-card">
-      <div class="keybind-actions" id="keybindActions" role="tablist" aria-label="Chọn hành động cần gán phím"></div>
+      <div class="keybind-actions" id="keybindActions" role="tablist" data-i18n-aria="Chọn hành động cần gán phím" aria-label="Chọn hành động cần gán phím"></div>
 
-      <div class="keybind-taps" id="keybindTaps" role="group" aria-label="Số lần bấm liên tiếp">
-        <span class="keybind-taps-label">Số lần bấm</span>
-        <button type="button" class="keybind-tap" data-taps="2">2 lần</button>
-        <button type="button" class="keybind-tap" data-taps="3">3 lần</button>
-        <span class="keybind-taps-desc">Bấm liên tiếp trong 0,32 giây</span>
+      <div class="keybind-taps" id="keybindTaps" role="group" data-i18n-aria="Số lần bấm liên tiếp" aria-label="Số lần bấm liên tiếp">
+        <span class="keybind-taps-label" data-i18n="Số lần bấm">Số lần bấm</span>
+        <button type="button" class="keybind-tap" data-taps="2" data-i18n="2 lần">2 lần</button>
+        <button type="button" class="keybind-tap" data-taps="3" data-i18n="3 lần">3 lần</button>
+        <span class="keybind-taps-desc" data-i18n="Bấm liên tiếp trong 0,32 giây">Bấm liên tiếp trong 0,32 giây</span>
       </div>
 
       <div class="keybind-keyboard-wrap">
-        <div class="keybind-keyboard" id="keybindKeyboard" aria-label="Bàn phím chọn phím tắt"></div>
+        <div class="keybind-keyboard" id="keybindKeyboard" data-i18n-aria="Bàn phím chọn phím tắt" aria-label="Bàn phím chọn phím tắt"></div>
         <div class="keybind-hint error" id="keybindError" role="alert" aria-live="polite"></div>
       </div>
     </div>
@@ -799,11 +855,12 @@
   <footer>
     <div class="status-msg" id="statusMsg">
       <svg width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-      <span>Đã tự động lưu cài đặt!</span>
+      <span data-i18n="Đã tự động lưu cài đặt!">Đã tự động lưu cài đặt!</span>
     </div>
-    <button class="btn-reset" id="btnReset">Khôi phục mặc định</button>
+    <button class="btn-reset" id="btnReset" data-i18n="Khôi phục mặc định">Khôi phục mặc định</button>
   </footer>
 
+  <script src="i18n.js"></script>
   <script src="shortcut-keys.js"></script>
   <script src="options.js"></script>
 </body>

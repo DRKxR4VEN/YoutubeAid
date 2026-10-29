@@ -5,6 +5,9 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   const SHORTCUTS = window.YtAidShortcuts;
+  const I18N = window.YtAidI18n;
+  const T = (text, params) => (I18N ? I18N.t(text, params) : text);
+
   const FALLBACK_SHORTCUT_KEYS = {
     shorts: 's',
     home: 'h',
@@ -21,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const DEFAULTS = {
+    language: 'vi',
     enableLoop: true,
     enableShortcuts: true,
     enableCopyButtons: true,
@@ -33,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableAdSkip: true,
     enableHideAds: true,
     enableHideMix: true,
-    enableHideChips: true,
+    hideButtonNames: false,
     shortcutKeys: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_KEYS } : { ...FALLBACK_SHORTCUT_KEYS },
     shortcutTaps: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_TAPS } : { ...FALLBACK_SHORTCUT_TAPS }
   };
@@ -48,8 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableAutoPasteReplace: document.getElementById('enableAutoPasteReplace'),
     enableAdSkip: document.getElementById('enableAdSkip'),
     enableHideAds: document.getElementById('enableHideAds'),
-    enableHideMix: document.getElementById('enableHideMix'),
-    enableHideChips: document.getElementById('enableHideChips')
+    enableHideMix: document.getElementById('enableHideMix')
   };
 
   const statusMsg = document.getElementById('statusMsg');
@@ -59,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const keybindTapsEl = document.getElementById('keybindTaps');
   const keybindError = document.getElementById('keybindError');
   const keybindSection = document.getElementById('keybindSection');
+  const langButtons = document.querySelectorAll('.lang-btn');
 
   const KEY_ROWS = [
     ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
@@ -79,11 +83,29 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedActionId = 'shorts';
   let statusTimer = null;
 
+  function applyLanguage(lang, { persist = false } = {}) {
+    if (!I18N) return;
+    I18N.setLanguage(lang);
+    I18N.apply(document);
+    langButtons.forEach((btn) => {
+      btn.classList.toggle('is-active', btn.dataset.lang === I18N.getLanguage());
+    });
+    document.title = `YouTube Aid - ${T('Bảng điều khiển & Phím tắt nhanh')}`;
+    try {
+      chrome.action?.setTitle({ title: T('Youtube Aid - Cài đặt & Phím tắt') });
+    } catch (e) { }
+    clearKeybindError();
+    buildKeybindEditor();
+    if (persist) {
+      chrome.storage.local.set({ language: I18N.getLanguage() }, () => {
+        void chrome.runtime?.lastError;
+      });
+    }
+  }
+
   function showStatus(text = 'Đã tự động lưu cài đặt!') {
-    statusMsg.innerHTML = `
-      <svg width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-      <span>${text}</span>
-    `;
+    const span = statusMsg.querySelector('span');
+    if (span) span.textContent = T(text);
     statusMsg.classList.add('visible');
 
     if (statusTimer) clearTimeout(statusTimer);
@@ -116,11 +138,11 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.className = 'keybind-action';
       btn.dataset.action = action.id;
       btn.setAttribute('role', 'tab');
-      btn.title = action.label;
+      btn.title = T(action.label);
 
       const label = document.createElement('span');
       label.className = 'keybind-action-label';
-      label.textContent = SHORT_LABELS[action.id] || action.label;
+      label.textContent = T(SHORT_LABELS[action.id] || action.label);
 
       const keys = document.createElement('span');
       keys.className = 'keybind-action-keys';
@@ -177,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       el.classList.toggle('is-active', active);
       el.setAttribute('aria-selected', active ? 'true' : 'false');
+      if (action) el.title = T(action.label);
 
       const keysEl = el.querySelector('.keybind-action-keys');
       if (!keysEl) return;
@@ -224,15 +247,16 @@ document.addEventListener('DOMContentLoaded', () => {
       keyEl.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
 
       if (isNative) {
-        keyEl.title = `YouTube đang dùng phím ${key.toUpperCase()} cho phím tắt gốc`;
+        keyEl.title = T('YouTube đang dùng phím {0} cho phím tắt gốc', [key.toUpperCase()]);
       } else if (isCurrent) {
-        keyEl.title = `Phím hiện tại của "${selected.label}"`;
+        keyEl.title = T('Phím hiện tại của "{0}"', [T(selected.label)]);
       } else if (conflictReason) {
         keyEl.title = conflictReason;
       } else if (usedBy) {
-        keyEl.title = `Phím ${key.toUpperCase()} đang dùng cho "${usedBy.label}" (${actionTaps(usedBy.id)} lần bấm) — vẫn chọn được vì khác số lần bấm`;
+        keyEl.title = T('Phím {0} đang dùng cho "{1}" ({2} lần bấm) — vẫn chọn được vì khác số lần bấm',
+          [key.toUpperCase(), T(usedBy.label), actionTaps(usedBy.id)]);
       } else {
-        keyEl.title = `Gán phím ${key.toUpperCase()} cho "${selected.label}"`;
+        keyEl.title = T('Gán phím {0} cho "{1}"', [key.toUpperCase(), T(selected.label)]);
       }
     });
   }
@@ -279,17 +303,17 @@ document.addEventListener('DOMContentLoaded', () => {
         !SHORTCUTS.conflictMessage(actionId, letter, currentShortcutKeys, nextTaps)
       );
       if (!free) {
-        showKeybindError(`Không còn phím trống cho "${action.label}". Hãy đổi phím của hành động khác trước.`);
+        showKeybindError(T('Không còn phím trống cho "{0}". Hãy đổi phím của hành động khác trước.', [T(action.label)]));
         return;
       }
       key = free;
-      note = ` Đã đổi phím sang ${free.toUpperCase()} để không trùng phím khác.`;
+      note = free ? T(' Đã đổi phím sang {0} để không trùng phím khác.', [free.toUpperCase()]) : '';
     }
 
     currentShortcutTaps = SHORTCUTS.sanitizeTaps(nextTaps);
     currentShortcutKeys[actionId] = key;
     clearKeybindError();
-    saveShortcutKeys(`Đã đặt "${SHORT_LABELS[actionId] || action.label}" thành ${taps} lần bấm.${note}`);
+    saveShortcutKeys(T('Đã đặt "{0}" thành {1} lần bấm.{2}', [T(SHORT_LABELS[actionId] || action.label), taps, note]));
     refreshKeybindState();
   }
 
@@ -305,6 +329,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function loadSettings() {
     chrome.storage.local.get(DEFAULTS, (items) => {
+      if (I18N) I18N.setLanguage(items.language);
+      applyLanguage(items.language);
+
       Object.keys(toggleInputs).forEach((key) => {
         if (toggleInputs[key]) toggleInputs[key].checked = !!items[key];
       });
@@ -343,8 +370,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  langButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!I18N || btn.dataset.lang === I18N.getLanguage()) return;
+      applyLanguage(btn.dataset.lang, { persist: true });
+    });
+  });
+
+  // Another tab (or the popup) changed the language while this page is open.
+  try {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== 'local' || !changes.language || !I18N) return;
+      if (changes.language.newValue === I18N.getLanguage()) return;
+      applyLanguage(changes.language.newValue);
+    });
+  } catch (e) { }
+
   btnReset.addEventListener('click', () => {
-    if (confirm('Khôi phục tất cả cài đặt về mặc định ban đầu?')) {
+    if (confirm(T('Khôi phục tất cả cài đặt về mặc định ban đầu?'))) {
       chrome.storage.local.set(DEFAULTS, () => {
         clearKeybindError();
         loadSettings();

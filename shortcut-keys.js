@@ -11,6 +11,9 @@
 (function (root) {
   'use strict';
 
+  const I18N = root.YtAidI18n || null;
+  const T = (text, params) => (I18N ? I18N.t(text, params) : text);
+
   const ACTIONS = [
     { id: 'shorts', label: 'Mở video Shorts gợi ý', taps: 2, target: 'youtube.com/shorts/{id}' },
     { id: 'home', label: 'Về Trang chủ YouTube', taps: 2, target: 'youtube.com/' },
@@ -77,17 +80,17 @@
   // The same letter is allowed twice only when the tap counts differ.
   function conflictMessage(actionId, key, keys, taps) {
     const action = findAction(actionId);
-    if (!action) return 'Hành động không hợp lệ.';
+    if (!action) return T('Hành động không hợp lệ.');
 
     const normalized = String(key || '').toLowerCase();
     if (normalized.length !== 1) {
-      return 'Mỗi phím tắt chỉ dùng một chữ cái a–z.';
+      return T('Mỗi phím tắt chỉ dùng một chữ cái a–z.');
     }
     if (!/^[a-z]$/.test(normalized)) {
-      return 'Chỉ dùng được chữ cái a–z, không dùng số hay ký tự đặc biệt.';
+      return T('Chỉ dùng được chữ cái a–z, không dùng số hay ký tự đặc biệt.');
     }
     if (!isAllowedKey(normalized)) {
-      return `Phím "${normalized.toUpperCase()}" YouTube đang dùng cho phím tắt gốc nên không thể chọn.`;
+      return T('Phím "{0}" YouTube đang dùng cho phím tắt gốc nên không thể chọn.', [normalized.toUpperCase()]);
     }
 
     const effectiveTaps = sanitizeTaps(taps);
@@ -98,7 +101,7 @@
       effectiveTaps[other.id] === actionTaps
     );
     if (clash) {
-      return `Phím "${normalized.toUpperCase()}" đã dùng cho "${clash.label}" (${actionTaps} lần bấm).`;
+      return T('Phím "{0}" đã dùng cho "{1}" ({2} lần bấm).', [normalized.toUpperCase(), T(clash.label), actionTaps]);
     }
 
     return '';

@@ -33,8 +33,54 @@
   // script targets the www DOM / player stack and must stay off Music.
   const IS_MUSIC_SITE = window.location.hostname === 'music.youtube.com';
 
+  // --- Localisation ---
+  const I18N = window.YtAidI18n || null;
+  // t() returns the string for the language picked in the dashboard, so the
+  // whole UI can never mix Vietnamese and English.
+  function T(text, params) {
+    return I18N ? I18N.t(text, params) : text;
+  }
+
+  // Build-time pass for injected markup: translates text nodes and the
+  // title / aria-label / placeholder attributes that exactly match a dictionary
+  // entry. Keeps per-string call sites out of the HTML templates.
+  function localizeTree(root) {
+    if (!I18N || !root || !root.nodeType) return root;
+    const scope = root;
+    if (scope.nodeType === 1) {
+      const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          const parent = node.parentElement;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          if (parent.closest('script, style, textarea')) return NodeFilter.FILTER_REJECT;
+          return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        }
+      });
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+      for (const node of textNodes) {
+        const raw = node.nodeValue;
+        const trimmed = raw.trim();
+        const next = I18N.t(trimmed);
+        if (next !== trimmed) node.nodeValue = raw.replace(trimmed, next);
+      }
+    }
+    const elements = scope.querySelectorAll('[title], [aria-label], [placeholder]');
+    const all = scope.nodeType === 1 ? [scope, ...elements] : elements;
+    for (const el of all) {
+      for (const attr of ['title', 'aria-label', 'placeholder']) {
+        const value = el.getAttribute(attr);
+        if (!value) continue;
+        const next = I18N.t(value);
+        if (next !== value) el.setAttribute(attr, next);
+      }
+    }
+    return root;
+  }
+
   // --- Configuration & Default Settings ---
   const DEFAULT_SETTINGS = {
+    language: 'vi',
     enableLoop: true,
     enableShortcuts: true,
     enableCopyButtons: true,
@@ -47,7 +93,7 @@
     enableAdSkip: true,
     enableHideAds: true,
     enableHideMix: true,
-    enableHideChips: true,
+    hideButtonNames: false,
     audioBoost: 100,
     randomVideo: { video: true, shorts: true, music: true, feed: true },
     shortcutKeys: { ...DEFAULT_SHORTCUT_KEYS },
@@ -101,6 +147,7 @@
         settings.enableThumbnailDownload = true;
         settings.audioBoost = sanitizeAudioBoost(settings.audioBoost);
         settings.randomVideo = sanitizeRandomVideoOptions(settings.randomVideo);
+        if (I18N) I18N.setLanguage(settings.language);
         if (record && !restoreLastCopied(record)) safeRemoveStorage(LAST_COPIED_KEY);
         initExtension();
       });
@@ -216,6 +263,11 @@
       rebuildShortcutKeymap();
     }
 
+    if (changed('language')) {
+      if (I18N) I18N.setLanguage(settings.language);
+      refreshLocalizedUi();
+    }
+
     settings.enableCleanLink = true;
     settings.enableThumbnailDownload = true;
     if (IS_MUSIC_SITE) return;
@@ -223,7 +275,7 @@
     if (!settings.enableShortcuts) resetKeyBuffer();
     if (changed('enableAdSkip') || changed('enableHideAds')) syncAdSkipSettings();
     if (changed('enableHideMix')) syncMixState();
-    if (changed('enableHideChips')) syncChipBarState();
+    if (changed('hideButtonNames')) syncButtonNamesUi();
     if (changed('enableLoop')) ensureVideoLoop();
     if (changed('enableCopyButtons')) {
       document.body.classList.toggle('yt-aid-hide-copy-buttons', !settings.enableCopyButtons);
@@ -239,6 +291,30 @@
         changed('enableAutoPasteSearch') || changed('enableAutoPasteReplace')) {
       syncToolbarState();
     }
+  }
+
+  // Rebuilds every injected surface so the new language applies to all labels
+  // at once — no element keeps a string from the previous language.
+  function refreshLocalizedUi() {
+    if (!I18N || IS_MUSIC_SITE) return;
+    try { closeDropdown(); } catch (e) { }
+    try { closeHomeFlyout(); } catch (e) { }
+    try { closeFavoritePicker(); } catch (e) { }
+    try { closeBookmarkPage(); } catch (e) { }
+    try { closeBookmarkConfirm(false); } catch (e) { }
+    try { closeThumbnailCropper(); } catch (e) { }
+
+    document.querySelectorAll([
+      '.yt-aid-watch-toolbar', '.yt-aid-card-bar', '#yt-aid-channel-actions',
+      '#yt-aid-guide-entry', '#yt-aid-mini-entry', '#yt-aid-bookmark-shelf',
+      '#yt-aid-random-home', '.yt-aid-home-trigger', '.yt-aid-home-flyout',
+      '#yt-aid-bookmark-page', '.yt-aid-crop-overlay', '.yt-aid-bm-confirm-overlay',
+      '.yt-aid-bm-favorite-picker', '#yt-aid-tools-menu', '#yt-aid-random-menu'
+    ].join(', ')).forEach((el) => el.remove());
+
+    injectAllAreas();
+    injectBookmarkShelf();
+    syncButtonNamesUi();
   }
 
   // --- Main Initializer ---
@@ -287,6 +363,7 @@
 
   function showToast(message, type = 'info', duration = 2400) {
     if (!settings.enableToasts) return;
+    message = T(message);
     if (!toastContainer) createToastContainer();
 
     const toast = document.createElement('div');
@@ -495,9 +572,9 @@
 
     loopBtn.classList.toggle('active', wanted);
     loopBtn.setAttribute('aria-pressed', wanted ? 'true' : 'false');
-    loopBtn.title = wanted ? 'Auto Loop đang bật' : 'Auto Loop đang tắt';
+    loopBtn.title = T(wanted ? 'Auto Loop đang bật' : 'Auto Loop đang tắt');
     const label = loopBtn.querySelector('span');
-    if (label) label.textContent = wanted ? 'Loop: ON' : 'Loop: OFF';
+    if (label) label.textContent = T(wanted ? 'Autoloop: ON' : 'Autoloop: OFF');
   }
 
   function stopLoopWatchdog() {
@@ -944,7 +1021,7 @@
 
   function navigateToShorts() {
     if (IS_MUSIC_SITE) {
-      showToast(`Phím tắt [${shortcutSequence('shorts')}]: Chuyển sang YouTube Shorts`, 'info', 1600);
+      showToast(T('Phím tắt [{0}]: Chuyển sang YouTube Shorts', [shortcutSequence('shorts')]), 'info', 1600);
       goToYoutubeTarget('/shorts');
       return;
     }
@@ -955,26 +1032,26 @@
     if (shortsAnchor) {
       const id = shortsIdFromAnchor(shortsAnchor);
       if (id) {
-        showToast(`Phím tắt [${shortcutSequence('shorts')}]: Mở Shorts gợi ý [${id}]`, 'info', 1600);
+        showToast(T('Phím tắt [{0}]: Mở Shorts gợi ý [{1}]', [shortcutSequence('shorts'), id]), 'info', 1600);
       } else {
-        showToast(`Phím tắt [${shortcutSequence('shorts')}]: Chuyển sang YouTube Shorts`, 'info', 1600);
+        showToast(T('Phím tắt [{0}]: Chuyển sang YouTube Shorts', [shortcutSequence('shorts')]), 'info', 1600);
       }
       shortsAnchor.click();
       return;
     }
 
     if (cachedSuggestedShortsId) {
-      showToast(`Phím tắt [${shortcutSequence('shorts')}]: Mở Shorts gợi ý [${cachedSuggestedShortsId}]`, 'info', 1600);
+      showToast(T('Phím tắt [{0}]: Mở Shorts gợi ý [{1}]', [shortcutSequence('shorts'), cachedSuggestedShortsId]), 'info', 1600);
       simulateSpaNavigation(`/shorts/${cachedSuggestedShortsId}`);
       return;
     }
 
-    showToast(`Phím tắt [${shortcutSequence('shorts')}]: Chuyển sang YouTube Shorts`, 'info', 1600);
+    showToast(T('Phím tắt [{0}]: Chuyển sang YouTube Shorts', [shortcutSequence('shorts')]), 'info', 1600);
     simulateSpaNavigation('/shorts');
   }
 
   function navigateToHome() {
-    showToast(`Phím tắt [${shortcutSequence('home')}]: Về trang chủ`, 'info', 1600);
+    showToast(T('Phím tắt [{0}]: Về trang chủ', [shortcutSequence('home')]), 'info', 1600);
     if (IS_MUSIC_SITE) {
       goToYoutubeTarget('/');
       return;
@@ -999,7 +1076,7 @@
   }
 
   function navigateToHistory() {
-    showToast(`Phím tắt [${shortcutSequence('history')}]: Mở lịch sử xem`, 'info', 1600);
+    showToast(T('Phím tắt [{0}]: Mở lịch sử xem', [shortcutSequence('history')]), 'info', 1600);
     if (IS_MUSIC_SITE) {
       goToYoutubeTarget('/feed/history');
       return;
@@ -1023,7 +1100,7 @@
   }
 
   function navigateToPlaylists() {
-    showToast(`Phím tắt [${shortcutSequence('playlists')}]: Danh sách phát`, 'info', 1600);
+    showToast(T('Phím tắt [{0}]: Danh sách phát', [shortcutSequence('playlists')]), 'info', 1600);
     if (IS_MUSIC_SITE) {
       goToYoutubeTarget('/feed/playlists');
       return;
@@ -1050,11 +1127,11 @@
 
   function navigateToMusic() {
     if (IS_MUSIC_SITE) {
-      showToast(`Phím tắt [${shortcutSequence('music')}]: Bạn đang ở YouTube Music`, 'info', 1600);
+      showToast(T('Phím tắt [{0}]: Bạn đang ở YouTube Music', [shortcutSequence('music')]), 'info', 1600);
       if (window.location.pathname !== '/') window.location.assign('https://music.youtube.com/');
       return;
     }
-    showToast(`Phím tắt [${shortcutSequence('music')}]: Chuyển sang YouTube Music`, 'info', 1600);
+    showToast(T('Phím tắt [{0}]: Chuyển sang YouTube Music', [shortcutSequence('music')]), 'info', 1600);
     window.location.href = 'https://music.youtube.com/';
   }
 
@@ -1365,7 +1442,7 @@
   // Open search query directly in a brand new tab
   function openSearchInNewTab(text) {
     window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(text)}`, '_blank', 'noopener');
-    showToast(`Đã mở tìm kiếm trong tab mới: "${previewText(text, 30)}"`, 'success');
+    showToast(T('Đã mở tìm kiếm trong tab mới: "{0}"', [previewText(text, 30)]), 'success');
   }
 
   // Fill the search bar then run the search on the current tab
@@ -1389,7 +1466,7 @@
       }
     }, 450);
 
-    showToast(`Đang tìm kiếm: "${previewText(text, 35)}"`, 'success');
+    showToast(T('Đang tìm kiếm: "{0}"', [previewText(text, 35)]), 'success');
   }
 
   // ==========================================
@@ -1565,6 +1642,7 @@
     document.body.classList.add('yt-aid-crop-open');
     document.documentElement.classList.add('yt-aid-crop-open');
     cropOverlayEl = overlay;
+    localizeTree(overlay);
 
     const image = overlay.querySelector('#yt-aid-crop-image');
     const frame = overlay.querySelector('#yt-aid-crop-frame');
@@ -1709,12 +1787,12 @@
       saveBtn.disabled = busy;
       originalBtn.disabled = busy;
       resetBtn.disabled = busy;
-      saveBtn.textContent = busy ? 'Đang lưu…' : 'Tải phần đã chọn';
+      saveBtn.textContent = T(busy ? 'Đang lưu…' : 'Tải phần đã chọn');
     };
 
     const saveOriginal = () => {
       saveBlobAsFile(blob, filename);
-      showToast(`Đã tải ảnh: ${previewText(filename, 45)}`, 'success', 2800);
+      showToast(T('Đã tải ảnh: {0}', [previewText(filename, 45)]), 'success', 2800);
       closeThumbnailCropper();
     };
 
@@ -1742,7 +1820,7 @@
         if (!cropped) throw new Error('empty canvas');
 
         saveBlobAsFile(cropped, filename);
-        showToast(`Đã tải ảnh đã cắt: ${sw} × ${sh}`, 'success', 2800);
+        showToast(T('Đã tải ảnh đã cắt: {0} × {1}', [sw, sh]), 'success', 2800);
         closeThumbnailCropper();
       } catch (e) {
         if (closed) return;
@@ -2108,7 +2186,7 @@
 
       writeClipboard(text).then((ok) => {
         if (!ok) return;
-        showToast(`Đã sao chép đoạn bôi đen: "${previewText(text)}"`, 'success', 1800);
+        showToast(T('Đã sao chép đoạn bôi đen: "{0}"', [previewText(text)]), 'success', 1800);
       });
     };
 
@@ -2190,11 +2268,11 @@
         rememberCopiedText(text);
 
         if (!hasText) {
-          showToast(`Đã dán vào ô tìm kiếm: "${previewText(text, 35)}"`, 'success', 2000);
+          showToast(T('Đã dán vào ô tìm kiếm: "{0}"', [previewText(text, 35)]), 'success', 2000);
         } else if (settings.enableAutoPasteReplace) {
-          showToast(`Đã thay nội dung tìm kiếm bằng: "${previewText(text, 35)}"`, 'success', 2000);
+          showToast(T('Đã thay nội dung tìm kiếm bằng: "{0}"', [previewText(text, 35)]), 'success', 2000);
         } else {
-          showToast(`Đã thêm vào ô tìm kiếm: "${previewText(text, 35)}"`, 'success', 2000);
+          showToast(T('Đã thêm vào ô tìm kiếm: "{0}"', [previewText(text, 35)]), 'success', 2000);
         }
       });
     }, true);
@@ -2366,13 +2444,13 @@
           </button>
 
           <!-- 2. Copy + Search + Enter -->
-          <button class="yt-aid-pill-btn yt-aid-pill-sub yt-aid-icon-only" id="yt-aid-btn-copy-enter" title="Copy & tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)" aria-label="Copy và tìm kiếm trực tiếp">
+          <button class="yt-aid-pill-btn yt-aid-pill-sub" id="yt-aid-btn-copy-enter" title="Copy & tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)" aria-label="Copy và tìm kiếm trực tiếp">
             <svg viewBox="0 0 24 24">
               <path fill="currentColor" d="M3 2h7a2 2 0 0 1 2 2v1h-2V4H3v9h1v2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 4h6a2 2 0 0 1 2 2v1h-2V8H6v7h2v2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
               <path fill="currentColor" d="M17 2a3 3 0 1 0 2 5.2l2.3 2.3 1.4-1.4-2.3-2.3A3 3 0 0 0 17 2zm0 1.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
               <path fill="currentColor" d="M19 14v3H12.8l2.6-2.6-1.4-1.4L9 18l5 5 1.4-1.4-2.6-2.6H21v-5h-2z"/>
             </svg>
-            <span>Copy + Search + Enter</span>
+            <span>Quick Search</span>
           </button>
           <button class="yt-aid-newtab-btn" id="yt-aid-btn-copy-enter-newtab" title="Mở tìm kiếm sang tab mới">
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
@@ -2380,9 +2458,9 @@
         </div>
 
         <!-- Clean Copy Link -->
-        <button class="yt-aid-pill-btn yt-aid-clean-link yt-aid-icon-only" id="yt-aid-btn-clean-link" title="Clean Link: sao chép liên kết sạch không query tracking" aria-label="Clean Link">
+        <button class="yt-aid-pill-btn yt-aid-clean-link" id="yt-aid-btn-clean-link" title="Copy Link: sao chép liên kết sạch không query tracking" aria-label="Copy Link">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
-          <span>Clean Link</span>
+          <span>Copy Link</span>
         </button>
 
         <!-- Bookmark (lưu mốc thời gian hiện tại) + Log -->
@@ -2398,9 +2476,9 @@
         </div>
 
         <!-- Downloads button (thumbnail crop) -->
-        <button class="yt-aid-pill-btn yt-aid-downloads-btn yt-aid-icon-only" id="yt-aid-btn-downloads" title="Tải ảnh bìa thumbnail (có cắt ảnh)" aria-label="Tải thumbnail">
+        <button class="yt-aid-pill-btn yt-aid-downloads-btn" id="yt-aid-btn-downloads" title="Tải ảnh bìa thumbnail (có cắt ảnh)" aria-label="Tải thumbnail">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-          <span>Download Thumbnail</span>
+          <span>Thumbnail</span>
         </button>
       </div>
 
@@ -2408,26 +2486,34 @@
         <!-- Auto Loop Toggle Button -->
         <button class="yt-aid-pill-btn yt-aid-loop-indicator ${settings.enableLoop ? 'active' : ''}" id="yt-aid-btn-toggle-loop" title="${settings.enableLoop ? 'Auto Loop đang bật' : 'Auto Loop đang tắt'}">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
-          <span>Loop: ${settings.enableLoop ? 'ON' : 'OFF'}</span>
+          <span>Autoloop: ${settings.enableLoop ? 'ON' : 'OFF'}</span>
         </button>
 
         <!-- Extra tools dropdown -->
-        <button class="yt-aid-pill-btn yt-aid-tools-btn yt-aid-icon-only" id="yt-aid-btn-tools" title="Tính năng phụ" aria-label="Tính năng phụ" aria-haspopup="true" aria-expanded="false">
+        <button class="yt-aid-pill-btn yt-aid-tools-btn" id="yt-aid-btn-tools" title="Tính năng phụ" aria-label="Tính năng phụ" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
           <span>Tools</span>
           <svg class="yt-aid-chevron" viewBox="0 0 24 24"><path fill="currentColor" d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
+        </button>
+
+        <!-- Collapse the toolbar labels to icons only -->
+        <button class="yt-aid-pill-btn yt-aid-name-toggle" id="yt-aid-btn-toggle-names" title="Ẩn tên các nút trong thanh công cụ" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M21.41 11.58l-9-9A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7c0 .55.22 1.05.59 1.42l9 9a2 2 0 0 0 2.83 0l7-7a2 2 0 0 0 0-2.84zM7 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg>
+          <span>Hide Button Name</span>
         </button>
       </div>
     `;
 
     toolbar.querySelector('.yt-aid-toolbar-right').prepend(buildRandomVideoControl());
     titleContainer.appendChild(toolbar);
+    localizeTree(toolbar);
     syncRandomVideoUi();
+    syncButtonNamesUi();
 
     // 1. Copy Pure
     toolbar.querySelector('#yt-aid-btn-copy-pure').addEventListener('click', () => {
       const title = getWatchVideoTitle();
-      copyTextToClipboard(title, `Đã sao chép tiêu đề: "${previewText(title, 35)}"`);
+      copyTextToClipboard(title, T('Đã sao chép tiêu đề: "{0}"', [previewText(title, 35)]));
     });
 
     // 2. Copy + Search + Enter
@@ -2458,13 +2544,13 @@
     // Clean Link
     toolbar.querySelector('#yt-aid-btn-clean-link').addEventListener('click', () => {
       const cleanUrl = cleanYoutubeUrl(window.location.href);
-      copyTextToClipboard(cleanUrl, `Đã chép liên kết sạch: ${cleanUrl}`);
+      copyTextToClipboard(cleanUrl, T('Đã chép liên kết sạch: {0}', [cleanUrl]));
     });
 
     // Bookmark current video
     const bookmarkBtn = toolbar.querySelector('#yt-aid-btn-bookmark');
     bookmarkBtn.addEventListener('mouseenter', () => {
-      bookmarkBtn.title = `Lưu bookmark tại ${formatVideoTime(getCurrentVideoTime())}`;
+      bookmarkBtn.title = T('Lưu bookmark tại {0}', [formatVideoTime(getCurrentVideoTime())]);
     });
     bookmarkBtn.addEventListener('click', () => {
       if (isAdPlaying()) {
@@ -2509,6 +2595,13 @@
     toolsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleDropdown(toolsBtn, buildToolsMenu);
+    });
+
+    // Hide/show the labels of every button in this toolbar
+    toolbar.querySelector('#yt-aid-btn-toggle-names').addEventListener('click', (e) => {
+      e.stopPropagation();
+      updateSetting('hideButtonNames', !settings.hideButtonNames);
+      syncButtonNamesUi();
     });
   }
 
@@ -2581,6 +2674,23 @@
 
     const autoPasteReplaceToggle = document.getElementById('yt-aid-toggle-auto-paste-replace');
     if (autoPasteReplaceToggle) autoPasteReplaceToggle.checked = !!settings.enableAutoPasteReplace;
+
+    syncButtonNamesUi();
+  }
+
+  // Collapses every toolbar label to icons only. The toggle button keeps its
+  // own label so the next click is always self-explanatory.
+  function syncButtonNamesUi() {
+    const hidden = !!settings.hideButtonNames;
+    document.querySelectorAll('.yt-aid-watch-toolbar').forEach((bar) => {
+      bar.classList.toggle('yt-aid-hide-names', hidden);
+    });
+    const btn = document.getElementById('yt-aid-btn-toggle-names');
+    if (!btn) return;
+    btn.title = T(hidden ? 'Hiện tên các nút trong thanh công cụ' : 'Ẩn tên các nút trong thanh công cụ');
+    btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    const label = btn.querySelector('span');
+    if (label) label.textContent = T(hidden ? 'Show Button Name' : 'Hide Button Name');
   }
 
   function updateSetting(key, value) {
@@ -2594,7 +2704,7 @@
     menu.className = 'yt-aid-tools-menu';
     const checked = (value) => (value ? ' checked' : '');
     menu.innerHTML = `
-      <div class="yt-aid-tools-title">Tính năng phụ${EXT_VERSION ? ` · v${EXT_VERSION}` : ''}</div>
+      <div class="yt-aid-tools-title">${T('Tính năng phụ')}${EXT_VERSION ? ` · v${EXT_VERSION}` : ''}</div>
 
       <label class="yt-aid-tools-item">
         <span class="yt-aid-tools-text">
@@ -2625,17 +2735,6 @@
         </span>
         <span class="yt-aid-switch">
           <input type="checkbox" id="yt-aid-toggle-auto-paste-replace"${checked(settings.enableAutoPasteReplace)}>
-          <span class="yt-aid-switch-slider"></span>
-        </span>
-      </label>
-
-      <label class="yt-aid-tools-item">
-        <span class="yt-aid-tools-text">
-          <span class="yt-aid-tools-name">Ẩn thanh chủ đề (Tất cả, Âm nhạc…)</span>
-          <span class="yt-aid-tools-desc">Ẩn dải chip lọc ở Trang chủ và dưới video đề xuất</span>
-        </span>
-        <span class="yt-aid-switch">
-          <input type="checkbox" id="yt-aid-toggle-hide-chips"${checked(settings.enableHideChips)}>
           <span class="yt-aid-switch-slider"></span>
         </span>
       </label>
@@ -2673,10 +2772,6 @@
       updateSetting('enableAutoPasteReplace', e.target.checked);
     });
 
-    menu.querySelector('#yt-aid-toggle-hide-chips').addEventListener('change', (e) => {
-      updateSetting('enableHideChips', e.target.checked);
-      syncChipBarState();
-    });
     menu.querySelector('#yt-aid-toggle-hide-mix').addEventListener('change', (e) => {
       updateSetting('enableHideMix', e.target.checked);
       syncMixState();
@@ -2704,7 +2799,7 @@
       safeSetStorage({ audioBoost: settings.audioBoost });
     });
 
-    return menu;
+    return localizeTree(menu);
   }
 
   function initDropdownDismiss() {
@@ -2778,6 +2873,7 @@
       host.classList.add('yt-aid-channel-actions-host');
     }
     anchor.appendChild(bar);
+    localizeTree(bar);
 
     bar.querySelectorAll('.yt-aid-channel-btn').forEach((btn) => {
       btn.addEventListener('click', (event) => {
@@ -2848,6 +2944,7 @@
       `;
 
       details.appendChild(cardBar);
+      localizeTree(cardBar);
 
       const getCardTitle = () => {
         const titleEl = item.querySelector(isLockup ? 'a.ytLockupMetadataViewModelTitle' : '#video-title, span#video-title');
@@ -2865,7 +2962,7 @@
         e.stopPropagation();
         e.preventDefault();
         const title = getCardTitle();
-        copyTextToClipboard(title, `Đã sao chép: "${previewText(title, 30)}"`);
+        copyTextToClipboard(title, T('Đã sao chép: "{0}"', [previewText(title, 30)]));
       });
 
       cardBar.querySelector('.yt-aid-copy-enter').addEventListener('click', (e) => {
@@ -2884,7 +2981,7 @@
         e.stopPropagation();
         e.preventDefault();
         const clean = cleanYoutubeUrl(getCardUrl());
-        copyTextToClipboard(clean, `Đã chép link sạch: ${clean}`);
+        copyTextToClipboard(clean, T('Đã chép link sạch: {0}', [clean]));
       });
 
       cardBar.querySelector('.yt-aid-thumb').addEventListener('click', (e) => {
@@ -2976,8 +3073,8 @@
     trigger.type = 'button';
     trigger.className = HOME_TRIGGER_CLASS;
     trigger.dataset.ytAidVersion = EXT_VERSION;
-    trigger.title = 'Công cụ video';
-    trigger.setAttribute('aria-label', 'Công cụ video');
+    trigger.title = T('Công cụ video');
+    trigger.setAttribute('aria-label', T('Công cụ video'));
     trigger.setAttribute('aria-haspopup', 'true');
     trigger.setAttribute('aria-expanded', 'false');
     trigger.innerHTML = homeTriggerSvg();
@@ -3017,14 +3114,9 @@
       </button>
     `);
 
-    buttons.push(`
-      <button type="button" class="yt-aid-flyout-btn yt-aid-bookmark" title="Bookmark video" aria-label="Bookmark video">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"/></svg>
-      </button>
-    `);
-
     panel.innerHTML = buttons.join('');
     panel.dataset.ytAidConfig = homeFlyoutConfig();
+    localizeTree(panel);
 
     const flyoutData = () => {
       const live = homeFlyout.item ? readHomeCardData(homeFlyout.item) : null;
@@ -3040,7 +3132,7 @@
         const title = flyoutData().title;
         closeHomeFlyout();
         if (!title) return;
-        copyTextToClipboard(title, `Đã sao chép: "${previewText(title, 30)}"`);
+        copyTextToClipboard(title, T('Đã sao chép: "{0}"', [previewText(title, 30)]));
       });
     }
 
@@ -3073,21 +3165,7 @@
         const clean = cleanYoutubeUrl(flyoutData().url);
         closeHomeFlyout();
         if (!clean) return;
-        copyTextToClipboard(clean, `Đã chép liên kết: ${previewText(clean, 45)}`);
-      });
-    }
-
-    const bookmarkBtn = panel.querySelector('.yt-aid-bookmark');
-    if (bookmarkBtn) {
-      bookmarkBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const data = flyoutData();
-        const id = videoIdFromUrl(data.url);
-        closeHomeFlyout();
-        if (!id) return;
-        const isShort = /\/shorts\//.test(data.url);
-        toggleBookmark({ id, title: data.title, channel: '', isShort });
+        copyTextToClipboard(clean, T('Đã chép liên kết: {0}', [previewText(clean, 45)]));
       });
     }
 
@@ -3122,7 +3200,7 @@
       panel.className = HOME_FLYOUT_CLASS;
       panel.dataset.ytAidVersion = EXT_VERSION;
       panel.setAttribute('role', 'group');
-      panel.setAttribute('aria-label', 'Công cụ video');
+      panel.setAttribute('aria-label', T('Công cụ video'));
       panel.setAttribute('aria-hidden', 'true');
       panel.addEventListener('pointerdown', (e) => e.stopPropagation());
       panel.addEventListener('click', (e) => e.stopPropagation());
@@ -3318,15 +3396,15 @@
     document.querySelectorAll('.yt-aid-random-go').forEach((button) => {
       button.disabled = !!randomRequest || !enabled;
       button.setAttribute('aria-busy', randomRequest ? 'true' : 'false');
-      button.querySelector('span').textContent = randomRequest ? 'Đang chọn…' : 'Video ngẫu nhiên';
-      button.title = !enabled ? 'Chọn ít nhất một loại video trong bộ lọc' :
-        options.feed ? 'Chọn ngẫu nhiên từ FYP / feed của bạn' : 'Khám phá từ tìm kiếm công khai, không dùng feed';
+      button.querySelector('span').textContent = T(randomRequest ? 'Đang chọn…' : 'Random video');
+      button.title = !enabled ? T('Chọn ít nhất một loại video trong bộ lọc') :
+        T(options.feed ? 'Chọn ngẫu nhiên từ FYP / feed của bạn' : 'Khám phá từ tìm kiếm công khai, không dùng feed');
     });
     document.querySelectorAll('#yt-aid-random-menu input').forEach((input) => {
       input.checked = options[input.dataset.randomKey];
     });
     const state = document.getElementById('yt-aid-random-feed-state');
-    if (state) state.textContent = options.feed ? 'Bật' : 'Tắt';
+    if (state) state.textContent = T(options.feed ? 'Bật' : 'Tắt');
   }
 
   function buildRandomVideoControl() {
@@ -3335,7 +3413,7 @@
     const go = makeIconButton('yt-aid-pill-btn yt-aid-random-go', 'Video ngẫu nhiên',
       'M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z', openRandomVideo);
     const label = document.createElement('span');
-    label.textContent = 'Video ngẫu nhiên';
+    label.textContent = 'Random video';
     go.appendChild(label);
     group.appendChild(go);
     const filter = makeIconButton('yt-aid-pill-btn yt-aid-random-filter', 'Lọc video ngẫu nhiên',
@@ -3399,7 +3477,7 @@
     note.className = 'yt-aid-tools-desc yt-aid-random-note';
     note.textContent = 'Bật: chọn trong feed đã tải; ngoài feed sẽ lấy Trang chủ. Tắt: tìm kiếm công khai theo chủ đề ngẫu nhiên, không gửi cookie tài khoản; không phải toàn bộ kho YouTube. Video nhạc theo danh mục Music của YouTube. Chọn ít nhất một loại.';
     menu.appendChild(note);
-    return menu;
+    return localizeTree(menu);
   }
 
   function injectRandomHomeControl() {
@@ -3422,6 +3500,7 @@
     bar.id = 'yt-aid-random-home';
     bar.appendChild(buildRandomVideoControl());
     grid.parentElement.insertBefore(bar, grid);
+    localizeTree(bar);
     syncRandomVideoUi();
   }
 
@@ -3773,7 +3852,7 @@
     if (!data || !data.id) return false;
     const t = Math.max(0, Math.floor(Number(time) || 0));
     if (bookmarks.some((b) => b.id === data.id && b.time === t)) {
-      showToast(`Đã có bookmark tại ${formatVideoTime(t)}`, 'warning');
+      showToast(T('Đã có bookmark tại {0}', [formatVideoTime(t)]), 'warning');
       return false;
     }
     bookmarks = [{
@@ -3791,22 +3870,11 @@
     syncBookmarkUi();
     showToast(
       t > 0
-        ? `Đã lưu bookmark tại ${formatVideoTime(t)}`
-        : `Đã thêm bookmark: "${previewText(data.title || data.id, 35)}"`,
+        ? T('Đã lưu bookmark tại {0}', [formatVideoTime(t)])
+        : T('Đã thêm bookmark: "{0}"', [previewText(data.title || data.id, 35)]),
       'success'
     );
     return true;
-  }
-
-  // Dùng cho nút trên thẻ video ở Trang chủ (không biết mốc thời gian): bật/tắt bookmark ở 0:00.
-  function toggleBookmark(data) {
-    if (!data || !data.id) return;
-    const existing = bookmarks.find((b) => b.id === data.id && b.time === 0);
-    if (existing) {
-      removeBookmark(existing.uid);
-      return;
-    }
-    addBookmark(data, 0);
   }
 
   function closeBookmarkConfirm(confirmed) {
@@ -3861,13 +3929,13 @@
       const cancel = document.createElement('button');
       cancel.type = 'button';
       cancel.className = 'yt-aid-bm-confirm-cancel';
-      cancel.textContent = 'Hủy';
+      cancel.textContent = T('Hủy');
       cancel.addEventListener('click', () => closeBookmarkConfirm(false));
       actions.appendChild(cancel);
       const accept = document.createElement('button');
       accept.type = 'button';
       accept.className = 'yt-aid-bm-confirm-delete';
-      accept.textContent = confirmLabel || 'Xóa';
+      accept.textContent = confirmLabel || T('Xóa');
       accept.addEventListener('click', () => closeBookmarkConfirm(true));
       actions.appendChild(accept);
       dialog.appendChild(actions);
@@ -3906,9 +3974,9 @@
     if (!bm) return;
     const label = bm.name || bm.title || bm.id;
     const confirmed = await confirmBookmarkAction(
-      'Xóa bookmark?',
+      T('Xóa bookmark?'),
       `${previewText(label, 80)} · ${formatVideoTime(bm.time)}`,
-      'Xóa bookmark'
+      T('Xóa bookmark')
     );
     if (!confirmed || !bookmarks.some((item) => item.uid === uid)) return;
     bookmarks = bookmarks.filter((item) => item.uid !== uid);
@@ -3922,7 +3990,8 @@
     const bm = bookmarks.find((b) => b.uid === uid);
     if (!bm) return;
     // Trùng tên gốc của video hoặc tên mặc định của log thì coi như không đặt tên riêng.
-    if (name === bm.title || name === `Bookmark tại ${formatVideoTime(bm.time)}`) name = '';
+    const timeText = formatVideoTime(bm.time);
+    if (name === bm.title || name === `Bookmark tại ${timeText}` || name === `Bookmark at ${timeText}`) name = '';
     if (bm.name !== name) {
       bm.name = name;
       saveBookmarks();
@@ -3936,9 +4005,9 @@
     const targetUids = new Set(list.map((b) => b.uid));
     const title = list.find((b) => b.title)?.title || id;
     const confirmed = await confirmBookmarkAction(
-      `Xóa ${list.length} bookmark?`,
+      T('Xóa {0} bookmark?', [list.length]),
       previewText(title, 80),
-      'Xóa tất cả mốc'
+      T('Xóa tất cả mốc')
     );
     if (!confirmed) return;
     const before = bookmarks.length;
@@ -3947,7 +4016,7 @@
     if (!count) return;
     saveBookmarks();
     syncBookmarkUi();
-    showToast(`Đã xóa ${count} bookmark của video`, 'info');
+    showToast(T('Đã xóa {0} bookmark của video', [count]), 'info');
   }
 
   async function clearAllBookmarks() {
@@ -3955,9 +4024,9 @@
     const targetUids = new Set(bookmarks.map((b) => b.uid));
     const count = targetUids.size;
     const confirmed = await confirmBookmarkAction(
-      'Xóa tất cả bookmark?',
-      `${count} bookmark sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.`,
-      'Xóa tất cả'
+      T('Xóa tất cả bookmark?'),
+      T('{0} bookmark sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.', [count]),
+      T('Xóa tất cả')
     );
     if (!confirmed) return;
     const before = bookmarks.length;
@@ -3966,7 +4035,7 @@
     if (!removed) return;
     saveBookmarks();
     syncBookmarkUi();
-    showToast(`Đã xóa ${removed} bookmark`, 'info');
+    showToast(T('Đã xóa {0} bookmark', [removed]), 'info');
   }
 
   function loadBookmarks(done) {
@@ -3994,7 +4063,7 @@
     input.className = 'yt-aid-bm-rename-input';
     input.maxLength = BOOKMARK_NAME_MAX;
     input.value = bookmarkDisplayName(bm);
-    input.placeholder = 'Tên bookmark';
+    input.placeholder = T('Tên bookmark');
     parent.replaceChild(input, nameEl);
     input.focus();
     input.select();
@@ -4040,18 +4109,11 @@
       const label = logBtn.querySelector('span');
       const text = count > 0 ? String(count) : '';
       if (label && label.textContent !== text) label.textContent = text;
-      const logTitle = count > 0 ? `Xem log bookmark của video này (${count})` : 'Xem log bookmark của video này';
+      const logTitle = count > 0
+        ? T('Xem log bookmark của video này ({0})', [count])
+        : T('Xem log bookmark của video này');
       if (logBtn.title !== logTitle) logBtn.title = logTitle;
       logBtn.classList.toggle('active', count > 0);
-    }
-
-    const flyoutBtn = document.querySelector(`.${HOME_FLYOUT_CLASS} .yt-aid-bookmark`);
-    if (flyoutBtn && homeFlyout.data) {
-      const fid = videoIdFromUrl(homeFlyout.data.url);
-      const on = !!fid && bookmarks.some((b) => b.id === fid && b.time === 0);
-      flyoutBtn.classList.toggle('active', on);
-      const path = flyoutBtn.querySelector('path');
-      if (path) path.setAttribute('d', on ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE);
     }
   }
 
@@ -4130,7 +4192,7 @@
     saveBookmarks();
     syncBookmarkUi(true);
     showToast(
-      next ? `Đã yêu thích · ${FAVORITE_ICONS[next].label}` : 'Đã bỏ yêu thích bookmark',
+      next ? T('Đã yêu thích · {0}', [T(FAVORITE_ICONS[next].label)]) : T('Đã bỏ yêu thích bookmark'),
       next ? 'success' : 'info'
     );
   }
@@ -4146,7 +4208,7 @@
     const picker = document.createElement('div');
     picker.className = 'yt-aid-bm-favorite-picker';
     picker.setAttribute('role', 'menu');
-    picker.setAttribute('aria-label', 'Chọn biểu tượng yêu thích');
+    picker.setAttribute('aria-label', T('Chọn biểu tượng yêu thích'));
 
     FAVORITE_ICON_KEYS.forEach((key) => {
       const option = document.createElement('button');
@@ -4155,10 +4217,10 @@
       option.classList.toggle('active', bm.favoriteIcon === key);
       option.setAttribute('role', 'menuitemradio');
       option.setAttribute('aria-checked', bm.favoriteIcon === key ? 'true' : 'false');
-      option.title = FAVORITE_ICONS[key].label;
+      option.title = T(FAVORITE_ICONS[key].label);
       option.appendChild(svgIcon(FAVORITE_ICONS[key].path));
       const label = document.createElement('span');
-      label.textContent = FAVORITE_ICONS[key].label;
+      label.textContent = T(FAVORITE_ICONS[key].label);
       option.appendChild(label);
       option.addEventListener('click', (event) => {
         event.preventDefault();
@@ -4171,7 +4233,7 @@
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'yt-aid-bm-favorite-remove';
-    remove.textContent = 'Bỏ yêu thích';
+    remove.textContent = T('Bỏ yêu thích');
     remove.disabled = !bm.favoriteIcon;
     remove.addEventListener('click', (event) => {
       event.preventDefault();
@@ -4217,7 +4279,7 @@
     const iconKey = FAVORITE_ICON_KEYS.includes(bm.favoriteIcon) ? bm.favoriteIcon : '';
     const toggle = makeIconButton(
       `yt-aid-bm-action yt-aid-bm-favorite${iconKey ? ' active' : ''}`,
-      iconKey ? `Bỏ yêu thích · ${FAVORITE_ICONS[iconKey].label}` : 'Yêu thích bookmark',
+      iconKey ? T('Bỏ yêu thích · {0}', [T(FAVORITE_ICONS[iconKey].label)]) : T('Yêu thích bookmark'),
       iconKey ? FAVORITE_ICONS[iconKey].path : HEART_OUTLINE_ICON,
       () => toggleBookmarkFavorite(bm.uid)
     );
@@ -4227,7 +4289,7 @@
     if (iconKey) {
       const choose = makeIconButton(
         'yt-aid-bm-action yt-aid-bm-favorite-choose',
-        'Đổi biểu tượng yêu thích',
+        T('Đổi biểu tượng yêu thích'),
         CHEVRON_DOWN_ICON,
         () => openFavoritePicker(choose, bm)
       );
@@ -4256,7 +4318,7 @@
   }
 
   function defaultBookmarkLabel(bm) {
-    return `Bookmark tại ${formatVideoTime(bm.time)}`;
+    return T('Bookmark tại {0}', [formatVideoTime(bm.time)]);
   }
 
   // 1 dòng bookmark: [mốc thời gian] [tên] [đổi tên] [xóa] — dùng ở Log và trang Bookmark.
@@ -4267,7 +4329,7 @@
     const timeBtn = document.createElement('button');
     timeBtn.type = 'button';
     timeBtn.className = 'yt-aid-bm-log-time';
-    timeBtn.title = 'Tua tới mốc này';
+    timeBtn.title = T('Tua tới mốc này');
     timeBtn.textContent = formatVideoTime(bm.time);
     timeBtn.addEventListener('click', (e) => openBookmark(e, bm));
     row.appendChild(timeBtn);
@@ -4282,8 +4344,8 @@
 
     // Ô nhập đổi tên bắt đầu từ tên đang hiển thị.
     const editBm = { ...bm, name: bm.name || defaultBookmarkLabel(bm), title: '' };
-    row.appendChild(makeIconButton('yt-aid-bm-action', 'Đổi tên', EDIT_ICON, () => startInlineRename(name, editBm)));
-    row.appendChild(makeIconButton('yt-aid-bm-action yt-aid-bm-action-danger', 'Xóa bookmark', TRASH_ICON, () => removeBookmark(bm.uid)));
+    row.appendChild(makeIconButton('yt-aid-bm-action', T('Đổi tên'), EDIT_ICON, () => startInlineRename(name, editBm)));
+    row.appendChild(makeIconButton('yt-aid-bm-action yt-aid-bm-action-danger', T('Xóa bookmark'), TRASH_ICON, () => removeBookmark(bm.uid)));
     return row;
   }
 
@@ -4311,7 +4373,7 @@
     if (multi || (single && single.time > 0)) {
       const badge = document.createElement('span');
       badge.className = multi ? 'yt-aid-bm-time yt-aid-bm-count' : 'yt-aid-bm-time';
-      badge.textContent = multi ? `${items.length} bookmark` : formatVideoTime(single.time);
+      badge.textContent = multi ? T('{0} bookmark', [items.length]) : formatVideoTime(single.time);
       thumbLink.appendChild(badge);
     }
     card.appendChild(thumbLink);
@@ -4361,7 +4423,7 @@
         more.type = 'button';
         more.className = 'yt-aid-bm-chip yt-aid-bm-chip-more';
         more.textContent = `+${items.length - MAX_CHIPS}`;
-        more.title = 'Xem tất cả bookmark';
+        more.title = T('Xem tất cả bookmark');
         more.addEventListener('click', (e) => {
           e.preventDefault();
           openBookmarkPage();
@@ -4381,10 +4443,10 @@
       const clearVideo = document.createElement('button');
       clearVideo.type = 'button';
       clearVideo.className = 'yt-aid-bm-danger-btn yt-aid-bm-video-clear';
-      clearVideo.title = 'Xóa tất cả bookmark của video này';
+      clearVideo.title = T('Xóa tất cả bookmark của video này');
       clearVideo.appendChild(svgIcon(TRASH_ICON));
       const clearVideoText = document.createElement('span');
-      clearVideoText.textContent = `Xóa tất cả (${items.length})`;
+      clearVideoText.textContent = T('Xóa tất cả ({0})', [items.length]);
       clearVideo.appendChild(clearVideoText);
       clearVideo.addEventListener('click', () => removeVideoBookmarks(group.id));
       info.appendChild(clearVideo);
@@ -4396,12 +4458,12 @@
     const actions = document.createElement('div');
     actions.className = 'yt-aid-bm-actions';
     if (compact && single) {
-      actions.appendChild(makeIconButton('yt-aid-bm-action', 'Đổi tên bookmark', EDIT_ICON, () => startInlineRename(titleLink, single)));
-      actions.appendChild(makeIconButton('yt-aid-bm-action yt-aid-bm-action-danger', 'Xóa bookmark', CLOSE_ICON, () => removeBookmark(single.uid)));
+      actions.appendChild(makeIconButton('yt-aid-bm-action', T('Đổi tên bookmark'), EDIT_ICON, () => startInlineRename(titleLink, single)));
+      actions.appendChild(makeIconButton('yt-aid-bm-action yt-aid-bm-action-danger', T('Xóa bookmark'), CLOSE_ICON, () => removeBookmark(single.uid)));
     } else {
       actions.appendChild(makeIconButton(
         'yt-aid-bm-action yt-aid-bm-action-danger',
-        multi ? `Xóa ${items.length} bookmark của video` : 'Xóa bookmark',
+        multi ? T('Xóa {0} bookmark của video', [items.length]) : T('Xóa bookmark'),
         TRASH_ICON,
         () => removeVideoBookmarks(group.id)
       ));
@@ -4429,10 +4491,10 @@
     shelf.classList.toggle('yt-aid-bm-shelf-collapsed', bookmarkShelfCollapsed);
     const toggle = shelf.querySelector('.yt-aid-bm-shelf-toggle');
     if (!toggle) return;
-    toggle.title = bookmarkShelfCollapsed ? 'Hiển thị video bookmark' : 'Ẩn video bookmark';
+    toggle.title = T(bookmarkShelfCollapsed ? 'Hiển thị video bookmark' : 'Ẩn video bookmark');
     toggle.setAttribute('aria-expanded', bookmarkShelfCollapsed ? 'false' : 'true');
     toggle.querySelector('path').setAttribute('d', bookmarkShelfCollapsed ? EYE_ICON : EYE_OFF_ICON);
-    toggle.querySelector('span').textContent = bookmarkShelfCollapsed ? 'Hiện' : 'Ẩn';
+    toggle.querySelector('span').textContent = T(bookmarkShelfCollapsed ? 'Hiện' : 'Ẩn');
   }
 
   function renderBookmarkShelf() {
@@ -4452,8 +4514,8 @@
     const titleText = document.createElement('span');
     const shelfGroups = groupBookmarksByVideo(bookmarks);
     titleText.textContent = shelfGroups.length === bookmarks.length
-      ? `Bookmark (${bookmarks.length})`
-      : `Bookmark (${shelfGroups.length} video · ${bookmarks.length} mốc)`;
+      ? T('Bookmark ({0})', [bookmarks.length])
+      : T('Bookmark ({0} video · {1} mốc)', [shelfGroups.length, bookmarks.length]);
     title.appendChild(titleText);
     header.appendChild(title);
 
@@ -4462,11 +4524,11 @@
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'yt-aid-bm-link-btn yt-aid-bm-shelf-toggle';
-    toggle.title = bookmarkShelfCollapsed ? 'Hiển thị video bookmark' : 'Ẩn video bookmark';
+    toggle.title = T(bookmarkShelfCollapsed ? 'Hiển thị video bookmark' : 'Ẩn video bookmark');
     toggle.setAttribute('aria-expanded', bookmarkShelfCollapsed ? 'false' : 'true');
     toggle.appendChild(svgIcon(bookmarkShelfCollapsed ? EYE_ICON : EYE_OFF_ICON));
     const toggleText = document.createElement('span');
-    toggleText.textContent = bookmarkShelfCollapsed ? 'Hiện' : 'Ẩn';
+    toggleText.textContent = T(bookmarkShelfCollapsed ? 'Hiện' : 'Ẩn');
     toggle.appendChild(toggleText);
     toggle.addEventListener('click', () => setBookmarkShelfCollapsed(!bookmarkShelfCollapsed));
     headerActions.appendChild(toggle);
@@ -4474,7 +4536,7 @@
     const more = document.createElement('button');
     more.type = 'button';
     more.className = 'yt-aid-bm-link-btn';
-    more.textContent = 'Xem tất cả';
+    more.textContent = T('Xem tất cả');
     more.addEventListener('click', openBookmarkPage);
     headerActions.appendChild(more);
     header.appendChild(headerActions);
@@ -4524,7 +4586,7 @@
     if (!list.length) {
       const empty = document.createElement('div');
       empty.className = 'yt-aid-bm-log-empty';
-      empty.textContent = 'Video này chưa có bookmark. Bấm nút Bookmark để lưu mốc thời gian hiện tại.';
+      empty.textContent = T('Video này chưa có bookmark. Bấm nút Bookmark để lưu mốc thời gian hiện tại.');
       menu.appendChild(empty);
       return;
     }
@@ -4537,7 +4599,7 @@
     const clear = document.createElement('button');
     clear.type = 'button';
     clear.className = 'yt-aid-bm-danger-btn yt-aid-bm-log-clear';
-    clear.textContent = 'Xóa tất cả bookmark của video này';
+    clear.textContent = T('Xóa tất cả bookmark của video này');
     clear.addEventListener('click', () => removeVideoBookmarks(id));
     menu.appendChild(clear);
   }
@@ -4607,7 +4669,7 @@
       entry.href = '#';
       entry.appendChild(svgIcon(BOOKMARK_ICON_OUTLINE));
       const label = document.createElement('span');
-      label.textContent = 'Bookmark';
+      label.textContent = T('Bookmark');
       entry.appendChild(label);
       entry.addEventListener('click', openBookmarkFromGuide);
       items.appendChild(entry);
@@ -4624,7 +4686,7 @@
       entry.href = '#';
       entry.appendChild(svgIcon(BOOKMARK_ICON_OUTLINE));
       const label = document.createElement('span');
-      label.textContent = 'Bookmark';
+      label.textContent = T('Bookmark');
       entry.appendChild(label);
       entry.addEventListener('click', openBookmarkFromGuide);
       mini.appendChild(entry);
@@ -4678,17 +4740,17 @@
     const list = q ? bookmarks.filter((bm) => bookmarkSearchText(bm).includes(q)) : bookmarks;
 
     if (!list.length) {
-      if (count) count.textContent = `0 video · ${bookmarks.length} bookmark`;
+      if (count) count.textContent = T('{0} video · {1} bookmark', [0, bookmarks.length]);
       const empty = document.createElement('div');
       empty.className = 'yt-aid-bm-empty';
       empty.textContent = bookmarks.length
-        ? 'Không tìm thấy bookmark nào khớp.'
-        : 'Chưa có bookmark nào. Mở một video và bấm nút Bookmark để lưu mốc thời gian.';
+        ? T('Không tìm thấy bookmark nào khớp.')
+        : T('Chưa có bookmark nào. Mở một video và bấm nút Bookmark để lưu mốc thời gian.');
       grid.replaceChildren(empty);
       return;
     }
     const groups = groupBookmarksByVideo(list);
-    const countText = `${groups.length} video · ${list.length} bookmark`;
+    const countText = T('{0} video · {1} bookmark', [groups.length, list.length]);
     if (count && count.textContent !== countText) count.textContent = countText;
     const cards = groups.map((group) => {
       const signature = JSON.stringify(group);
@@ -4743,7 +4805,7 @@
       const h = document.createElement('h2');
       h.appendChild(svgIcon(BOOKMARK_ICON_FILLED));
       const hText = document.createElement('span');
-      hText.textContent = 'Bookmark';
+      hText.textContent = T('Bookmark');
       h.appendChild(hText);
       header.appendChild(h);
 
@@ -4754,7 +4816,7 @@
       const search = document.createElement('input');
       search.type = 'search';
       search.className = 'yt-aid-bm-search';
-      search.placeholder = 'Tìm trong bookmark…';
+      search.placeholder = T('Tìm trong bookmark…');
       search.addEventListener('input', () => {
         bookmarkFilter = search.value;
         renderBookmarkPage();
@@ -4764,10 +4826,10 @@
       const clearAll = document.createElement('button');
       clearAll.type = 'button';
       clearAll.className = 'yt-aid-bm-danger-btn yt-aid-bm-clear-all';
-      clearAll.title = 'Xóa tất cả bookmark';
+      clearAll.title = T('Xóa tất cả bookmark');
       clearAll.appendChild(svgIcon(TRASH_ICON));
       const clearText = document.createElement('span');
-      clearText.textContent = 'Xóa tất cả';
+      clearText.textContent = T('Xóa tất cả');
       clearAll.appendChild(clearText);
       clearAll.addEventListener('click', clearAllBookmarks);
       header.appendChild(clearAll);
@@ -4775,8 +4837,8 @@
       const closeBtn = document.createElement('button');
       closeBtn.type = 'button';
       closeBtn.className = 'yt-aid-bm-close';
-      closeBtn.title = 'Đóng (Esc)';
-      closeBtn.setAttribute('aria-label', 'Đóng');
+      closeBtn.title = T('Đóng (Esc)');
+      closeBtn.setAttribute('aria-label', T('Đóng'));
       closeBtn.appendChild(svgIcon(CLOSE_ICON));
       closeBtn.addEventListener('click', closeBookmarkPage);
       header.appendChild(closeBtn);
@@ -5171,15 +5233,6 @@
     window.addEventListener('yt-navigate-finish', syncMixState);
     window.addEventListener('popstate', syncMixState);
     syncMixState();
-  }
-
-  // ==========================================
-  // 12. ẨN THANH CHỦ ĐỀ (chip lọc: Tất cả, Âm nhạc, ...)
-  // ==========================================
-  function syncChipBarState() {
-    const root = document.documentElement;
-    if (IS_MUSIC_SITE || !settings.enableHideChips) root.removeAttribute('data-yt-aid-hide-chips');
-    else root.setAttribute('data-yt-aid-hide-chips', '');
   }
 
 })();
