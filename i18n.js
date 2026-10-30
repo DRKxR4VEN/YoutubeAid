@@ -181,6 +181,7 @@
     ['Không tìm thấy liên kết video', 'Video link not found'],
     ['Mở trang tải dự phòng', 'Open backup download page'],
     ['Hủy tải', 'Cancel download'],
+    ['Đang tải xuống dưới nền', 'Downloading in background'],
     ['Tải MP3 / MP4', 'Download MP3 / MP4'],
     ['Tải MP3 & MP4', 'Download MP3 & MP4'],
     ['Tải video MP4 và nhạc MP3 chất lượng cao', 'Download high-quality MP4 videos and MP3 music'],

@@ -2163,6 +2163,17 @@
   let activeMediaDownload = null;
   let mediaDownloadModalEl = null;
 
+  // Chi dong UI modal, KHONG huy download (cho nut X — tai duoi nen)
+  function dismissMediaDownloadModal() {
+    if (mediaDownloadModalEl) {
+      const el = mediaDownloadModalEl;
+      mediaDownloadModalEl = null;
+      el.classList.remove('yt-aid-dl-open');
+      setTimeout(() => el.remove(), 180);
+    }
+  }
+
+  // Huy download hoan toan + dong UI (cho nut Huy)
   function closeMediaDownloadModal() {
     if (activeMediaDownload && activeMediaDownload.pollTimer) {
       clearInterval(activeMediaDownload.pollTimer);
@@ -2172,13 +2183,7 @@
       activeMediaDownload.aborted = true;
       activeMediaDownload = null;
     }
-
-    if (mediaDownloadModalEl) {
-      const el = mediaDownloadModalEl;
-      mediaDownloadModalEl = null;
-      el.classList.remove('yt-aid-dl-open');
-      setTimeout(() => el.remove(), 180);
-    }
+    dismissMediaDownloadModal();
   }
 
   function startMediaDownload({ videoUrl, title, format = 'mp3', formatLabel = 'MP3' }) {
@@ -2258,17 +2263,26 @@
     const progressFill = overlay.querySelector('#yt-aid-dl-progress-fill');
     const progressText = overlay.querySelector('#yt-aid-dl-progress-text');
 
-    const handleClose = () => closeMediaDownloadModal();
-    closeBtn.addEventListener('click', handleClose);
-    cancelBtn.addEventListener('click', handleClose);
+    // Nut X va click backdrop: dong modal, tai duoi nen (khong huy)
+    const handleDismiss = () => {
+      const wasActive = activeMediaDownload && !activeMediaDownload.aborted;
+      dismissMediaDownloadModal();
+      if (wasActive) {
+        showToast(T('Đang tải xuống dưới nền'), 'info', 3000);
+      }
+    };
+    // Nut Huy: huy download hoan toan
+    const handleCancel = () => closeMediaDownloadModal();
+    closeBtn.addEventListener('click', handleDismiss);
+    cancelBtn.addEventListener('click', handleCancel);
     overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) handleClose();
+      if (e.target === overlay) handleDismiss();
     });
 
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
         document.removeEventListener('keydown', onKeyDown, true);
-        handleClose();
+        handleDismiss();
       }
     };
     document.addEventListener('keydown', onKeyDown, true);
@@ -2290,19 +2304,23 @@
       videoUrl: cleanUrl,
       format
     }, (res) => {
-      if (activeMediaDownload?.aborted || !mediaDownloadModalEl) return;
+      if (activeMediaDownload?.aborted) return;
 
       if (!res || !res.success || !res.progressUrl) {
         const errMsg = res?.error || T('Không thể kết nối dịch vụ chuyển đổi, hãy thử lại.');
-        statusEl.textContent = errMsg;
-        statusEl.classList.add('error');
+        if (mediaDownloadModalEl) {
+          statusEl.textContent = errMsg;
+          statusEl.classList.add('error');
+        }
         showToast(T('Lỗi khi tải: {0}', [errMsg]), 'error');
         return;
       }
 
-      statusEl.textContent = T('Đang chuyển đổi: {0}%', ['10']);
-      progressFill.style.width = '10%';
-      progressText.textContent = '10%';
+      if (mediaDownloadModalEl) {
+        statusEl.textContent = T('Đang chuyển đổi: {0}%', ['10']);
+        progressFill.style.width = '10%';
+        progressText.textContent = '10%';
+      }
 
       let pollAttempts = 0;
       const MAX_POLLS = 120; // 4 minutes
@@ -2311,8 +2329,12 @@
         pollAttempts++;
         if (pollAttempts > MAX_POLLS) {
           if (activeMediaDownload?.pollTimer) clearInterval(activeMediaDownload.pollTimer);
-          statusEl.textContent = T('Quá thời gian xử lý, hãy bấm vào trang dự phòng để tải.');
-          statusEl.classList.add('error');
+          if (mediaDownloadModalEl) {
+            statusEl.textContent = T('Quá thời gian xử lý, hãy bấm vào trang dự phòng để tải.');
+            statusEl.classList.add('error');
+          } else {
+            showToast(T('Quá thời gian xử lý, hãy bấm vào trang dự phòng để tải.'), 'warning');
+          }
           return;
         }
 
@@ -2320,40 +2342,50 @@
           action: 'checkMediaProgress',
           progressUrl: res.progressUrl
         }, (pollRes) => {
-          if (activeMediaDownload?.aborted || !mediaDownloadModalEl) return;
+          if (activeMediaDownload?.aborted) return;
 
           if (!pollRes || !pollRes.success) {
             return;
           }
 
           const pct = Math.max(10, Math.min(100, pollRes.progress || 10));
-          progressFill.style.width = `${pct}%`;
-          progressText.textContent = `${pct}%`;
-          statusEl.textContent = T('Đang chuyển đổi: {0}%', [String(pct)]);
+          if (mediaDownloadModalEl) {
+            progressFill.style.width = `${pct}%`;
+            progressText.textContent = `${pct}%`;
+            statusEl.textContent = T('Đang chuyển đổi: {0}%', [String(pct)]);
+          }
 
           if (pollRes.isFinished && pollRes.downloadUrl) {
             if (activeMediaDownload?.pollTimer) clearInterval(activeMediaDownload.pollTimer);
             if (activeMediaDownload) activeMediaDownload.pollTimer = null;
 
-            progressFill.style.width = '100%';
-            progressText.textContent = '100%';
-            statusEl.textContent = T('Đang tải file về máy…');
+            if (mediaDownloadModalEl) {
+              progressFill.style.width = '100%';
+              progressText.textContent = '100%';
+              statusEl.textContent = T('Đang tải file về máy…');
+            }
 
             chrome.runtime.sendMessage({
               action: 'saveMediaFile',
               url: pollRes.downloadUrl,
               filename: targetFilename
             }, (saveRes) => {
-              if (activeMediaDownload?.aborted || !mediaDownloadModalEl) return;
+              if (activeMediaDownload?.aborted) return;
 
               if (saveRes?.success) {
-                statusEl.textContent = T('Tải xuống hoàn tất!');
-                statusEl.classList.add('success');
                 showToast(T('Tải xuống hoàn tất!'), 'success', 3000);
-                cancelBtn.textContent = T('Đóng');
-                setTimeout(() => {
-                  closeMediaDownloadModal();
-                }, 2400);
+                if (mediaDownloadModalEl) {
+                  statusEl.textContent = T('Tải xuống hoàn tất!');
+                  statusEl.classList.add('success');
+                  cancelBtn.textContent = T('Đóng');
+                  setTimeout(() => {
+                    closeMediaDownloadModal();
+                  }, 2400);
+                } else {
+                  // Download hoan tat o nen, don dep
+                  if (activeMediaDownload) activeMediaDownload.aborted = true;
+                  activeMediaDownload = null;
+                }
               } else {
                 const a = document.createElement('a');
                 a.href = pollRes.downloadUrl;
@@ -2362,9 +2394,15 @@
                 document.body.appendChild(a);
                 a.click();
                 setTimeout(() => a.remove(), 1000);
+                showToast(T('Tải xuống hoàn tất!'), 'success', 3000);
 
-                statusEl.textContent = T('Tải xuống hoàn tất!');
-                cancelBtn.textContent = T('Đóng');
+                if (mediaDownloadModalEl) {
+                  statusEl.textContent = T('Tải xuống hoàn tất!');
+                  cancelBtn.textContent = T('Đóng');
+                } else {
+                  if (activeMediaDownload) activeMediaDownload.aborted = true;
+                  activeMediaDownload = null;
+                }
               }
             });
           }
@@ -2676,14 +2714,14 @@
     window.addEventListener('yt-navigate-start', () => {
       cancelRandomVideo();
       closeDropdown();
-      try { closeMediaDownloadModal(); } catch (e) { }
+      try { dismissMediaDownloadModal(); } catch (e) { }
     });
     window.addEventListener('pagehide', cancelRandomVideo);
     window.addEventListener('yt-navigate-finish', () => {
       cancelRandomVideo();
       closeHomeFlyout();
       closeDropdown();
-      try { closeMediaDownloadModal(); } catch (e) { }
+      try { dismissMediaDownloadModal(); } catch (e) { }
       scheduleInjection(80, true);
     });
 
@@ -5605,6 +5643,27 @@
     scheduleAdSkip();
   }
 
+  function removeSecondaryAdBanners() {
+    if (!settings.enableHideAds) return;
+    try {
+      const adSlots = document.querySelectorAll(
+        'ytd-ad-slot-renderer, ' +
+        '#secondary ytd-ad-slot-renderer, ' +
+        '#secondary-inner ytd-ad-slot-renderer, ' +
+        'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"], ' +
+        '#panels:has(ytd-ads-engagement-panel-content-renderer), ' +
+        '#masthead-ad'
+      );
+      adSlots.forEach((slot) => {
+        slot.style.setProperty('display', 'none', 'important');
+        const parentSection = slot.closest('ytd-item-section-renderer, ytd-rich-item-renderer, ytd-rich-section-renderer');
+        if (parentSection && parentSection.querySelectorAll('ytd-video-renderer, ytd-rich-grid-media').length === 0) {
+          parentSection.style.setProperty('display', 'none', 'important');
+        }
+      });
+    } catch (e) { }
+  }
+
   function initAdSkipper() {
     if (IS_MUSIC_SITE) return;
     attachAdSkipObservers();
@@ -5614,6 +5673,7 @@
     });
     // Dự phòng: gắn lại observer khi player bị YouTube thay mới và quét định kỳ.
     setInterval(() => {
+      removeSecondaryAdBanners();
       if (!settings.enableAdSkip) return;
       attachAdSkipObservers();
       runAdSkip();

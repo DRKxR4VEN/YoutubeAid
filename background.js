@@ -7,6 +7,12 @@ const RULE_ID_LOADER = 1001;
 const RULE_ID_AFFADAFFA = 1002;
 const RULE_ID_SAVENOW = 1003;
 
+// Server danh sách: ưu tiên p.savenow.to (nhanh hơn), fallback sang loader.to
+const DOWNLOAD_SERVERS = [
+  { base: 'https://p.savenow.to', referer: 'https://p.savenow.to/', origin: 'https://p.savenow.to' },
+  { base: 'https://loader.to',    referer: 'https://loader.to/',    origin: 'https://loader.to' }
+];
+
 function setupHeaderRules() {
   if (!chrome.declarativeNetRequest) return;
 
@@ -32,8 +38,8 @@ function setupHeaderRules() {
       action: {
         type: 'modifyHeaders',
         requestHeaders: [
-          { header: 'Referer', operation: 'set', value: 'https://loader.to/' },
-          { header: 'Origin', operation: 'set', value: 'https://loader.to' }
+          { header: 'Referer', operation: 'set', value: 'https://p.savenow.to/' },
+          { header: 'Origin', operation: 'set', value: 'https://p.savenow.to' }
         ]
       },
       condition: {
@@ -47,12 +53,12 @@ function setupHeaderRules() {
       action: {
         type: 'modifyHeaders',
         requestHeaders: [
-          { header: 'Referer', operation: 'set', value: 'https://loader.to/' },
-          { header: 'Origin', operation: 'set', value: 'https://loader.to' }
+          { header: 'Referer', operation: 'set', value: 'https://p.savenow.to/' },
+          { header: 'Origin', operation: 'set', value: 'https://p.savenow.to' }
         ]
       },
       condition: {
-        urlFilter: '||savenow.to/api/*',
+        urlFilter: '||savenow.to/*',
         resourceTypes: ['xmlhttprequest', 'sub_frame', 'other']
       }
     }
@@ -113,34 +119,49 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function handleStartDownload({ videoUrl, format = 'mp3' }) {
   if (!videoUrl) throw new Error('Missing video URL');
 
-  const startUrl = `https://loader.to/ajax/download.php?format=${encodeURIComponent(format)}&url=${encodeURIComponent(videoUrl)}`;
-  const res = await fetch(startUrl, {
-    method: 'GET',
-    headers: {
-      'Accept': 'application/json, text/plain, */*',
-      'Referer': 'https://loader.to/',
-      'Origin': 'https://loader.to'
+  let lastError = null;
+
+  // Thử lần lượt các server: ưu tiên server nhanh, fallback server dự phòng
+  for (const server of DOWNLOAD_SERVERS) {
+    try {
+      const startUrl = `${server.base}/ajax/download.php?format=${encodeURIComponent(format)}&url=${encodeURIComponent(videoUrl)}`;
+      const res = await fetch(startUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json, text/plain, */*',
+          'Referer': server.referer,
+          'Origin': server.origin
+        }
+      });
+
+      if (!res.ok) {
+        lastError = new Error(`HTTP error ${res.status} from ${server.base}`);
+        continue;
+      }
+
+      const data = await res.json();
+      if (!data || !data.success || !data.progress_url) {
+        lastError = new Error(data?.message || data?.error || `No progress URL from ${server.base}`);
+        continue;
+      }
+
+      console.log(`[YtAid] Download initiated via ${server.base}`);
+      return {
+        success: true,
+        id: data.id,
+        progressUrl: data.progress_url,
+        title: data.title,
+        info: data.info,
+        format: data.format
+      };
+    } catch (err) {
+      lastError = err;
+      console.warn(`[YtAid] Server ${server.base} failed:`, err.message);
+      continue;
     }
-  });
-
-  if (!res.ok) {
-    throw new Error(`HTTP error ${res.status}`);
   }
 
-  const data = await res.json();
-  if (!data || !data.success || !data.progress_url) {
-    const msg = data?.message || data?.error || 'Could not initiate conversion';
-    throw new Error(msg);
-  }
-
-  return {
-    success: true,
-    id: data.id,
-    progressUrl: data.progress_url,
-    title: data.title,
-    info: data.info,
-    format: data.format
-  };
+  throw lastError || new Error('All download servers failed');
 }
 
 async function handleCheckProgress({ progressUrl }) {
@@ -150,8 +171,8 @@ async function handleCheckProgress({ progressUrl }) {
     method: 'GET',
     headers: {
       'Accept': 'application/json, text/plain, */*',
-      'Referer': 'https://loader.to/',
-      'Origin': 'https://loader.to'
+      'Referer': 'https://p.savenow.to/',
+      'Origin': 'https://p.savenow.to'
     }
   });
 

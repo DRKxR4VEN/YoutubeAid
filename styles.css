@@ -1839,23 +1839,33 @@ html.yt-aid-bm-active ytd-guide-entry-renderer[active] yt-formatted-string {
    10. ẨN KHUNG QUẢNG CÁO (bật bằng class trên <body>)
    Không ẩn .video-ads / .ytp-ad-player-overlay vì auto-skip cần các phần tử này.
    ======================================================== */
-body.yt-aid-hide-ads ytd-ad-slot-renderer,
-body.yt-aid-hide-ads ytd-in-feed-ad-layout-renderer,
-body.yt-aid-hide-ads ytd-display-ad-renderer,
-body.yt-aid-hide-ads ytd-promoted-sparkles-web-renderer,
-body.yt-aid-hide-ads ytd-promoted-video-renderer,
-body.yt-aid-hide-ads ytd-banner-promo-renderer,
-body.yt-aid-hide-ads ytd-statement-banner-renderer,
-body.yt-aid-hide-ads ytd-companion-slot-renderer,
-body.yt-aid-hide-ads ytd-player-legacy-desktop-watch-ads-renderer,
-body.yt-aid-hide-ads ytd-action-companion-ad-renderer,
-body.yt-aid-hide-ads #masthead-ad,
-body.yt-aid-hide-ads #player-ads,
-body.yt-aid-hide-ads .ytp-ad-overlay-container,
-body.yt-aid-hide-ads .ytp-ad-image-overlay,
-body.yt-aid-hide-ads ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
-body.yt-aid-hide-ads ytd-rich-section-renderer:has(ytd-statement-banner-renderer),
-body.yt-aid-hide-ads ytd-rich-section-renderer:has(ytd-ad-slot-renderer) {
+/* Che va an triet de cac banner/slot quang cao o trang chu, cot phai video (secondary), masthead */
+ytd-ad-slot-renderer,
+ytd-in-feed-ad-layout-renderer,
+ytd-display-ad-renderer,
+ytd-promoted-sparkles-web-renderer,
+ytd-promoted-sparkles-text-search-renderer,
+ytd-promoted-video-renderer,
+ytd-banner-promo-renderer,
+ytd-statement-banner-renderer,
+ytd-companion-slot-renderer,
+ytd-player-legacy-desktop-watch-ads-renderer,
+ytd-action-companion-ad-renderer,
+#masthead-ad,
+#player-ads,
+#panels:has(ytd-ads-engagement-panel-content-renderer),
+ytd-ads-engagement-panel-content-renderer,
+ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"],
+ytd-watch-next-secondary-results-renderer ytd-ad-slot-renderer,
+#secondary ytd-ad-slot-renderer,
+#secondary-inner ytd-ad-slot-renderer,
+#secondary #panels-full-bleed-container:has(ytd-ad-slot-renderer),
+.ytp-ad-overlay-container,
+.ytp-ad-image-overlay,
+ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
+ytd-rich-section-renderer:has(ytd-statement-banner-renderer),
+ytd-rich-section-renderer:has(ytd-ad-slot-renderer),
+ytd-item-section-renderer:has(> #contents > ytd-ad-slot-renderer) {
   display: none !important;
 }
 
@@ -1927,14 +1937,27 @@ html[data-yt-aid-ad] .html5-video-player::after {
    thanh về icon; chính nút bật/tắt vẫn giữ nhãn để lần bấm sau rõ ràng.
    ======================================================== */
 .yt-aid-watch-toolbar {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important; /* An thanh cuon neu co */
   gap: 4px;
-  margin-top: 8px;
+  margin-top: 6px;
   margin-bottom: 4px;
-  padding: 4px 5px;
+  padding: 3px 6px;
+}
+.yt-aid-watch-toolbar::-webkit-scrollbar {
+  display: none !important;
 }
 
 .yt-aid-watch-toolbar .yt-aid-toolbar-left,
 .yt-aid-watch-toolbar .yt-aid-toolbar-right {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
   gap: 4px;
 }
 
@@ -1943,14 +1966,22 @@ html[data-yt-aid-ad] .html5-video-player::after {
 }
 
 .yt-aid-watch-toolbar .yt-aid-pill-btn {
-  padding: 4px 8px;
+  padding: 3px 7px;
   font-size: 11px;
-  gap: 5px;
+  gap: 4px;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.yt-aid-watch-toolbar .yt-aid-split-group {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
 }
 
 .yt-aid-watch-toolbar .yt-aid-split-group .yt-aid-pill-btn {
-  padding: 4px 8px;
+  padding: 3px 7px;
   font-size: 11px;
+  white-space: nowrap !important;
 }
 
 .yt-aid-watch-toolbar .yt-aid-tools-btn .yt-aid-chevron {
