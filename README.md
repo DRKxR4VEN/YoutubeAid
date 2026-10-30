@@ -1,171 +1,144 @@
 # YouTube Aid - Chrome Extension (Manifest V3)
 
-Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm (thay thế hoặc nối thêm nội dung cũ), clean link không query tracking, tải ảnh bìa thumbnail/avatar/banner có cắt ảnh tuỳ ý, hệ thống phím tắt điều hướng tức thì (SPA) có thể tùy chỉnh số lần bấm và tự động lặp lại video (Auto Loop, không lặp quảng cáo). Phím tắt cũng hoạt động trên **music.youtube.com**. Toàn bộ giao diện có thể chuyển đổi giữa **Tiếng Việt** và **English**.
+Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: tải Video MP4 & Âm thanh MP3 tốc độ cao, quản lý hàng đợi tải ngầm (Download Queue), sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm (thay thế hoặc nối thêm nội dung cũ), clean link không query tracking, tải ảnh bìa thumbnail/avatar/banner có cắt ảnh tuỳ ý, hệ thống phím tắt điều hướng tức thì (SPA) có thể tùy chỉnh số lần bấm, tự động lặp lại video (Auto Loop, không lặp quảng cáo), tự động bỏ qua quảng cáo kèm hiệu ứng xoay buffer, ẩn banner quảng cáo cột phải, và tự động lướt Shorts. Phím tắt cũng hoạt động trên **music.youtube.com**. Toàn bộ giao diện có thể chuyển đổi giữa **Tiếng Việt** và **English**.
 
-**Phiên bản hiện tại:** 1.16.0
+**Phiên bản hiện tại:** 1.17.1
 
 ---
 
 ## Tính Năng Hiện Có (Tóm Tắt)
 
+- **Tải Video MP4 & Nhạc MP3:** Tải nhanh video chất lượng cao (1080p, 720p, 480p, 360p) hoặc file âm thanh MP3 (320kbps).
+- **Tải xuống dưới nền & Hàng đợi (Download Queue):** Bấm nút ✕ trên modal để tiếp tục tải ngầm, click vào biểu tượng ℹ màu xanh để mở danh sách tác vụ đang tải, hỗ trợ tạm dừng / tiếp tục và hủy tác vụ bằng icon trực quan.
+- **Thanh công cụ thẳng hàng:** Toolbar trên trang xem video luôn giữ trên 1 dòng duy nhất, chống tràn và không rớt dòng.
 - **Copy thông minh:** Copy Title, Copy + Search + Enter, Copy Link sạch (không tracking) trên Watch page, sidebar, Trang chủ và feed tìm kiếm.
 - **Copy khi bôi đen:** kéo chọn text là tự động sao chép kèm toast xác nhận.
 - **Auto paste:** click ô tìm kiếm để dán nội dung vừa copy (thay thế hoặc nối thêm).
-- **Thumbnail & ảnh kênh:** tải ảnh bìa chất lượng cao nhất kèm hộp thoại cắt ảnh; tải avatar/banner kênh.
+- **Thumbnail & ảnh kênh:** gộp chung menu tải xuống với MP3/MP4; tải ảnh bìa chất lượng cao nhất kèm hộp thoại cắt ảnh; tải avatar/banner kênh.
 - **Audio Boost:** tăng âm lượng video **100–150%** bằng Web Audio (gain + limiter), tự áp dụng lại khi chuyển video.
 - **Auto Loop:** tự lặp video, không lặp quảng cáo, không nhảy sang video kế tiếp trong playlist.
 - **Phím tắt điều hướng:** Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music — tùy chỉnh phím a–z và 2/3 lần bấm; hoạt động cả trên YouTube Music.
 - **Bookmark mốc thời gian:** lưu/đổi tên/xóa/yêu thích bookmark, log theo video, dải bookmark trên Trang chủ, trang lưu trữ ở thanh bên và hoàn tác 5 giây khi xóa.
 - **Video ngẫu nhiên:** chọn từ feed hoặc tìm kiếm công khai, lọc Video thường / Shorts / Video nhạc.
-- **Quảng cáo:** tự bỏ qua quảng cáo video và ẩn khung quảng cáo.
+- **Bỏ qua & ẩn quảng cáo:** tự bỏ qua quảng cáo video (màn hình đen kèm spinner xoay đệm như mất mạng), ẩn triệt để banner quảng cáo cột bên phải và masthead.
+- **Tự động lướt Shorts:** tự động chuyển video Shorts tiếp theo khi xem xong.
 - **Giao diện:** dashboard 2 cột tinh gọn, chuyển đổi **Tiếng Việt / English** đồng bộ toàn bộ UI; ẩn/hiện tên nút trên thanh công cụ.
 
 ---
 
-
 ## Các Tính Năng Nổi Bật
 
-### 1. Bộ Nút Copy Title Thông Minh & Điều Hướng Tìm Kiếm
+### 1. Tải Video MP4, Âm Thanh MP3 & Hàng Đợi Tải Xuống
+Nút **Tải xuống (Download)** trên thanh công cụ Watch page gộp chung các tùy chọn tải media:
+- **Tải MP3:** Trích xuất âm thanh chất lượng cao 320kbps.
+- **Tải MP4:** Cho phép chọn độ phân giải tùy chọn (1080p Full HD, 720p HD, 480p, 360p).
+- **Tải Thumbnail:** Tải và cắt ảnh bìa video trực tiếp.
+- **Hệ thống Server Tốc Độ Cao:** Sử dụng hạ tầng chuyển đổi tối ưu với cơ chế tự động fallback dự phòng.
+- **Tải xuống dưới nền (Background Download):** Khi modal đang xử lý, nhấn nút **✕** (hoặc Esc) sẽ đóng cửa sổ nhưng **tiến trình tải vẫn chạy ngầm dưới nền**, đi kèm thông báo toast.
+- **Hàng đợi tải xuống (Download Queue):** 
+  - Bấm vào **biểu tượng chữ ℹ màu xanh** ở góc màn hình để mở bảng quản lý danh sách tải xuống.
+  - Xem tiến độ % chuyển đổi, định dạng file, thanh tiến trình trực quan.
+  - Hỗ trợ nút icon **Tạm dừng (⏸) / Tiếp tục (▶)** và **Hủy (✕)** riêng cho từng file đang tải.
+
+### 2. Bộ Nút Copy Title Thông Minh & Điều Hướng Tìm Kiếm
 Tiêm tự động vào **Watch page (dưới tiêu đề)** và **Sidebar (video liên quan)**:
 - **Copy Title**: Sao chép nguyên bản tiêu đề video vào Clipboard.
 - **Copy + Search + Enter**: Sao chép tiêu đề, tự động điền vào thanh tìm kiếm và thực hiện tìm kiếm trực tiếp ngay trên trang hiện tại. Đi kèm nút mở sang tab mới riêng biệt (`↗`) hoặc dùng phím tắt `Ctrl + Click`.
-- **Home page / Search feed**: mỗi thẻ video có **một nút tròn nhỏ cố định ở góc dưới-phải** (icon lưới 2×2). Bấm vào nút là xổ ra **popover 2×2 gồm 4 nút icon tinh gọn** — Copy tiêu đề, Copy + tìm kiếm ngay, Copy link sạch và Tải ảnh bìa — đặt ngay phía trên nút, canh mép phải và tự lật xuống dưới khi sát đáy màn hình. Popover chỉ được tạo khi mở lần đầu, tự đóng khi bấm ra ngoài, cuộn trang, nhấn <kbd>Esc</kbd> hoặc chuyển trang; không còn quét chuột, không còn thanh nổi bám theo con trỏ nên không tốn hiệu năng khi lướt feed.
+- **Home page / Search feed**: mỗi thẻ video có **một nút tròn nhỏ cố định ở góc dưới-phải** (icon lưới 2×2). Bấm vào nút là xổ ra **popover 2×2 gồm 4 nút icon tinh gọn** — Copy tiêu đề, Copy + tìm kiếm ngay, Copy link sạch và Tải ảnh bìa.
 
-### 2. Copy Khi Bôi Đen (Copy on Select)
+### 3. Copy Khi Bôi Đen (Copy on Select)
 - Giữ chuột kéo bôi xanh một đoạn text bất kỳ trên YouTube (mô tả video, bình luận, tiêu đề...) là đoạn đó **được sao chép ngay** vào Clipboard.
-- Hiển thị toast xác nhận giống các thông báo copy khác: `Đã sao chép đoạn bôi đen: "..."`.
+- Hiển thị toast xác nhận: `Đã sao chép đoạn bôi đen: "..."`.
 - Tự bỏ qua khi đang chọn text trong ô nhập liệu (search box, bình luận) và chống sao chép trùng lặp liên tục.
 - Bật/tắt trong menu **Tools** trên thanh công cụ Watch page.
 
-### 3. Tự Động Dán Vào Ô Tìm Kiếm (Auto Paste)
+### 4. Tự Động Dán Vào Ô Tìm Kiếm (Auto Paste)
 - Click vào ô tìm kiếm YouTube → nội dung bạn vừa copy sẽ tự động được dán vào, **không cần Ctrl + V**.
 - Kết hợp hoàn hảo với Copy Khi Bôi Đen: bôi đen text → click ô tìm kiếm → Enter là xong.
-- Dùng được với nội dung copy thủ công (<kbd>Ctrl</kbd> + <kbd>C</kbd> hoặc chuột phải → Copy) kể cả khi đã tắt tính năng copy khi bôi đen, và với nội dung copy từ **tab hoặc ứng dụng khác** — tiện ích đọc clipboard hệ thống khi bạn click vào ô tìm kiếm (quyền `clipboardRead`). Nếu không đọc được clipboard, tiện ích dùng nội dung copy gần nhất mà nó đã ghi nhận.
-- **Copy nội dung mới rồi click lại vẫn dán được:** nội dung tiện ích đã dán trước đó được thay bằng nội dung mới (mặc định), hoặc nối thêm vào sau kèm một khoảng trắng nếu tắt tuỳ chọn **Thay nội dung đã dán trước đó**.
-- Không bao giờ ghi đè query người dùng tự gõ — chỉ thay/nối nội dung do chính tiện ích viết vào ô tìm kiếm.
-- Bộ nhớ dự phòng này được chia sẻ giữa các tab và tự hết hạn sau 15 phút, nên không dán nhầm nội dung cũ.
+- Dùng được với nội dung copy thủ công hoặc từ ứng dụng khác (quyền `clipboardRead`).
+- Tùy chọn thay thế nội dung cũ hoặc nối thêm vào sau.
 
-### 4. Menu Tools (Tính Năng Phụ)
-Nút **Tools** nằm ngay bên phải nút **Auto Loop** trên thanh công cụ Watch page, mở dropdown tập hợp các tính năng phụ kèm công tắc bật/tắt hoặc thanh trượt:
+### 5. Menu Tools (Tính Năng Phụ)
+Nút **Tools** trên thanh công cụ Watch page mở dropdown tập hợp các tiện ích nhanh:
 - Tự động copy khi bôi đen
 - Tự động dán vào ô tìm kiếm
 - Thay nội dung đã dán trước đó (tắt để nối thêm, tự chèn khoảng trắng)
-- **Tăng âm lượng video:** thanh trượt **100–150%**, áp dụng tức thì cho video đang phát. Trên 100% tiện ích dùng Web Audio (gain + limiter) nên to hơn mức tối đa của YouTube mà ít bị rè; mức đã chọn được lưu và tự áp dụng lại khi chuyển video. Sau khi tải lại trang, mức tăng áp dụng ngay khi bạn tương tác lần đầu để tránh làm mất tiếng. Nếu tiện ích khác đã giữ âm thanh của video, mức tăng tự trả về 100% kèm thông báo. Audio Boost chỉ chạy trên YouTube thường, không can thiệp vào YouTube Music.
+- **Tăng âm lượng video:** thanh trượt **100–150%**, áp dụng tức thì cho video đang phát bằng Web Audio API (gain + limiter) chống rè tiếng.
 
-Tính năng tải ảnh bìa và Clean Copy Link luôn hoạt động, không có công tắc bật/tắt.
-
-Trạng thái được lưu vào `chrome.storage.local` và đồng bộ với trang cài đặt.
-
-### 5. Tự Động Lặp Lại Video (Auto Loop)
+### 6. Tự Động Lặp Lại Video (Auto Loop)
 - Tự động kích hoạt `video.loop = true` khi xem video trên YouTube.
-- **Không lặp quảng cáo:** ngay khi player chuyển sang trạng thái `ad-showing` / `ad-interrupting` (hoặc xuất hiện lớp UI quảng cáo), loop bị tắt trên toàn bộ thẻ video và giữ tắt suốt thời gian quảng cáo, kể cả khi quảng cáo bị skip. Hết quảng cáo, loop được bật lại **tự động nếu bạn đã bật Auto Loop từ trước**; nếu bạn đã tắt Auto Loop thì vẫn giữ tắt.
-- **Trạng thái hiển thị rõ ràng:** nút Auto Loop có nền xanh lá + chữ `Autoloop: ON` khi đang bật, nền đỏ nhẹ + chữ `Autoloop: OFF` khi đang tắt.
-- **Việc tạm tắt khi có quảng cáo là hoàn toàn ngầm:** nút không đổi trạng thái, không hiện thông báo. Nếu bạn bật/tắt Auto Loop ngay trong lúc quảng cáo đang chạy, lựa chọn đó được ghi nhớ và áp dụng ngay khi quảng cáo kết thúc.
-- Tự động duy trì trạng thái lặp qua các lần chuyển video đơn trang (SPA Navigation).
-- **Không bị nhảy sang video kế tiếp trong playlist:** YouTube tự gỡ `loop` của thẻ video khi trạng thái trình phát thay đổi, và playlist sẽ chuyển bài khi video kết thúc. Tiện ích theo dõi trực tiếp thuộc tính `loop` để bật lại ngay lập tức, đồng thời tự tua về đầu video ngay trước khi video kết thúc — nên dù bạn bật thêm chế độ lặp của YouTube, video vẫn lặp lại chính nó.
+- **Không lặp quảng cáo:** loop tự tắt trong lúc quảng cáo và tự bật lại khi hết quảng cáo.
+- **Trạng thái hiển thị rõ ràng:** nút Auto Loop có nền xanh lá (`Autoloop: ON`) hoặc đỏ nhẹ (`Autoloop: OFF`).
+- Không bị nhảy sang video kế tiếp trong playlist khi hết bài.
 
-### 6. Nút Copy Link (URL Chuẩn Không Tracking)
-- Luôn hiển thị sẵn trên watch page, sidebar và thẻ video ở trang chủ / search feed (không có công tắc bật/tắt).
+### 7. Nút Copy Link (URL Chuẩn Không Tracking)
 - Tự động loại bỏ toàn bộ các query tracking rác khi chia sẻ: `si`, `pp`, `feature`, `utm_*`, `fbclid`, `gclid`, v.v.
 - Chuẩn hóa link dạng gọn gàng: `https://www.youtube.com/watch?v={videoId}` hoặc `https://www.youtube.com/shorts/{id}`.
-- Vẫn giữ mốc thời gian `t` nếu bạn đang xem dở một đoạn và muốn chia sẻ đúng đoạn đó.
+- Vẫn giữ mốc thời gian `t` nếu đang xem dở một đoạn.
 
-### 7. Tải Ảnh Bìa Thumbnail & Cắt Ảnh Trước Khi Lưu
-Nút **Thumbnail** trên thanh công cụ Watch page mở hộp thoại **Cắt & tải ảnh bìa**: ảnh bìa chất lượng cao nhất hiện có được tải về trước, sau đó bạn tự do chọn vùng muốn lưu. Tính năng này luôn bật, không có công tắc trong cài đặt hay menu Tools.
+### 8. Tải Ảnh Bìa Thumbnail & Cắt Ảnh Trước Khi Lưu
+- Tải ảnh bìa với độ phân giải cao nhất (`maxresdefault` 1280×720, `sddefault`, `hqdefault`...).
+- Hộp thoại cắt ảnh trực quan: kéo chỉnh khung, zoom, xuất pixel gốc JPEG chất lượng cao hoặc bấm **Tải ảnh gốc**.
+- Hỗ trợ tải cả **Ảnh đại diện (Avatar 1024px)** và **Ảnh banner (2560px)** trên trang Kênh.
 
-- **Chất lượng tối đa:** thử lần lượt `maxresdefault` (1280×720, cả `.jpg` và `.webp`) → `sddefault` (640×360) → `hq720` → `hqdefault` (480×360) → `mqdefault` (320×180), nên video cũ không có maxres vẫn tải được bình thường.
-- **Tải lại nhanh:** ảnh bìa vừa tải được giữ trong bộ nhớ đệm (20 video gần nhất), mở lại hộp thoại cắt ảnh gần như tức thì.
-- **Cắt tuỳ ý:** kéo bên trong khung để di chuyển vùng chọn, kéo 4 góc để thay đổi kích thước; nút **Đặt lại** trả về toàn bộ ảnh.
-- **Xuất đúng độ phân giải gốc:** vùng cắt được vẽ từ pixel gốc của ảnh (không phải ảnh đang thu nhỏ trên màn hình) và lưu thành JPEG chất lượng 0.92.
-- **Tải ảnh gốc:** nút **Tải ảnh gốc** bỏ qua bước cắt nếu bạn chỉ cần ảnh nguyên bản.
-- Đóng hộp thoại bằng **Huỷ**, nút **×**, phím <kbd>Esc</kbd> hoặc click ra ngoài. Phím tắt của tiện ích và YouTube tạm ngưng khi hộp thoại đang mở.
-
-Ngoài ra icon tải xuống nhỏ cạnh **video liên quan (sidebar)** và nút công cụ ở góc dưới-phải **thẻ video trang chủ / search feed** (mở popover 4 nút: Copy tiêu đề, Copy + tìm kiếm, Copy link sạch, Tải ảnh bìa) mở cùng hộp thoại cắt ảnh cho video đó.
-
-**Ảnh kênh:** trên bất kỳ trang kênh YouTube (`/@handle`, `/channel/...`, `/c/...`, `/user/...`), hai nút **Ảnh đại diện** và **Ảnh banner** (cùng icon tải xuống) xuất hiện ở góc trên bên phải phần thông tin kênh. Ảnh được lấy ở độ phân giải cao nhất mà kênh cung cấp (avatar được nâng lên tới 1024px, banner tới 2560px) và cũng mở hộp thoại cắt ảnh trước khi lưu.
-
-Chi tiết kỹ thuật:
-- Ảnh được `fetch` từ `i.ytimg.com` (thumbnail) hoặc `yt3.googleusercontent.com` (avatar/banner), rồi lưu qua Blob URL — **không cần thêm quyền nào** và không mở tab mới.
-- Tên file được làm sạch ký tự cấm và kèm mã video: `Tiêu đề video [videoId].jpg`, ví dụ `Rick Astley - Never Gonna Give You Up [dQw4w9WgXcQ].jpg`.
-- Luôn bật sẵn, không cần cấu hình.
-
-### 8. Hệ Thống Phím Tắt Nhanh & Tùy Chỉnh (YouTube + YouTube Music)
+### 9. Hệ Thống Phím Tắt Nhanh & Tùy Chỉnh (YouTube + YouTube Music)
 | Phím tắt mặc định | Thao tác | Đích đến & Cơ chế |
 | :---: | :--- | :--- |
-| <kbd>s</kbd> <kbd>s</kbd> | Mở ngay video Shorts gợi ý | `youtube.com/shorts/{id}` *(Click trực tiếp link gợi ý có sẵn, phản hồi tức thì)* |
-| <kbd>h</kbd> <kbd>h</kbd> | Về Trang chủ YouTube (Home) | `youtube.com/` *(SPA client-side navigation không tải lại trang)* |
+| <kbd>s</kbd> <kbd>s</kbd> | Mở ngay video Shorts gợi ý | `youtube.com/shorts/{id}` *(SPA phản hồi tức thì)* |
+| <kbd>h</kbd> <kbd>h</kbd> | Về Trang chủ YouTube (Home) | `youtube.com/` *(SPA client-side navigation)* |
 | <kbd>h</kbd> <kbd>h</kbd> <kbd>h</kbd> | Mở Lịch sử xem video (History) | `youtube.com/feed/history` |
 | <kbd>p</kbd> <kbd>p</kbd> | Mở Danh sách phát (Playlists) | `youtube.com/feed/playlists` |
 | <kbd>m</kbd> <kbd>m</kbd> | Mở YouTube Music | `music.youtube.com/` |
 
-**Hoạt động trên YouTube Music:** content script được nạp cho `music.youtube.com/*`, nên phím tắt chạy được ở mọi trang của YouTube Music (trang chủ, Explore, Library, album, playlist, bài hát…). Vì Music là origin khác, các đích `youtube.com/...` được mở bằng điều hướng thẳng thay vì router SPA; riêng <kbd>m</kbd> <kbd>m</kbd> khi đang ở Music chỉ đưa về trang chủ Music. Các tính năng gắn với DOM của YouTube thường (Auto Loop, toolbar watch page, nút trên thẻ feed, copy/dán tự động) **không** được nạp trên Music để không can thiệp vào trình phát nhạc.
-
-**Tùy chỉnh phím tắt:** mở **Cài đặt** → mục **Tùy chỉnh phím tắt**. Chọn hành động ở hàng thẻ phía trên, chọn **2 lần** hoặc **3 lần** bấm, rồi bấm trực tiếp chữ cái trên **bàn phím QWERTY thu nhỏ** để gán. Phím đang dùng cho hành động khác (cùng số lần bấm) và phím YouTube đang dùng bị khoá ngay trên bàn phím, nên không thể tạo xung đột. Mọi thay đổi được lưu ngay và áp dụng tức thì trên các tab YouTube đang mở.
-- **Số lần bấm tùy chọn 2 hoặc 3** cho từng hành động. Mặc định: mọi hành động bấm 2 lần, riêng Lịch sử bấm 3 lần. Phím đơn không được phép vì sẽ kích hoạt ngoài ý muốn khi đang lướt YouTube.
-- Đổi số lần bấm mà phím hiện tại bị trùng với hành động khác (ví dụ Lịch sử chuyển từ 3 → 2 lần khi Trang chủ cũng dùng <kbd>h</kbd> 2 lần): chỉ hành động đang sửa được tự chuyển sang một chữ cái còn trống, mọi phím tắt khác giữ nguyên. Thông báo ở chân trang cho biết phím mới.
-- **Hai hành động chỉ được dùng chung một phím khi số lần bấm khác nhau** (mặc định <kbd>h</kbd> <kbd>h</kbd> = Trang chủ, <kbd>h</kbd> <kbd>h</kbd> <kbd>h</kbd> = Lịch sử). Nhấn 2 lần rồi chờ 0,32 giây để chạy hành động 2 lần; nhấn tiếp lần 3 để chạy hành động 3 lần. Nếu không còn hành động 3 lần nào dùng phím đó, chuỗi 2 lần chạy ngay không cần chờ.
-- Chỉ dùng chữ cái `a–z`. Các phím YouTube đang dùng (`k`, `j`, `l`, `f`, `t`, `i`, `n`, `c`…) bị khoá hoàn toàn; riêng `m` và `p` vẫn chọn được vì tiện ích tự phát lại hành vi gốc (mute / video trước) khi bạn không nhấn tiếp.
-- Nếu dữ liệu lưu bị hỏng hoặc bị sửa tay, tiện ích tự chuẩn hoá về phím/số lần bấm mặc định thay vì làm hỏng phím tắt.
-
-- **Tối ưu tốc độ phản hồi:** Sử dụng cơ chế điều hướng nội bộ SPA của YouTube giúp chuyển trang ngay lập tức dưới 50ms, không tải lại toàn trang.
-- **Không xung đột phím native:** `<kbd>m</kbd>` (mute) và `<kbd>p</kbd>` (video trước) của YouTube trùng phím mở đầu chord, nên tiện ích chủ động "giữ" phím và **tự phát lại hành vi gốc** (click nút mute / nút previous của player) nếu sau 320ms không có phím thứ hai. Cả hai tính năng đều hoạt động.
-- **Cơ chế an toàn:** Tự động kiểm tra ngữ cảnh nhập liệu (`input`, `textarea`, `ytd-searchbox`, `ytmusic-search-box`, `ytd-comments`, `contenteditable`) để vô hiệu hóa phím tắt khi người dùng đang gõ; nhấn <kbd>Esc</kbd> để huỷ chuỗi phím đang chờ.
-
-### 9. Giao Diện & Bảng Cài Đặt (Options & Popup)
-- Thiết kế Dark mode tối giản, tinh gọn, hòa nhập 100% vào ngôn ngữ thiết kế của YouTube.
-- Logo ứng dụng mới dạng badge tròn nổi, phối đỏ–đen, kèm biểu tượng trợ lý.
-- Toàn bộ icon tính năng được chuẩn hóa dạng đen trắng tối giản, chuyên nghiệp.
-- Công tắc bật/tắt (toggle) đỏ đặc trưng của YouTube khi kích hoạt.
-- **Bố cục 2 cột:** 10 tính năng chính xếp thành lưới hai cột với tiêu đề và mô tả ngắn gọn một–hai dòng, gọn hơn nhiều so với danh sách một cột trước đây; tự chuyển về một cột trên màn hình hẹp.
-- **Chuyển đổi ngôn ngữ Việt / Anh:** nút **Tiếng Việt | English** ở góc phải header. Chọn ngôn ngữ nào thì toàn bộ giao diện — bảng điều khiển, thanh công cụ trên YouTube, toast, hộp thoại cắt ảnh, bookmark, menu Tools — dùng đúng ngôn ngữ đó, không pha lẫn chuỗi của ngôn ngữ còn lại. Lựa chọn lưu trong `chrome.storage.local` và áp dụng ngay cho mọi tab đang mở, không cần tải lại trang.
-- Khu **Tùy chỉnh phím tắt** dùng thẻ hành động + bàn phím QWERTY thu nhỏ; phím hiện tại tô đỏ, phím bị khoá mờ đi.
-- Dữ liệu cài đặt được lưu trữ đồng bộ qua `chrome.storage.local` và áp dụng ngay lập tức, không cần tải lại tab.
+- Hoạt động mượt mà trên cả `music.youtube.com`.
+- Tùy chỉnh trực tiếp từ bảng điều khiển cài đặt qua bàn phím trực quan (hỗ trợ bấm 2 lần hoặc 3 lần).
+- Chống gõ nhầm khi đang nhập liệu vào form/chat/bình luận.
 
 ### 10. Bookmark Mốc Thời Gian (Xem Sau)
-- **Nút Bookmark** trên thanh công cụ Watch page lưu **đúng thời điểm đang xem** (giây), rồi trở về giao diện trung tính để không gây nhầm với nút bật/tắt. Mỗi video có thể có nhiều bookmark; không lưu khi đang phát quảng cáo.
-- **Nút Log** cạnh nút Bookmark: mở danh sách bookmark của video đang xem. Bấm vào mốc thời gian để tua tới ngay, có nút **đổi tên**, **xóa** từng bookmark và **xóa tất cả** bookmark của video.
-- Mỗi bookmark có thể được **yêu thích** ngay bằng biểu tượng trái tim mặc định. **Chỉ sau khi yêu thích** mới hiện nút đổi giữa 7 biểu tượng: âm nhạc, học tập, trang phục, du lịch, ăn uống, đoạn phim hay và trái tim; bỏ yêu thích sẽ ẩn nút đổi biểu tượng.
-- **Dải Bookmark trên Trang chủ:** các bookmark mới nhất hiện ở đầu newfeed (tối đa 12, tự trải thành lưới theo bề rộng). Nút **Ẩn/Hiện** thu gọn video và ghi nhớ trạng thái sau khi tải lại trang.
-- **Mục Bookmark ở thanh bên trái** (mở rộng và thu gọn): trang lưu trữ đầy đủ có ô tìm kiếm, đổi tên / xóa từng bookmark và nút **Xóa tất cả**. Đóng bằng Esc, nút × hoặc khi chuyển trang.
-- **Xóa bookmark:** xóa từng bookmark diễn ra ngay, không hỏi xác nhận; chỉ **xóa tất cả** mới hiện hộp xác nhận riêng của tiện ích (không dùng hộp thoại của YouTube/trình duyệt). Cả hai thao tác đều có toast **Hoàn tác** trong **5 giây** để khôi phục bookmark về đúng vị trí cũ.
-- Chỉ bookmark được **mốc thời gian trong video** (qua nút Bookmark trên thanh công cụ Watch page). Thẻ video ở Trang chủ/feed không còn nút bookmark và không thể bookmark nguyên một video ở 0:00.
-- Dữ liệu lưu trong `chrome.storage.local` (khóa `bookmarks`), đồng bộ giữa các tab, tối đa 2000 bookmark. Bookmark của bản cũ được giữ lại và không bắt buộc có biểu tượng yêu thích.
+- Lưu chính xác từng giây mốc thời gian video đang phát kèm ghi chú / đổi tên.
+- Hỗ trợ đánh dấu yêu thích với 7 biểu tượng phân loại.
+- Dải Bookmark tiện lợi trên đầu Trang chủ và trang quản lý đầy đủ ở sidebar bên trái.
+- Tính năng **Hoàn tác (Undo)** trong 5 giây khi lỡ tay xóa bookmark.
 
 ### 11. Video Ngẫu Nhiên
-- Nút **Video ngẫu nhiên** trên Trang chủ/feed và thanh công cụ Watch mở trực tiếp một video; nút lọc nhỏ liền bên cạnh mở ba checkbox **Video thường**, **Shorts**, **Video nhạc**. Bỏ chọn cả ba sẽ vô hiệu hóa nút mở video.
-- **Dựa vào FYP / feed — Bật:** chỉ chọn trong các thẻ feed đã tải; khi đang xem video thì lấy đề xuất từ Trang chủ bằng phiên đăng nhập hiện tại. Feed trống hoặc không có loại phù hợp sẽ thông báo, không tự chuyển sang nguồn công khai.
-- **Tắt:** lấy kết quả tìm kiếm công khai theo chủ đề ngẫu nhiên, không gửi cookie tài khoản và không dùng feed. Đây là khám phá ngẫu nhiên trong tập kết quả, **không phải lấy mẫu đều trên toàn bộ kho YouTube**; kết quả vẫn có thể phụ thuộc khu vực và xếp hạng tìm kiếm.
-- Video nhạc được xác nhận bằng danh mục **Music** của YouTube; Shorts được nhận diện từ loại thẻ/liên kết, không đoán bằng thời lượng. Bỏ qua video không phát được, livestream và video đang xem; hạn chế lặp video vừa chọn trong phiên trang hiện tại.
-- Bộ lọc được ghi nhớ qua tải lại trang và đồng bộ giữa các tab. Chỉ tải dữ liệu khi bấm nút, có thời hạn chờ và hủy khi chuyển trang/đổi bộ lọc; không thêm quyền hay dịch vụ bên ngoài, không thay đổi YouTube Music.
+- Nút **Video ngẫu nhiên** trên Trang chủ và thanh công cụ Watch page.
+- Bộ lọc linh hoạt: Video thường, Shorts, Video âm nhạc.
+- Lựa chọn nguồn từ feed cá nhân hoặc tìm kiếm công khai.
 
-### 12. Tự Động Bỏ Qua Quảng Cáo
-- **Auto skip:** khi video đang phát quảng cáo, tiện ích tự tắt tiếng, tăng tốc, bấm nút "Bỏ qua" (nếu có) và tua tới cuối quảng cáo, rồi khôi phục âm lượng/tốc độ. Hoạt động cả khi bạn chuyển sang tab khác, vì dùng MutationObserver và sự kiện của thẻ video (không bị trình duyệt tạm dừng như timer).
-- **Ẩn khung quảng cáo:** ẩn quảng cáo trong newfeed, banner đầu trang, quảng cáo cạnh video và banner đè lên video.
-- Khi quảng cáo xuất hiện, khung hình được giấu ngay (nền đen) và tắt tiếng, nên gần như không thấy quảng cáo nháy lên.
-- Bật/tắt từng tính năng trong trang cài đặt. Không chặn request mạng nên chỉ xử lý được những gì hiện trên giao diện; có thể cần cập nhật khi YouTube đổi cấu trúc trang.
+### 12. Tự Động Bỏ Qua Quảng Cáo & Ẩn Banner
+- **Auto skip:** Tự động tắt tiếng, tăng tốc độ phát lên tối đa và nhấn nút Bỏ qua ngay khi xuất hiện.
+- **Hiệu ứng che quảng cáo:** Màn hình đen với vòng xoay đệm (spinner) ở tâm như lúc đang tải mạng, không gây chói mắt.
+- **Ẩn triệt để banner quảng cáo:** Xóa hoàn toàn banner "Được tài trợ" ở cột đề xuất bên phải (`#secondary`), trang chủ và masthead.
 
-### 13. Tên Nút Trên Thanh Công Cụ
-- **Tên nút:** thanh công cụ Watch page mặc định hiện đủ tên từng nút (Random video, Autoloop, Quick Search, Copy Link, Thumbnail, Bookmark, Tools…). Bấm **Hide Button Name** để ẩn toàn bộ tên, chỉ còn icon — nút này đổi thành **Show Button Name** và giữ nguyên tên của chính nó; bấm lại để hiện tên. Lựa chọn được ghi nhớ qua tải lại trang. Log bookmark chỉ hiện số khi có bookmark.
-- **Tên nút theo ngôn ngữ:** khi chọn Tiếng Việt, các tên trên hiển thị là **Video ngẫu nhiên, Tự động lặp, Tìm nhanh, Sao chép liên kết, Ảnh bìa, Công cụ, Ẩn/Hiện tên nút**; khi chọn English là **Random video, Autoloop, Quick Search, Copy Link, Thumbnail, Tools, Hide/Show Button Name**.
+### 13. Tự Động Lướt Shorts
+- Tự động chuyển tiếp sang video Shorts tiếp theo khi xem xong video hiện tại, rảnh tay thưởng thức video ngắn.
+
+### 14. Bố Cục Thanh Bar & Tùy Biến Giao Diện
+- **Thanh Bar Thẳng Hàng:** Thiết kế `nowrap` gọn gàng, tất cả nút bấm nằm cùng trên 1 hàng, không bao giờ bị nhảy dòng làm vỡ bố cục.
+- **Ẩn/Hiện Tên Nút:** Nhấn nút **Ẩn tên nút (Hide Button Name)** để thu gọn thanh bar về icon tối giản.
+- **Đa Ngôn Ngữ:** Chuyển đổi linh hoạt giữa Tiếng Việt và English cho 100% thành phần giao diện.
 
 ---
 
 ## Thay Đổi Gần Đây
 
+### v1.17.1
+- **Sắp xếp lại thanh bar:** Cố định thanh công cụ trên 1 hàng ngang duy nhất (`flex-wrap: nowrap`), tối ưu khoảng cách đệm chống tràn nút.
+- **Download Queue (Hàng đợi tải xuống):** 
+  - Chuyển tải ngầm khi bấm nút ✕ trên modal tải xuống kèm toast góc trái.
+  - Click vào biểu tượng **ℹ màu xanh** để mở bảng hàng đợi quản lý các file MP3/MP4 đang tải.
+  - Tích hợp icon **Tạm dừng / Tiếp tục** và **Hủy tải** trực tiếp trong hàng đợi.
+- **Ẩn triệt để banner quảng cáo:** Loại bỏ hoàn toàn khối banner "Được tài trợ" ở cột bên phải danh sách đề xuất (`#secondary`).
+- **Hiệu ứng che quảng cáo:** Thêm màn hình đen kèm biểu tượng spinner xoay đệm trung tâm khi phát quảng cáo.
+- **Tối ưu tốc độ tải:** Chuyển đổi server tải sang hệ thống `savenow.to` nhanh hơn, tự động fallback `loader.to`.
+
 ### v1.16.0
-- **Hoàn tác khi xóa bookmark:** xóa một bookmark không còn hộp xác nhận; xóa tất cả vẫn xác nhận. Cả hai hiện toast **Hoàn tác** 5 giây, khôi phục bookmark đúng thứ tự cũ.
-- **Tối ưu hiệu năng toàn tiện ích:** bỏ đo đạc layout lặp lại mỗi 1,5 giây ở mục Bookmark thanh bên (chỉ căn lại khi cần và khi đổi kích thước cửa sổ), so sánh bookmark đồng bộ bằng vòng lặp thay vì `JSON.stringify`, gộp các lần vẽ lại bookmark khi chuyển trang, và ngừng quét nhận diện quảng cáo trên mỗi sự kiện `timeupdate`/`progress` khi video đang phát bình thường.
+- **Hoàn tác khi xóa bookmark:** Toast hoàn tác 5 giây khôi phục vị trí cũ.
+- **Tối ưu hiệu năng toàn tiện ích:** Bỏ đo đạc layout định kỳ, tối ưu nhận diện DOM.
 
 ### v1.15.0
-- **Song ngữ Việt / Anh:** thêm `i18n.js` và nút chuyển ngôn ngữ trong dashboard; dịch toàn bộ giao diện (dashboard, toolbar, menu Tools, toast, bookmark, hộp thoại cắt ảnh, tooltip) và áp dụng ngay cho mọi tab đang mở.
-- **Dashboard tinh gọn:** 10 tính năng chính xếp thành 2 cột, mô tả ngắn gọn hơn; tự về 1 cột trên màn hình hẹp.
-- **Tên nút trên thanh công cụ:** thêm nhãn Random video, Autoloop, Thumbnail, Quick Search, Copy Link, Tools; thêm nút **Hide/Show Button Name** để ẩn/hiện toàn bộ tên nút, và dịch tên nút theo ngôn ngữ đang chọn.
-- **Loại bỏ hoàn toàn** tính năng ẩn thanh chủ đề (Tất cả, Âm nhạc…).
-- **Bookmark chỉ theo mốc thời gian:** bỏ nút bookmark trên thẻ video Trang chủ/feed và bỏ khả năng bookmark nguyên video ở 0:00; vẫn giữ bookmark thời điểm trong video, log, yêu thích, dải bookmark và trang lưu trữ.
-- **Audio Boost:** giữ trần **150%**, dùng gain + limiter để hạn chế rè khi tăng âm lượng.
-
-### Feed không còn ô trống
-- Khi đang ẩn quảng cáo, số thẻ giữa hai dải rộng (Shorts...) có thể bị lẻ làm hàng cuối trống bên phải. Tiện ích chỉ đổi thứ tự hiển thị (CSS `order`), dời dải rộng xuống sau khi hàng dở được lấp đủ; không xóa hay di chuyển video nào.
+- **Song ngữ Việt / Anh:** Hỗ trợ đa ngôn ngữ toàn diện qua `i18n.js`.
+- **Dashboard 2 cột:** Tinh gọn trang cài đặt Options.
 
 ---
 
@@ -173,28 +146,17 @@ Chi tiết kỹ thuật:
 
 ```
 Youtube_Aid/
-├── manifest.json      # Manifest V3: quyền storage, clipboardWrite, clipboardRead
-├── i18n.js            # Từ điển Việt–Anh và API dịch dùng chung cho content script + trang cài đặt
-├── shortcut-keys.js   # Quy tắc phím tắt dùng chung: phím hợp lệ, kiểm tra xung đột, chuẩn hoá
-├── content.js         # Logic tiêm DOM, copy/paste, ảnh bìa/avatar/banner, SPA Navigation, Shortcuts, Loop, Tools menu
-├── styles.css         # CSS toolbar, dropdown, sidebar, card buttons, channel actions, toast, hộp thoại cắt ảnh
-├── options.html       # Giao diện bảng điều khiển & bàn phím tùy chỉnh phím tắt
-├── options.js         # Logic lưu/khôi phục cài đặt và bàn phím gán phím tắt
-├── generate_icons.js  # Script sinh tự động logo và bộ icon trắng đen chuẩn
-├── icons/             # Thư mục icon PNG (16x16, 48x48, 128x128 và monochrome icons)
-│   ├── icon16.png
-│   ├── icon48.png
-│   ├── icon128.png
-│   ├── youtube_aid.png
-│   ├── loop.png
-│   ├── shortcuts.png
-│   ├── copy.png
-│   ├── link.png
-│   ├── bell.png
-│   ├── table.png
-│   ├── paste.png
-│   └── thumbnail.png
-└── README.md          # Tài liệu hướng dẫn sử dụng và cài đặt
+├── manifest.json      # Cấu hình Manifest V3: storage, clipboard, downloads, declarativeNetRequest
+├── background.js      # Service worker: xử lý tải media, API chuyển đổi, rule modify header mạng
+├── i18n.js            # Từ điển Việt–Anh và API dịch dùng chung
+├── shortcut-keys.js   # Logic cấu hình và xử lý phím tắt
+├── content.js         # Content script: điều khiển DOM YouTube, toolbar, download queue, ad skip, auto loop...
+├── styles.css         # Toàn bộ CSS phong cách native của YouTube, animation, spinner, download queue
+├── options.html       # Bảng điều khiển cài đặt tiện ích
+├── options.js         # Logic xử lý giao diện cài đặt & phím tắt
+├── generate_icons.js  # Script sinh icon tự động
+├── icons/             # Bộ icon PNG các kích thước chuẩn
+└── README.md          # Hướng dẫn chi tiết tiện ích
 ```
 
 ---
@@ -202,14 +164,11 @@ Youtube_Aid/
 ## Hướng Dẫn Cài Đặt Vào Trình Duyệt
 
 1. Mở trình duyệt Chrome / Edge / Brave / Cốc Cốc.
-2. Truy cập vào đường dẫn quản lý tiện ích:
+2. Truy cập vào trang quản lý tiện ích mở rộng:
    - Chrome / Brave / Cốc Cốc: `chrome://extensions/`
    - Microsoft Edge: `edge://extensions/`
-3. Bật chế độ dành cho nhà phát triển (**Developer mode**) ở góc trên bên phải.
-4. Nhấn vào nút **Tải tiện ích đã giải nén** (**Load unpacked**).
-5. Chọn thư mục dự án đã tải về (thư mục chứa `manifest.json` của YoutubeAid).
-6. Hoàn tất! Truy cập [YouTube](https://www.youtube.com/) để trải nghiệm.
-7. Sau mỗi lần cập nhật code, bấm **Reload** tại `chrome://extensions/` (đặc biệt khi `manifest.json` thay đổi).
-
-### 14. Tự Động Lướt Shorts
-- **Công tắc** "Tự động lướt Shorts" trong Options (mặc định tắt). Khi bật, xem hết một Short thì tự chuyển sang Short kế tiếp, kể cả khi tab ở nền. Dựa vào nút "Short kế tiếp" của YouTube nên có thể cần chỉnh nếu YouTube đổi giao diện.
+3. Bật chế độ nhà phát triển (**Developer mode**) ở góc trên bên phải.
+4. Nhấn nút **Tải tiện ích đã giải nén** (**Load unpacked**).
+5. Chọn thư mục dự án `YoutubeAid` (thư mục chứa tệp `manifest.json`).
+6. Hoàn tất! Mở lại trang YouTube và tận hưởng các tính năng.
+7. Khi có cập nhật mới, chỉ cần nhấn nút **Reload (Làm mới)** tại `chrome://extensions/`.
