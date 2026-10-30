@@ -210,3 +210,6 @@ Youtube_Aid/
 5. Chọn thư mục dự án đã tải về (thư mục chứa `manifest.json` của YoutubeAid).
 6. Hoàn tất! Truy cập [YouTube](https://www.youtube.com/) để trải nghiệm.
 7. Sau mỗi lần cập nhật code, bấm **Reload** tại `chrome://extensions/` (đặc biệt khi `manifest.json` thay đổi).
+
+### 14. Tự Động Lướt Shorts
+- **Công tắc** "Tự động lướt Shorts" trong Options (mặc định tắt). Khi bật, xem hết một Short thì tự chuyển sang Short kế tiếp, kể cả khi tab ở nền. Dựa vào nút "Short kế tiếp" của YouTube nên có thể cần chỉnh nếu YouTube đổi giao diện.

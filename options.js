@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableThumbnailDownload: true,
     enableAdSkip: true,
     enableHideAds: true,
+    enableShortsAutoScroll: false,
     hideButtonNames: false,
     shortcutKeys: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_KEYS } : { ...FALLBACK_SHORTCUT_KEYS },
     shortcutTaps: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_TAPS } : { ...FALLBACK_SHORTCUT_TAPS }
@@ -50,7 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
     enableAutoPasteSearch: document.getElementById('enableAutoPasteSearch'),
     enableAutoPasteReplace: document.getElementById('enableAutoPasteReplace'),
     enableAdSkip: document.getElementById('enableAdSkip'),
-    enableHideAds: document.getElementById('enableHideAds')
+    enableHideAds: document.getElementById('enableHideAds'),
+    enableShortsAutoScroll: document.getElementById('enableShortsAutoScroll')
   };
 
   const statusMsg = document.getElementById('statusMsg');

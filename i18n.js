@@ -53,6 +53,8 @@
     ['Tự động bỏ qua quảng cáo', 'Skip ads automatically'],
     ['Tự bấm Bỏ qua và tua nhanh quảng cáo, kể cả ở tab khác.', 'Clicks Skip and fast-forwards ads, even in background tabs.'],
     ['Ẩn khung quảng cáo', 'Hide ad surfaces'],
+    ['Tự động lướt Shorts', 'Auto scroll Shorts'],
+    ['Xem hết một Short thì tự chuyển sang Short kế tiếp.', 'Moves to the next Short when the current one ends.'],
     ['Ẩn quảng cáo ở feed, banner đầu trang và cạnh video.', 'Hides ads in the feed, the masthead banner and beside the video.'],
     ['Phím tắt điều hướng', 'Navigation shortcuts'],
     ['Bấm 2–3 lần một phím để mở Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music.', 'Double or triple tap a key to open Shorts, Home, History, Playlists or YouTube Music.'],

@@ -92,6 +92,7 @@
     enableThumbnailDownload: true,
     enableAdSkip: true,
     enableHideAds: true,
+    enableShortsAutoScroll: false,
     hideButtonNames: false,
     audioBoost: 100,
     randomVideo: { video: true, shorts: true, music: true, feed: true },
@@ -342,7 +343,8 @@
       initDOMObserver,
       initBookmarks,
       initAdSkipper,
-      initFeedReflow
+      initFeedReflow,
+      initShortsAutoScroll
     ].forEach((fn) => {
       try { fn(); } catch (e) { console.error('[YoutubeAid] init lỗi:', fn.name, e); }
     });
@@ -5362,6 +5364,148 @@
       scheduleFeedReflow(0);
     }, 1200);
     scheduleFeedReflow(300);
+  }
+
+  // ==========================================
+  // 12. AUTO SCROLL SHORTS (hết video thì tự sang Short kế tiếp)
+  // ==========================================
+  // Shorts mặc định lặp lại video nên không có sự kiện "ended". Ta bắt hai tín hiệu trên
+  // sự kiện timeupdate (vẫn chạy khi tab ở nền): (1) còn <= 0,35s là hết, (2) video vừa
+  // quay vòng về đầu. Sau đó bấm nút "Short kế tiếp" của YouTube (hoặc phím mũi tên xuống).
+  let shortsLastTime = 0;
+  let shortsLastAdvanceAt = 0;
+
+  function findShortsNextButton() {
+    return document.querySelector(
+      'ytd-shorts #navigation-button-down button, #navigation-button-down button, ' +
+      'ytd-shorts #navigation-button-down yt-button-shape button'
+    );
+  }
+
+  function shortsKeyDown() {
+    const opts = { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true, cancelable: true };
+    const target = document.querySelector('ytd-shorts') || document.body;
+    target.dispatchEvent(new KeyboardEvent('keydown', opts));
+    document.dispatchEvent(new KeyboardEvent('keyup', opts));
+  }
+
+  function shortsScrollDown() {
+    const box = document.querySelector('#shorts-container, ytd-shorts #shorts-inner-container, #shorts-inner-container');
+    if (box) box.scrollBy({ top: box.clientHeight || window.innerHeight, behavior: 'smooth' });
+  }
+
+  function advanceShorts() {
+    const now = Date.now();
+    if (now - shortsLastAdvanceAt < 1500) return;
+    shortsLastAdvanceAt = now;
+    const startPath = window.location.pathname;
+    showShortsChip('Auto scroll → next');
+
+    // Bước 1: bấm nút "Short kế tiếp" (đúng 1 lần). Nếu sau 0,8s URL chưa đổi thì thử cách khác.
+    const btn = findShortsNextButton();
+    if (btn) btn.click(); else shortsKeyDown();
+
+    setTimeout(() => {
+      if (window.location.pathname !== startPath) return;
+      if (btn) shortsKeyDown();
+      setTimeout(() => {
+        if (window.location.pathname === startPath) shortsScrollDown();
+      }, 800);
+    }, 800);
+  }
+
+  // Nhãn nhỏ ở góc trái dưới để biết tính năng đang chạy (tự mất sau vài giây).
+  let shortsChip = null;
+  let shortsChipTimer = 0;
+  function showShortsChip(text, sticky = false) {
+    try {
+      if (!shortsChip || !shortsChip.isConnected) {
+        shortsChip = document.createElement('div');
+        shortsChip.id = 'yt-aid-shorts-chip';
+        shortsChip.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483000;padding:6px 12px;' +
+          'border-radius:999px;background:rgba(0,0,0,.75);color:#fff;font:12px/1.2 Roboto,Arial,sans-serif;' +
+          'pointer-events:none;transition:opacity .3s;';
+        document.body.appendChild(shortsChip);
+      }
+      shortsChip.textContent = text;
+      shortsChip.style.opacity = '1';
+      clearTimeout(shortsChipTimer);
+      if (!sticky) shortsChipTimer = setTimeout(() => { if (shortsChip) shortsChip.style.opacity = '0'; }, 4000);
+    } catch (e) { }
+  }
+
+  // Tìm video Short đang hiển thị: không phụ thuộc thuộc tính is-active (YouTube hay đổi).
+  function getActiveShortsVideo() {
+    let v = document.querySelector('ytd-reel-video-renderer[is-active] video');
+    if (v) return v;
+    const vh = window.innerHeight, vw = window.innerWidth;
+    const candidates = document.querySelectorAll('ytd-shorts video, #shorts-player video, #shorts-container video');
+    let best = null;
+    let bestArea = 0;
+    candidates.forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const w = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
+      const h = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+      if (w * h > bestArea) { bestArea = w * h; best = el; }
+    });
+    if (!best) best = [...candidates].find((el) => !el.paused) || candidates[0] || null;
+    return best;
+  }
+
+  let shortsLastVideo = null;
+  // Tạm bật nhãn gỡ lỗi luôn hiện trên trang Shorts để biết tiện ích thấy gì. Đặt false khi đã ổn.
+  const SHORTS_DEBUG_CHIP = false;
+
+  function shortsTick() {
+    const onShorts = window.location.pathname.startsWith('/shorts');
+    if (!onShorts) {
+      if (shortsChip && shortsChip.style.opacity !== '0') shortsChip.style.opacity = '0';
+      return;
+    }
+
+    const video = getActiveShortsVideo();
+    const enabled = !!settings.enableShortsAutoScroll;
+    const dur = video ? video.duration : NaN;
+    const t = video ? video.currentTime : 0;
+    const info = video
+      ? `t=${t.toFixed(1)}/${isFinite(dur) ? dur.toFixed(1) : '?'} paused=${video.paused} loop=${video.loop} ended=${video.ended} next=${!!findShortsNextButton()}`
+      : 'no-video';
+    document.documentElement.setAttribute('data-yt-aid-shorts', info);
+    if (SHORTS_DEBUG_CHIP && Date.now() - shortsLastAdvanceAt > 2500) {
+      showShortsChip(`Auto scroll: ${enabled ? 'ON' : 'OFF'} · ${info}`, true);
+    }
+
+    if (!enabled || !video) return;
+    if (document.querySelector('ytd-reel-video-renderer[is-active] .ytp-ad-player-overlay, ytd-reel-video-renderer[is-active] ytd-ad-slot-renderer')) return;
+    if (!isFinite(dur) || dur < 1) return;
+
+    if (video !== shortsLastVideo) {
+      shortsLastVideo = video;
+      shortsLastTime = t;
+      return;
+    }
+    const nearEnd = (t >= dur - 0.3 && !video.paused) || video.ended;
+    const wrapped = shortsLastTime > dur * 0.6 && t < shortsLastTime - dur * 0.5;
+    shortsLastTime = t;
+    if (nearEnd || wrapped) advanceShorts();
+  }
+
+  function initShortsAutoScroll() {
+    // timeupdate (~4 lần/giây) + timer 150ms: nếu YouTube đổi thẻ video thì timer vẫn bắt được.
+    document.addEventListener('timeupdate', shortsTick, true);
+    document.addEventListener('ended', shortsTick, true);
+    setInterval(shortsTick, 150);
+    window.addEventListener('yt-navigate-finish', () => {
+      shortsLastTime = 0;
+      shortsLastVideo = null;
+      if (settings.enableShortsAutoScroll && window.location.pathname.startsWith('/shorts')) showShortsChip('Auto scroll Shorts: ON');
+    });
+    setTimeout(() => {
+      if (window.location.pathname.startsWith('/shorts')) {
+        showShortsChip(settings.enableShortsAutoScroll ? 'Auto scroll Shorts: ON' : 'Auto scroll Shorts: OFF (bật trong Options)');
+      }
+    }, 1500);
+    // Gỡ lỗi: trạng thái được ghi vào thuộc tính data-yt-aid-shorts của <html> (xem ở Console của trang).
   }
 
 })();
