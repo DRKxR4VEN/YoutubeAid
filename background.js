@@ -113,6 +113,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'pauseMediaDownload') {
+    if (chrome.downloads && request.downloadId) {
+      chrome.downloads.pause(request.downloadId, () => {
+        sendResponse({ success: !chrome.runtime.lastError });
+      });
+      return true;
+    }
+    sendResponse({ success: false });
+    return true;
+  }
+
+  if (request.action === 'resumeMediaDownload') {
+    if (chrome.downloads && request.downloadId) {
+      chrome.downloads.resume(request.downloadId, () => {
+        sendResponse({ success: !chrome.runtime.lastError });
+      });
+      return true;
+    }
+    sendResponse({ success: false });
+    return true;
+  }
+
+  if (request.action === 'cancelMediaDownload') {
+    if (chrome.downloads && request.downloadId) {
+      chrome.downloads.cancel(request.downloadId, () => {
+        sendResponse({ success: !chrome.runtime.lastError });
+      });
+      return true;
+    }
+    sendResponse({ success: false });
+    return true;
+  }
+
   return false;
 });
 

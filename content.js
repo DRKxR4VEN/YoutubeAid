@@ -367,7 +367,7 @@
     document.body.appendChild(toastContainer);
   }
 
-  function showToast(message, type = 'info', duration = 2400, action = null) {
+  function showToast(message, type = 'info', duration = 2400, action = null, onIconClick = null) {
     // An action toast (Undo) must appear even when regular toasts are off.
     if (!settings.enableToasts && !action) return;
     message = T(message);
@@ -386,9 +386,19 @@
     }
 
     toast.innerHTML = `
-      <div class="yt-aid-toast-icon">${iconSvg}</div>
+      <div class="yt-aid-toast-icon${onIconClick ? ' yt-aid-toast-clickable-icon' : ''}" title="${onIconClick ? T('Xem hàng đợi') : ''}">${iconSvg}</div>
       <div class="yt-aid-toast-message">${escapeHtml(message)}</div>
     `;
+
+    if (onIconClick) {
+      const iconEl = toast.querySelector('.yt-aid-toast-clickable-icon');
+      if (iconEl) {
+        iconEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          try { onIconClick(); } catch (err) { }
+        });
+      }
+    }
 
     let hideTimer = 0;
     let removeTimer = 0;
@@ -2158,6 +2168,145 @@
   }
 
   // ==========================================
+  // DOWNLOAD QUEUE & BACKGROUND TASKS
+  // ==========================================
+  const downloadQueue = new Map();
+  let queueDrawerEl = null;
+
+  function openDownloadQueueDrawer() {
+    if (!queueDrawerEl) {
+      queueDrawerEl = document.createElement('div');
+      queueDrawerEl.className = 'yt-aid-queue-drawer';
+      document.body.appendChild(queueDrawerEl);
+    }
+    renderDownloadQueue();
+    queueDrawerEl.classList.add('yt-aid-queue-open');
+  }
+
+  function closeDownloadQueueDrawer() {
+    if (queueDrawerEl) {
+      queueDrawerEl.classList.remove('yt-aid-queue-open');
+    }
+  }
+
+  function renderDownloadQueue() {
+    if (!queueDrawerEl) return;
+    const items = Array.from(downloadQueue.values());
+    const count = items.length;
+
+    queueDrawerEl.innerHTML = `
+      <div class="yt-aid-queue-header">
+        <div class="yt-aid-queue-title-wrap">
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          <span class="yt-aid-queue-title">${T('Hàng đợi tải xuống')}</span>
+          <span class="yt-aid-queue-count">${count}</span>
+        </div>
+        <button type="button" class="yt-aid-queue-close-btn" id="yt-aid-queue-close" title="${T('Đóng')}">
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <div class="yt-aid-queue-list">
+        ${count === 0 ? `<div class="yt-aid-queue-empty">${T('Không có tác vụ nào đang tải')}</div>` : ''}
+      </div>
+    `;
+
+    queueDrawerEl.querySelector('#yt-aid-queue-close').addEventListener('click', closeDownloadQueueDrawer);
+
+    if (count === 0) return;
+    const listEl = queueDrawerEl.querySelector('.yt-aid-queue-list');
+
+    items.forEach((item) => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'yt-aid-queue-item';
+      const isMp3 = item.format === 'mp3';
+      const badgeCls = isMp3 ? 'mp3' : 'mp4';
+      const badgeText = isMp3 ? 'MP3' : `MP4 ${item.format}p`;
+      const isPaused = item.status === 'paused';
+      const statusLabel = isPaused ? T('Đã tạm dừng') : (item.status === 'saving' ? T('Đang tải file về máy…') : `${T('Đang chuyển đổi')}: ${item.progress}%`);
+
+      // Icons: Pause (2 bars) vs Resume/Play (triangle), Cancel (X)
+      const pauseIconSvg = isPaused
+        ? '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+      const cancelIconSvg = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+
+      itemEl.innerHTML = `
+        <span class="yt-aid-queue-badge ${badgeCls}">${escapeHtml(badgeText)}</span>
+        <div class="yt-aid-queue-info">
+          <div class="yt-aid-queue-item-title" title="${escapeHtml(item.title)}">${escapeHtml(previewText(item.title, 36))}</div>
+          <div class="yt-aid-queue-item-meta">
+            <span>${escapeHtml(statusLabel)}</span>
+            <span>${item.progress}%</span>
+          </div>
+          <div class="yt-aid-queue-bar">
+            <div class="yt-aid-queue-fill${isPaused ? ' paused' : ''}" style="width: ${item.progress}%"></div>
+          </div>
+        </div>
+        <div class="yt-aid-queue-actions">
+          <button type="button" class="yt-aid-queue-btn btn-pause" data-id="${item.id}" title="${isPaused ? T('Tiếp tục') : T('Tạm dừng')}">
+            ${pauseIconSvg}
+          </button>
+          <button type="button" class="yt-aid-queue-btn btn-cancel" data-id="${item.id}" title="${T('Hủy tải xuống')}">
+            ${cancelIconSvg}
+          </button>
+        </div>
+      `;
+
+      const pauseBtn = itemEl.querySelector('.btn-pause');
+      const cancelBtn = itemEl.querySelector('.btn-cancel');
+
+      pauseBtn.addEventListener('click', () => {
+        togglePauseQueueItem(item.id);
+      });
+
+      cancelBtn.addEventListener('click', () => {
+        cancelQueueItem(item.id);
+      });
+
+      listEl.appendChild(itemEl);
+    });
+  }
+
+  function togglePauseQueueItem(id) {
+    const item = downloadQueue.get(id);
+    if (!item) return;
+
+    if (item.status === 'paused') {
+      // Resume
+      item.status = item.downloadId ? 'saving' : 'converting';
+      if (item.downloadId) {
+        chrome.runtime.sendMessage({ action: 'resumeMediaDownload', downloadId: item.downloadId });
+      }
+      showToast(T('Tiếp tục'), 'info', 1600);
+    } else {
+      // Pause
+      item.status = 'paused';
+      if (item.downloadId) {
+        chrome.runtime.sendMessage({ action: 'pauseMediaDownload', downloadId: item.downloadId });
+      }
+      showToast(T('Đã tạm dừng'), 'warning', 1600);
+    }
+    renderDownloadQueue();
+  }
+
+  function cancelQueueItem(id) {
+    const item = downloadQueue.get(id);
+    if (!item) return;
+
+    item.aborted = true;
+    if (item.pollTimer) {
+      clearInterval(item.pollTimer);
+      item.pollTimer = null;
+    }
+    if (item.downloadId) {
+      chrome.runtime.sendMessage({ action: 'cancelMediaDownload', downloadId: item.downloadId });
+    }
+    downloadQueue.delete(id);
+    renderDownloadQueue();
+    showToast(T('Đã hủy'), 'warning', 2000);
+  }
+
+  // ==========================================
   // 5D. MEDIA DOWNLOAD (MP3 & MP4)
   // ==========================================
   let activeMediaDownload = null;
@@ -2181,7 +2330,9 @@
     }
     if (activeMediaDownload) {
       activeMediaDownload.aborted = true;
+      if (activeMediaDownload.id) downloadQueue.delete(activeMediaDownload.id);
       activeMediaDownload = null;
+      renderDownloadQueue();
     }
     dismissMediaDownloadModal();
   }
@@ -2268,7 +2419,7 @@
       const wasActive = activeMediaDownload && !activeMediaDownload.aborted;
       dismissMediaDownloadModal();
       if (wasActive) {
-        showToast(T('Đang tải xuống dưới nền'), 'info', 3000);
+        showToast(T('Đang tải xuống dưới nền'), 'info', 4000, null, () => openDownloadQueueDrawer());
       }
     };
     // Nut Huy: huy download hoan toan
@@ -2292,12 +2443,21 @@
     const suffix = isMp3 ? '' : ` [${format}p]`;
     const targetFilename = `${sanitizeFilename(cleanTitle)} [${videoId}]${suffix}.${ext}`;
 
+    const downloadTaskId = `${videoId}_${format}_${Date.now()}`;
     activeMediaDownload = {
+      id: downloadTaskId,
       videoId,
+      title: cleanTitle,
       format,
+      formatLabel,
+      progress: 5,
+      status: "converting",
       pollTimer: null,
+      downloadId: null,
       aborted: false
     };
+    downloadQueue.set(downloadTaskId, activeMediaDownload);
+    renderDownloadQueue();
 
     chrome.runtime.sendMessage({
       action: 'startMediaDownload',
@@ -2349,6 +2509,10 @@
           }
 
           const pct = Math.max(10, Math.min(100, pollRes.progress || 10));
+          if (activeMediaDownload && !activeMediaDownload.aborted) {
+            activeMediaDownload.progress = pct;
+            renderDownloadQueue();
+          }
           if (mediaDownloadModalEl) {
             progressFill.style.width = `${pct}%`;
             progressText.textContent = `${pct}%`;
@@ -2359,6 +2523,11 @@
             if (activeMediaDownload?.pollTimer) clearInterval(activeMediaDownload.pollTimer);
             if (activeMediaDownload) activeMediaDownload.pollTimer = null;
 
+            if (activeMediaDownload && !activeMediaDownload.aborted) {
+              activeMediaDownload.status = "saving";
+              activeMediaDownload.progress = 100;
+              renderDownloadQueue();
+            }
             if (mediaDownloadModalEl) {
               progressFill.style.width = '100%';
               progressText.textContent = '100%';
@@ -2373,7 +2542,14 @@
               if (activeMediaDownload?.aborted) return;
 
               if (saveRes?.success) {
+                if (saveRes.downloadId && activeMediaDownload) {
+                  activeMediaDownload.downloadId = saveRes.downloadId;
+                }
                 showToast(T('Tải xuống hoàn tất!'), 'success', 3000);
+                if (activeMediaDownload?.id) {
+                  downloadQueue.delete(activeMediaDownload.id);
+                  renderDownloadQueue();
+                }
                 if (mediaDownloadModalEl) {
                   statusEl.textContent = T('Tải xuống hoàn tất!');
                   statusEl.classList.add('success');
