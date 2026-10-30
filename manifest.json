@@ -1,16 +1,26 @@
 {
   "manifest_version": 3,
   "name": "Youtube Aid",
-  "version": "1.16.8",
-  "description": "Tiện ích mở rộng YouTube: Copy title thông minh, Clean link không tracking, phím tắt tùy chỉnh trên YouTube & YouTube Music, tự động copy/dán khi bôi đen, tải ảnh bìa/avatar/banner có cắt ảnh và tự động lặp video (bỏ qua quảng cáo), bookmark video xem sau.",
+  "version": "1.17",
+  "description": "Tiện ích mở rộng YouTube: Tải video MP4 & âm thanh MP3 chất lượng cao, copy title thông minh, Clean link không tracking, phím tắt tùy chỉnh trên YouTube & YouTube Music, tự động copy/dán khi bôi đen, tải ảnh bìa/avatar/banner có cắt ảnh và tự động lặp video (bỏ qua quảng cáo), bookmark video xem sau.",
   "permissions": [
     "storage",
     "clipboardWrite",
-    "clipboardRead"
+    "clipboardRead",
+    "downloads",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
-    "https://www.youtube.com/*"
+    "https://www.youtube.com/*",
+    "https://music.youtube.com/*",
+    "https://*.loader.to/*",
+    "https://*.affadaffa.com/*",
+    "https://*.savenow.to/*",
+    "https://*.googlevideo.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": [

@@ -90,6 +90,7 @@
     enableAutoPasteSearch: true,
     enableAutoPasteReplace: true,
     enableThumbnailDownload: true,
+    enableMediaDownload: true,
     enableAdSkip: true,
     enableHideAds: true,
     enableShortsAutoScroll: false,
@@ -305,13 +306,15 @@
     try { closeBookmarkPage(); } catch (e) { }
     try { closeBookmarkConfirm(false); } catch (e) { }
     try { closeThumbnailCropper(); } catch (e) { }
+    try { closeMediaDownloadModal(); } catch (e) { }
 
     document.querySelectorAll([
       '.yt-aid-watch-toolbar', '.yt-aid-card-bar', '#yt-aid-channel-actions',
       '#yt-aid-guide-entry', '#yt-aid-mini-entry', '#yt-aid-bookmark-shelf',
       '#yt-aid-random-home', '.yt-aid-home-trigger', '.yt-aid-home-flyout',
       '#yt-aid-bookmark-page', '.yt-aid-crop-overlay', '.yt-aid-bm-confirm-overlay',
-      '.yt-aid-bm-favorite-picker', '#yt-aid-tools-menu', '#yt-aid-random-menu'
+      '.yt-aid-bm-favorite-picker', '#yt-aid-tools-menu', '#yt-aid-random-menu',
+      '.yt-aid-dl-overlay'
     ].join(', ')).forEach((el) => el.remove());
 
     injectAllAreas();
@@ -1630,7 +1633,7 @@
             <div class="yt-aid-crop-subtitle">${escapeHtml(previewText(title, 60))}</div>
           </div>
           <button type="button" class="yt-aid-crop-close" id="yt-aid-crop-close" title="Đóng" aria-label="Đóng">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"/></svg>
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
           </button>
         </div>
 
@@ -2155,6 +2158,294 @@
   }
 
   // ==========================================
+  // 5D. MEDIA DOWNLOAD (MP3 & MP4)
+  // ==========================================
+  let activeMediaDownload = null;
+  let mediaDownloadModalEl = null;
+
+  function closeMediaDownloadModal() {
+    if (activeMediaDownload && activeMediaDownload.pollTimer) {
+      clearInterval(activeMediaDownload.pollTimer);
+      activeMediaDownload.pollTimer = null;
+    }
+    if (activeMediaDownload) {
+      activeMediaDownload.aborted = true;
+      activeMediaDownload = null;
+    }
+
+    if (mediaDownloadModalEl) {
+      const el = mediaDownloadModalEl;
+      mediaDownloadModalEl = null;
+      el.classList.remove('yt-aid-dl-open');
+      setTimeout(() => el.remove(), 180);
+    }
+  }
+
+  function startMediaDownload({ videoUrl, title, format = 'mp3', formatLabel = 'MP3' }) {
+    if (!videoUrl) videoUrl = window.location.href;
+    const videoId = videoIdFromUrl(videoUrl);
+    if (!videoId) {
+      showToast(T('Không tìm thấy mã video để tải video/âm thanh'), 'warning');
+      return;
+    }
+
+    const cleanTitle = (title || getWatchVideoTitle() || 'youtube-video').trim();
+    const cleanUrl = cleanYoutubeUrl(videoUrl) || `https://www.youtube.com/watch?v=${videoId}`;
+    const thumbUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+    closeDropdown();
+    closeMediaDownloadModal();
+
+    if (!chrome.runtime || !chrome.runtime.sendMessage) {
+      showToast(T('Tiện ích vừa cập nhật, hãy tải lại trang (F5) để sử dụng tính năng tải.'), 'warning', 4000);
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'yt-aid-dl-overlay yt-aid-dl-open';
+    overlay.id = 'yt-aid-dl-overlay';
+    overlay.innerHTML = `
+      <div class="yt-aid-dl-dialog" role="dialog" aria-modal="true" aria-label="${T('Tải Video & Âm thanh')}">
+        <div class="yt-aid-dl-header">
+          <div class="yt-aid-dl-title-wrap">
+            <span class="yt-aid-dl-badge">${escapeHtml(formatLabel)}</span>
+            <div class="yt-aid-dl-heading">${T('Tải Video & Âm thanh')}</div>
+          </div>
+          <button type="button" class="yt-aid-dl-close" id="yt-aid-dl-close" title="${T('Đóng')}" aria-label="${T('Đóng')}">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </div>
+
+        <div class="yt-aid-dl-body">
+          <div class="yt-aid-dl-card">
+            <img class="yt-aid-dl-thumb" src="${escapeHtml(thumbUrl)}" alt="" draggable="false" />
+            <div class="yt-aid-dl-meta">
+              <div class="yt-aid-dl-video-title" title="${escapeHtml(cleanTitle)}">${escapeHtml(previewText(cleanTitle, 55))}</div>
+              <div class="yt-aid-dl-status-text" id="yt-aid-dl-status">${T('Đang khởi tạo tiến trình tải…')}</div>
+            </div>
+          </div>
+
+          <div class="yt-aid-dl-progress-section">
+            <div class="yt-aid-dl-progress-bar">
+              <div class="yt-aid-dl-progress-fill" id="yt-aid-dl-progress-fill" style="width: 5%"></div>
+            </div>
+            <div class="yt-aid-dl-progress-info">
+              <span class="yt-aid-dl-progress-text" id="yt-aid-dl-progress-text">5%</span>
+              <span class="yt-aid-dl-hint-text">${T('Vui lòng đợi máy chủ chuẩn bị file…')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="yt-aid-dl-footer">
+          <a href="https://loader.to/?link=${encodeURIComponent(cleanUrl)}" target="_blank" rel="noopener" class="yt-aid-dl-backup-link" id="yt-aid-dl-backup" title="${T('Mở trang tải dự phòng')}">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+            <span>${T('Mở trang tải dự phòng')}</span>
+          </a>
+          <div class="yt-aid-dl-actions">
+            <button type="button" class="yt-aid-dl-btn" id="yt-aid-dl-cancel">${T('Hủy')}</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    mediaDownloadModalEl = overlay;
+    localizeTree(overlay);
+
+    const closeBtn = overlay.querySelector('#yt-aid-dl-close');
+    const cancelBtn = overlay.querySelector('#yt-aid-dl-cancel');
+    const statusEl = overlay.querySelector('#yt-aid-dl-status');
+    const progressFill = overlay.querySelector('#yt-aid-dl-progress-fill');
+    const progressText = overlay.querySelector('#yt-aid-dl-progress-text');
+
+    const handleClose = () => closeMediaDownloadModal();
+    closeBtn.addEventListener('click', handleClose);
+    cancelBtn.addEventListener('click', handleClose);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) handleClose();
+    });
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        document.removeEventListener('keydown', onKeyDown, true);
+        handleClose();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+
+    const isMp3 = format === 'mp3';
+    const ext = isMp3 ? 'mp3' : 'mp4';
+    const suffix = isMp3 ? '' : ` [${format}p]`;
+    const targetFilename = `${sanitizeFilename(cleanTitle)} [${videoId}]${suffix}.${ext}`;
+
+    activeMediaDownload = {
+      videoId,
+      format,
+      pollTimer: null,
+      aborted: false
+    };
+
+    chrome.runtime.sendMessage({
+      action: 'startMediaDownload',
+      videoUrl: cleanUrl,
+      format
+    }, (res) => {
+      if (activeMediaDownload?.aborted || !mediaDownloadModalEl) return;
+
+      if (!res || !res.success || !res.progressUrl) {
+        const errMsg = res?.error || T('Không thể kết nối dịch vụ chuyển đổi, hãy thử lại.');
+        statusEl.textContent = errMsg;
+        statusEl.classList.add('error');
+        showToast(T('Lỗi khi tải: {0}', [errMsg]), 'error');
+        return;
+      }
+
+      statusEl.textContent = T('Đang chuyển đổi: {0}%', ['10']);
+      progressFill.style.width = '10%';
+      progressText.textContent = '10%';
+
+      let pollAttempts = 0;
+      const MAX_POLLS = 120; // 4 minutes
+
+      activeMediaDownload.pollTimer = setInterval(() => {
+        pollAttempts++;
+        if (pollAttempts > MAX_POLLS) {
+          if (activeMediaDownload?.pollTimer) clearInterval(activeMediaDownload.pollTimer);
+          statusEl.textContent = T('Quá thời gian xử lý, hãy bấm vào trang dự phòng để tải.');
+          statusEl.classList.add('error');
+          return;
+        }
+
+        chrome.runtime.sendMessage({
+          action: 'checkMediaProgress',
+          progressUrl: res.progressUrl
+        }, (pollRes) => {
+          if (activeMediaDownload?.aborted || !mediaDownloadModalEl) return;
+
+          if (!pollRes || !pollRes.success) {
+            return;
+          }
+
+          const pct = Math.max(10, Math.min(100, pollRes.progress || 10));
+          progressFill.style.width = `${pct}%`;
+          progressText.textContent = `${pct}%`;
+          statusEl.textContent = T('Đang chuyển đổi: {0}%', [String(pct)]);
+
+          if (pollRes.isFinished && pollRes.downloadUrl) {
+            if (activeMediaDownload?.pollTimer) clearInterval(activeMediaDownload.pollTimer);
+            if (activeMediaDownload) activeMediaDownload.pollTimer = null;
+
+            progressFill.style.width = '100%';
+            progressText.textContent = '100%';
+            statusEl.textContent = T('Đang tải file về máy…');
+
+            chrome.runtime.sendMessage({
+              action: 'saveMediaFile',
+              url: pollRes.downloadUrl,
+              filename: targetFilename
+            }, (saveRes) => {
+              if (activeMediaDownload?.aborted || !mediaDownloadModalEl) return;
+
+              if (saveRes?.success) {
+                statusEl.textContent = T('Tải xuống hoàn tất!');
+                statusEl.classList.add('success');
+                showToast(T('Tải xuống hoàn tất!'), 'success', 3000);
+                cancelBtn.textContent = T('Đóng');
+                setTimeout(() => {
+                  closeMediaDownloadModal();
+                }, 2400);
+              } else {
+                const a = document.createElement('a');
+                a.href = pollRes.downloadUrl;
+                a.download = targetFilename;
+                a.target = '_blank';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => a.remove(), 1000);
+
+                statusEl.textContent = T('Tải xuống hoàn tất!');
+                cancelBtn.textContent = T('Đóng');
+              }
+            });
+          }
+        });
+      }, 2000);
+    });
+  }
+
+  function buildMediaQualityMenu(data) {
+    const menu = document.createElement('div');
+    menu.id = 'yt-aid-media-menu';
+    menu.className = 'yt-aid-tools-menu yt-aid-media-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = `
+      <div class="yt-aid-tools-title">${T('Chọn chất lượng tải xuống')}</div>
+
+      <button type="button" class="yt-aid-media-menu-item" data-format="1080" data-label="MP4 1080p">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+        <span class="yt-aid-media-menu-label">${T('Video MP4 (1080p Full HD)')}</span>
+        <span class="yt-aid-media-menu-tag">1080p</span>
+      </button>
+
+      <button type="button" class="yt-aid-media-menu-item" data-format="720" data-label="MP4 720p">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+        <span class="yt-aid-media-menu-label">${T('Video MP4 (720p HD)')}</span>
+        <span class="yt-aid-media-menu-tag recommended">HD</span>
+      </button>
+
+      <button type="button" class="yt-aid-media-menu-item" data-format="480" data-label="MP4 480p">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+        <span class="yt-aid-media-menu-label">${T('Video MP4 (480p)')}</span>
+        <span class="yt-aid-media-menu-tag">480p</span>
+      </button>
+
+      <button type="button" class="yt-aid-media-menu-item" data-format="360" data-label="MP4 360p">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+        <span class="yt-aid-media-menu-label">${T('Video MP4 (360p)')}</span>
+        <span class="yt-aid-media-menu-tag">360p</span>
+      </button>
+
+      <div class="yt-aid-media-menu-divider"></div>
+
+      <button type="button" class="yt-aid-media-menu-item" data-format="mp3" data-label="MP3">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        <span class="yt-aid-media-menu-label">${T('Âm thanh MP3')} (320kbps)</span>
+        <span class="yt-aid-media-menu-tag">MP3</span>
+      </button>
+
+      <div class="yt-aid-media-menu-divider"></div>
+
+      <button type="button" class="yt-aid-media-menu-item" data-action="thumbnail" data-label="Thumbnail">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        <span class="yt-aid-media-menu-label">${T('Tải ảnh bìa thumbnail (có cắt ảnh)')}</span>
+        <span class="yt-aid-media-menu-tag">IMG</span>
+      </button>
+    `;
+
+    menu.querySelectorAll('.yt-aid-media-menu-item').forEach((item) => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeDropdown();
+        if (item.dataset.action === 'thumbnail') {
+          downloadThumbnail(null, data?.title || getWatchVideoTitle(), data?.url || window.location.href);
+          return;
+        }
+        const fmt = item.dataset.format;
+        const fmtLabel = item.dataset.label;
+        startMediaDownload({
+          videoUrl: data?.url || window.location.href,
+          title: data?.title || getWatchVideoTitle(),
+          format: fmt,
+          formatLabel: fmtLabel
+        });
+      });
+    });
+
+    localizeTree(menu);
+    return menu;
+  }
+
+  // ==========================================
   // 5. COPY ON SELECT & AUTO-PASTE INTO SEARCH
   // ==========================================
   function normalizeClipboardText(raw) {
@@ -2385,12 +2676,14 @@
     window.addEventListener('yt-navigate-start', () => {
       cancelRandomVideo();
       closeDropdown();
+      try { closeMediaDownloadModal(); } catch (e) { }
     });
     window.addEventListener('pagehide', cancelRandomVideo);
     window.addEventListener('yt-navigate-finish', () => {
       cancelRandomVideo();
       closeHomeFlyout();
       closeDropdown();
+      try { closeMediaDownloadModal(); } catch (e) { }
       scheduleInjection(80, true);
     });
 
@@ -2500,12 +2793,14 @@
             <span></span>
           </button>
         </div>
-
-        <!-- Downloads button (thumbnail crop) -->
-        <button class="yt-aid-pill-btn yt-aid-downloads-btn" id="yt-aid-btn-downloads" title="Tải ảnh bìa thumbnail (có cắt ảnh)" aria-label="Tải thumbnail">
+        <!-- Unified Download Button (MP3, MP4, Thumbnail) -->
+        ${(settings.enableMediaDownload || settings.enableThumbnailDownload) ? `
+        <button class="yt-aid-pill-btn yt-aid-downloads-btn yt-aid-media-btn" id="yt-aid-btn-media" title="${T('Tải xuống')}" aria-label="${T('Tải xuống')}" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-          <span>Thumbnail</span>
+          <span>Download</span>
+          <svg class="yt-aid-chevron" viewBox="0 0 24 24"><path fill="currentColor" d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
         </button>
+        ` : ''}
       </div>
 
       <div class="yt-aid-toolbar-right">
@@ -2594,12 +2889,17 @@
 
     syncBookmarkButtons();
 
-    // Thumbnail download with crop dialog
-    const downloadsBtn = toolbar.querySelector('#yt-aid-btn-downloads');
-    downloadsBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      downloadThumbnail(downloadsBtn, getWatchVideoTitle(), window.location.href);
-    });
+    // Unified Download dropdown (MP3, MP4, Thumbnail)
+    const mediaBtn = toolbar.querySelector('#yt-aid-btn-media');
+    if (mediaBtn) {
+      mediaBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleDropdown(mediaBtn, () => buildMediaQualityMenu({
+          url: window.location.href,
+          title: getWatchVideoTitle()
+        }));
+      });
+    }
 
     // Toggle Auto Loop
     const loopBtn = toolbar.querySelector('#yt-aid-btn-toggle-loop');
@@ -3094,7 +3394,7 @@
   }
 
   function homeFlyoutConfig() {
-    return `copy:${settings.enableCopyButtons ? 1 : 0}`;
+    return `copy:${settings.enableCopyButtons ? 1 : 0}|media:${settings.enableMediaDownload ? 1 : 0}`;
   }
 
   function buildHomeFlyoutContent(panel) {
@@ -3123,6 +3423,19 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
       </button>
     `);
+
+    if (settings.enableMediaDownload) {
+      buttons.push(`
+        <button type="button" class="yt-aid-flyout-btn yt-aid-media-dl" title="${T('Tải MP3 / MP4')}" aria-label="${T('Tải MP3 / MP4')}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        </button>
+      `);
+    }
+
+    const btnCount = buttons.length;
+    panel.classList.remove('yt-aid-flyout-5', 'yt-aid-flyout-6');
+    if (btnCount >= 6) panel.classList.add('yt-aid-flyout-6');
+    else if (btnCount >= 5) panel.classList.add('yt-aid-flyout-5');
 
     panel.innerHTML = buttons.join('');
     panel.dataset.ytAidConfig = homeFlyoutConfig();
@@ -3188,6 +3501,21 @@
         const data = flyoutData();
         closeHomeFlyout();
         downloadThumbnail(btn, data.title, data.url);
+      });
+    }
+
+    const mediaDlBtn = panel.querySelector('.yt-aid-media-dl');
+    if (mediaDlBtn) {
+      mediaDlBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const data = flyoutData();
+        closeHomeFlyout();
+        if (!data.url) {
+          showToast(T('Không tìm thấy liên kết video'), 'warning');
+          return;
+        }
+        startMediaDownload({ videoUrl: data.url, title: data.title, format: 'mp3', formatLabel: 'MP3' });
       });
     }
   }
@@ -5011,12 +5339,20 @@
     '.ytp-ad-skip-button',
     '.ytp-ad-skip-button-modern',
     '.ytp-ad-skip-button-container button',
-    '.ytp-skip-ad button'
+    '.ytp-skip-ad button',
+    'button.ytp-ad-skip-button-modern',
+    '[class*="ytp-ad-skip-button"]',
+    'button[id^="skip-button"]',
+    '.ytp-ad-skip-button-slot button',
+    'button[aria-label*="Skip"]',
+    'button[aria-label*="skip"]',
+    'button[aria-label*="Bỏ qua"]',
+    'button[aria-label*="bỏ qua"]'
   ].join(', ');
-  const AD_OVERLAY_CLOSE_SELECTORS = '.ytp-ad-overlay-close-button, .ytp-ad-overlay-close-container';
+  const AD_OVERLAY_CLOSE_SELECTORS = '.ytp-ad-overlay-close-button, .ytp-ad-overlay-close-container, .ytp-ad-image-overlay button';
   const AD_MAX_SEEK_DURATION = 600; // chỉ tua tới cuối nếu "video" ngắn hơn 10 phút (tránh tua nhầm video chính)
-  const AD_SKIP_POLL_MS = 250;
-  const AD_FAST_POLL_MS = 80; // khi đang có quảng cáo: kiểm tra mỗi 80ms thay vì chờ timer 250ms
+  const AD_SKIP_POLL_MS = 150; // kiểm tra định kỳ nhanh hơn
+  const AD_FAST_POLL_MS = 40; // khi đang có quảng cáo: kiểm tra mỗi 40ms để bấm nút ngay khi xuất hiện
 
   let adSkipState = null; // { muted, rate } của video trước khi vào quảng cáo
   let adSkipObservedPlayer = null;
@@ -5057,8 +5393,8 @@
   let adHideSince = 0;
   let adAtEndSince = 0;
   let adStuckAttempts = 0;
-  const AD_HIDE_MAX_MS = 1500;    // sau 15s mà quảng cáo vẫn chưa hết: ngừng giấu để bạn tự thao tác được
-  const AD_STUCK_AFTER_MS = 250;  // quảng cáo đứng ở cuối quá 0,4s thì coi là kẹt
+  const AD_HIDE_MAX_MS = 25000;   // tối đa 25s ẩn nếu quảng cáo kéo dài
+  const AD_STUCK_AFTER_MS = 150;  // quảng cáo đứng ở cuối quá 150ms thì xử lý ngay
   const AD_STUCK_MAX_TRIES = 20;
   const AD_WEAK_MAX_MS = 8000; // dấu hiệu "yếu" chỉ giấu tối đa 8 giây để không kẹt player đen
 
@@ -5096,16 +5432,36 @@
 
   // Click "thật" hơn: YouTube mới nghe pointer/mouse event, .click() đơn thuần đôi khi bị bỏ qua.
   function fireRealClick(el) {
+    if (!el) return;
+    try {
+      if (typeof el.click === 'function') el.click();
+    } catch (e) { }
     try {
       const r = el.getBoundingClientRect();
-      const opts = { bubbles: true, cancelable: true, composed: true, view: window,
-        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0 };
+      const clientX = r.left + (r.width > 0 ? r.width / 2 : 5);
+      const clientY = r.top + (r.height > 0 ? r.height / 2 : 5);
+      const opts = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        view: window,
+        clientX,
+        clientY,
+        button: 0,
+        buttons: 1
+      };
       ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((type) => {
         const Ctor = type.startsWith('pointer') ? PointerEvent : MouseEvent;
         el.dispatchEvent(new Ctor(type, opts));
       });
     } catch (e) { }
-    try { el.click(); } catch (e) { }
+    // Nếu phần tử cha có thể click
+    try {
+      const parentBtn = el.closest('button, [role="button"]');
+      if (parentBtn && parentBtn !== el) {
+        parentBtn.click();
+      }
+    } catch (e) { }
   }
 
   function runAdSkip() {
@@ -5149,30 +5505,35 @@
     if (!adSkipState) adSkipState = { muted: video.muted, rate: video.playbackRate };
     try {
       video.muted = true;
-      video.playbackRate = 16;
+      video.playbackRate = 8;
     } catch (e) { }
 
     const skipBtn = player.querySelector(AD_SKIP_BUTTON_SELECTORS);
-    if (skipBtn) fireRealClick(skipBtn);
+    if (skipBtn) {
+      fireRealClick(skipBtn);
+    } else {
+      // Tìm sâu hơn trong player hoặc document nếu nút nằm ngoài .video-ads
+      const docSkipBtn = document.querySelector(AD_SKIP_BUTTON_SELECTORS);
+      if (docSkipBtn) fireRealClick(docSkipBtn);
+    }
 
     // Quảng cáo đang tải/đệm: ép phát để nó có dữ liệu sớm nhất có thể.
     if (kind === 'strong' && video.paused) nudgeAdPlayback(player, video);
 
     // Tua tới cuối quảng cáo (cả loại không có nút bỏ qua). Chỉ tua khi chắc chắn là quảng cáo.
     const duration = video.duration;
-    if (kind === 'strong' && isFinite(duration) && duration > 0 && duration <= AD_MAX_SEEK_DURATION) {
-      const atEnd = video.ended || video.currentTime >= duration - 0.1;
+    if (kind === 'strong' && isFinite(duration) && duration > 1 && duration <= AD_MAX_SEEK_DURATION) {
+      const atEnd = video.ended || video.currentTime >= duration - 0.5;
       if (!atEnd) {
         adAtEndSince = 0;
-        // Video đang dừng thì tua tới cuối sẽ không phát sinh sự kiện kết thúc: cho chạy trước.
         if (video.paused) nudgeAdPlayback(player, video);
-        try { video.currentTime = duration; } catch (e) { }
+        try { video.currentTime = duration - 0.2; } catch (e) { }
       } else {
         // Đã ở cuối nhưng quảng cáo vẫn còn hiện (kẹt): lùi nhẹ rồi cho chạy lại để kích hoạt kết thúc.
         if (!adAtEndSince) adAtEndSince = Date.now();
         if (Date.now() - adAtEndSince > AD_STUCK_AFTER_MS && adStuckAttempts < AD_STUCK_MAX_TRIES) {
           adStuckAttempts++;
-          try { video.currentTime = Math.max(0, duration - 0.3); } catch (e) { }
+          try { video.currentTime = Math.max(0, duration - 0.5); } catch (e) { }
           nudgeAdPlayback(player, video);
         }
       }

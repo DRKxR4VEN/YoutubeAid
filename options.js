@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableAutoPasteSearch: true,
     enableAutoPasteReplace: true,
     enableThumbnailDownload: true,
+    enableMediaDownload: true,
     enableAdSkip: true,
     enableHideAds: true,
     enableShortsAutoScroll: false,
@@ -50,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableSelectionCopy: document.getElementById('enableSelectionCopy'),
     enableAutoPasteSearch: document.getElementById('enableAutoPasteSearch'),
     enableAutoPasteReplace: document.getElementById('enableAutoPasteReplace'),
+    enableMediaDownload: document.getElementById('enableMediaDownload'),
     enableAdSkip: document.getElementById('enableAdSkip'),
     enableHideAds: document.getElementById('enableHideAds'),
     enableShortsAutoScroll: document.getElementById('enableShortsAutoScroll')

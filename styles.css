@@ -1860,9 +1860,9 @@ body.yt-aid-hide-ads ytd-rich-section-renderer:has(ytd-ad-slot-renderer) {
 }
 
 
-/* Khi đang có quảng cáo video: giấu hình ngay lập tức, tiện ích tua qua ở phía sau.
+/* Khi đang có quảng cáo video: che màn hình bằng nền đen và hiện spinner xoay ở giữa (như đang tải/mất mạng)
    Dùng thuộc tính trên <html> do script đặt (data-yt-aid-ad), không phụ thuộc class của player.
-   Chỉ ẩn hiển thị (không display:none) để nút "Bỏ qua" vẫn bấm được bằng script. */
+   Chỉ ẩn hiển thị hình ảnh quảng cáo (không display:none) để nút "Bỏ qua" vẫn bấm được bằng script. */
 html[data-yt-aid-ad] .html5-video-player .html5-video-container,
 html[data-yt-aid-ad] .html5-video-player video,
 html[data-yt-aid-ad] .html5-video-player .ytp-ad-module,
@@ -1893,6 +1893,31 @@ html[data-yt-aid-ad] .html5-video-player .video-ads {
 
 html[data-yt-aid-ad] .html5-video-player {
   background: #000 !important;
+  position: relative !important;
+}
+
+/* Spinner xoay tròn ở giữa video player như lúc đang buffer/mất mạng */
+html[data-yt-aid-ad] .html5-video-player::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  margin-top: -26px;
+  margin-left: -26px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  box-sizing: border-box;
+  z-index: 999999;
+  pointer-events: none;
+  animation: yt-aid-spinner-rotate 0.8s linear infinite;
+}
+
+@keyframes yt-aid-spinner-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 
@@ -1965,4 +1990,330 @@ html[data-yt-aid-ad] .html5-video-player {
   width: 100%;
   box-sizing: border-box;
   margin: 8px 0 !important;
+}
+
+/* ========================================================
+   MEDIA DOWNLOAD (MP3 & MP4) & DIALOG
+   ======================================================== */
+.yt-aid-media-group {
+  display: inline-flex;
+  align-items: center;
+}
+
+.yt-aid-media-btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* Media Quality Dropdown Menu */
+.yt-aid-media-menu {
+  min-width: 260px;
+  padding: 8px;
+}
+
+.yt-aid-media-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--yta-radius-sm);
+  background: transparent;
+  color: var(--yta-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.yt-aid-media-menu-item:hover {
+  background: var(--yta-bg-hover);
+}
+
+.yt-aid-media-menu-item svg {
+  width: 16px;
+  height: 16px;
+  color: var(--yta-text-secondary);
+  flex-shrink: 0;
+}
+
+.yt-aid-media-menu-item:hover svg {
+  color: var(--yta-brand-red);
+}
+
+.yt-aid-media-menu-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-aid-media-menu-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yta-text-secondary);
+}
+
+.yt-aid-media-menu-tag.recommended {
+  background: rgba(62, 166, 255, 0.18);
+  color: var(--yta-brand-blue);
+}
+
+.yt-aid-media-menu-divider {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--yta-border-subtle);
+}
+
+/* Media Download Progress Dialog Overlay */
+.yt-aid-dl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+  font-family: var(--yta-font-family);
+  animation: yta-crop-fade 0.15s ease;
+}
+
+.yt-aid-dl-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 480px;
+  padding: 20px;
+  color: var(--yta-text-primary);
+  background: var(--yta-bg-menu);
+  border: 1px solid var(--yta-border);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  animation: yta-dialog-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes yta-dialog-pop {
+  from {
+    transform: scale(0.95) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.yt-aid-dl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.yt-aid-dl-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.yt-aid-dl-badge {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  background: var(--yta-brand-red);
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.yt-aid-dl-heading {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-dl-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--yta-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.yt-aid-dl-close:hover {
+  background: var(--yta-bg-hover);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-dl-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.yt-aid-dl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.yt-aid-dl-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: var(--yta-radius-md);
+  background: var(--yta-bg-card);
+  border: 1px solid var(--yta-border-subtle);
+}
+
+.yt-aid-dl-thumb {
+  width: 80px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #000;
+  flex-shrink: 0;
+}
+
+.yt-aid-dl-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.yt-aid-dl-video-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--yta-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-aid-dl-status-text {
+  font-size: 12px;
+  color: var(--yta-text-secondary);
+  transition: color 0.2s ease;
+}
+
+.yt-aid-dl-status-text.error {
+  color: #ff5252;
+}
+
+.yt-aid-dl-status-text.success {
+  color: var(--yta-brand-green);
+  font-weight: 600;
+}
+
+.yt-aid-dl-progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.yt-aid-dl-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--yta-radius-pill);
+  overflow: hidden;
+}
+
+.yt-aid-dl-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ff0000, #ff4e50);
+  border-radius: var(--yta-radius-pill);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.yt-aid-dl-progress-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.yt-aid-dl-progress-text {
+  font-weight: 600;
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-dl-hint-text {
+  color: var(--yta-text-muted);
+}
+
+.yt-aid-dl-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--yta-border-subtle);
+}
+
+.yt-aid-dl-backup-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--yta-brand-blue);
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.yt-aid-dl-backup-link:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
+.yt-aid-dl-backup-link svg {
+  width: 13px;
+  height: 13px;
+}
+
+.yt-aid-dl-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.yt-aid-dl-btn {
+  padding: 7px 16px;
+  border: 1px solid var(--yta-border);
+  border-radius: var(--yta-radius-pill);
+  background: transparent;
+  color: var(--yta-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.yt-aid-dl-btn:hover {
+  background: var(--yta-bg-hover);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.yt-aid-home-flyout.yt-aid-flyout-5,
+.yt-aid-home-flyout.yt-aid-flyout-6 {
+  grid-template-columns: repeat(3, 34px);
 }
