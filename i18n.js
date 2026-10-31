@@ -315,7 +315,13 @@
     ['Bookmark ({0})', 'Bookmarks ({0})'],
     ['Bookmark ({0} video · {1} mốc)', 'Bookmarks ({0} videos · {1} marks)'],
     ['{0} video · {1} bookmark', '{0} videos · {1} bookmarks'],
-    ['{0} bookmark', '{0} bookmarks']
+    ['{0} bookmark', '{0} bookmarks'],
+    ['Hiệu ứng & hoạt ảnh nút', 'Button effects & animations'],
+    ['Tắt để tăng hiệu năng, phản hồi tức thì không trễ hình.', 'Turn off to boost performance with instant response.'],
+    ['Tắt để tăng hiệu năng và giảm tải GPU', 'Turn off to boost performance and reduce GPU load'],
+    ['Xem bookmark', 'View bookmarks'],
+    ['Xem bookmark ({0})', 'View bookmarks ({0})'],
+    ['Mở danh sách video đã lưu bookmark', 'Open saved bookmark videos']
   ];
 
   const viToEn = new Map();

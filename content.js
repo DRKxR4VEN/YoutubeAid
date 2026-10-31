@@ -94,6 +94,7 @@
     enableAdSkip: true,
     enableHideAds: true,
     enableShortsAutoScroll: false,
+    enableAnimations: true,
     hideButtonNames: false,
     audioBoost: 100,
     randomVideo: { video: true, shorts: true, music: true, feed: true },
@@ -296,6 +297,10 @@
       syncAudioBoost();
       syncAudioBoostUi();
     }
+    if (changed('enableAnimations')) {
+      document.body.classList.toggle('yt-aid-no-animations', !settings.enableAnimations);
+      syncToolbarState();
+    }
     if (changed('enableLoop') || changed('enableSelectionCopy') ||
         changed('enableAutoPasteSearch') || changed('enableAutoPasteReplace')) {
       syncToolbarState();
@@ -316,7 +321,7 @@
 
     document.querySelectorAll([
       '.yt-aid-watch-toolbar', '.yt-aid-card-bar', '#yt-aid-channel-actions',
-      '#yt-aid-guide-entry', '#yt-aid-mini-entry', '#yt-aid-bookmark-shelf',
+      '#yt-aid-guide-entry', '#yt-aid-mini-entry',
       '#yt-aid-random-home', '.yt-aid-home-trigger', '.yt-aid-home-flyout',
       '#yt-aid-bookmark-page', '.yt-aid-crop-overlay', '.yt-aid-bm-confirm-overlay',
       '.yt-aid-bm-favorite-picker', '#yt-aid-tools-menu', '#yt-aid-random-menu',
@@ -324,7 +329,6 @@
     ].join(', ')).forEach((el) => el.remove());
 
     injectAllAreas();
-    injectBookmarkShelf();
     syncButtonNamesUi();
   }
 
@@ -417,7 +421,7 @@
       if (!toast.isConnected) return;
       toast.classList.remove('yt-aid-toast-show');
       toast.classList.add('yt-aid-toast-hide');
-      removeTimer = setTimeout(() => toast.remove(), 250);
+      removeTimer = setTimeout(() => toast.remove(), settings.enableAnimations ? 250 : 0);
     }
 
     if (action) {
@@ -2325,7 +2329,7 @@
       const el = mediaDownloadModalEl;
       mediaDownloadModalEl = null;
       el.classList.remove('yt-aid-dl-open');
-      setTimeout(() => el.remove(), 180);
+      setTimeout(() => el.remove(), settings.enableAnimations ? 180 : 0);
     }
   }
 
@@ -2846,7 +2850,7 @@
       }, delay);
     };
 
-    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger, #yt-aid-bookmark-shelf, #yt-aid-random-home';
+    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger, #yt-aid-home-bookmark-btn, #yt-aid-random-home';
     // Native hosts carry our layout classes but still need reinjection after rerenders.
     const AID_UI_SCOPE = '[class*="yt-aid-"]:not(.yt-aid-home-card-host):not(.yt-aid-channel-actions-host):not(body):not(html), [id^="yt-aid-"]';
     // None of the injection targets live in these subtrees. They are also the
@@ -3167,7 +3171,7 @@
     if (!menu) return;
 
     menu.classList.remove('yt-aid-tools-menu-show');
-    setTimeout(() => menu.remove(), 160);
+    setTimeout(() => menu.remove(), settings.enableAnimations ? 160 : 0);
   }
 
   function toggleDropdown(btn, buildMenu) {
@@ -3221,6 +3225,9 @@
 
     const autoPasteReplaceToggle = document.getElementById('yt-aid-toggle-auto-paste-replace');
     if (autoPasteReplaceToggle) autoPasteReplaceToggle.checked = !!settings.enableAutoPasteReplace;
+
+    const animToggle = document.getElementById('yt-aid-toggle-animations');
+    if (animToggle) animToggle.checked = !!settings.enableAnimations;
 
     syncButtonNamesUi();
   }
@@ -3286,6 +3293,17 @@
         </span>
       </label>
 
+      <label class="yt-aid-tools-item">
+        <span class="yt-aid-tools-text">
+          <span class="yt-aid-tools-name">Hiệu ứng & hoạt ảnh nút</span>
+          <span class="yt-aid-tools-desc">Tắt để tăng hiệu năng và giảm tải GPU</span>
+        </span>
+        <span class="yt-aid-switch">
+          <input type="checkbox" id="yt-aid-toggle-animations"${checked(settings.enableAnimations)}>
+          <span class="yt-aid-switch-slider"></span>
+        </span>
+      </label>
+
       <div class="yt-aid-tools-item yt-aid-tools-boost">
         <span class="yt-aid-tools-text">
           <span class="yt-aid-tools-name">Tăng âm lượng video</span>
@@ -3306,6 +3324,10 @@
     });
     menu.querySelector('#yt-aid-toggle-auto-paste-replace').addEventListener('change', (e) => {
       updateSetting('enableAutoPasteReplace', e.target.checked);
+    });
+    menu.querySelector('#yt-aid-toggle-animations').addEventListener('change', (e) => {
+      updateSetting('enableAnimations', e.target.checked);
+      document.body.classList.toggle('yt-aid-no-animations', !e.target.checked);
     });
 
     const boostRange = menu.querySelector('#yt-aid-audio-boost');
@@ -4052,11 +4074,15 @@
       if (existing) existing.remove();
       return;
     }
-    if (existing && existing.nextElementSibling === grid) return;
+    if (existing && existing.nextElementSibling === grid) {
+      syncHomeBookmarkButton();
+      return;
+    }
     if (existing) existing.remove();
     const bar = document.createElement('div');
     bar.id = 'yt-aid-random-home';
     bar.appendChild(buildRandomVideoControl());
+    bar.appendChild(buildHomeBookmarkButton());
     grid.parentElement.insertBefore(bar, grid);
     localizeTree(bar);
     syncRandomVideoUi();
@@ -4267,9 +4293,7 @@
   // Mỗi bookmark = 1 mốc thời gian của 1 video:
   // { uid, id, title, channel, isShort, time, name, favoriteIcon, addedAt }
   const BOOKMARKS_KEY = 'bookmarks';
-  const BOOKMARK_SHELF_COLLAPSED_KEY = 'bookmarkShelfCollapsed';
   const BOOKMARK_LIMIT = 2000;
-  const BOOKMARK_SHELF_MAX = 12;
   const BOOKMARK_NAME_MAX = 200;
   const BOOKMARK_ICON_OUTLINE = 'M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z';
   const BOOKMARK_ICON_FILLED = 'M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z';
@@ -4277,8 +4301,6 @@
   const EDIT_ICON = 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z';
   const TRASH_ICON = 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z';
   const LOG_ICON = 'M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z';
-  const EYE_ICON = 'M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z';
-  const EYE_OFF_ICON = 'M2.1 3.51.69-.69 18.38 18.37-.69.69-3.45-3.45A11.74 11.74 0 0 1 12 19.5C7 19.5 2.73 16.39 1 12a12.77 12.77 0 0 1 4.11-5.3L2.1 3.51zM12 4.5c5 0 9.27 3.11 11 7.5a12.67 12.67 0 0 1-2.6 4.01l-3.1-3.1A5 5 0 0 0 11.09 6.7L9.13 4.74A12.1 12.1 0 0 1 12 4.5zm-.71 4.55 3.66 3.66A3 3 0 0 0 11.29 9.05z';
   const CHEVRON_DOWN_ICON = 'M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z';
   const HEART_OUTLINE_ICON = 'M12.1 21.35 10.55 19.94C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A6.03 6.03 0 0 1 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.45l-1.35 1.4z';
   const FAVORITE_ICONS = {
@@ -4294,7 +4316,6 @@
   const BM_LOG_MENU_ID = 'yt-aid-bm-log-menu';
 
   let bookmarks = [];
-  let bookmarkShelfCollapsed = false;
   let bookmarkPageOpen = false;
   let bookmarkFilter = '';
   const bookmarkPageCards = new Map();
@@ -4566,7 +4587,7 @@
     bookmarks = merged.slice(0, BOOKMARK_LIMIT);
     saveBookmarks();
     syncBookmarkUi();
-    injectBookmarkShelf();
+    syncHomeBookmarkButton();
     return pending.length;
   }
 
@@ -4651,10 +4672,9 @@
 
   function loadBookmarks(done) {
     try {
-      chrome.storage.local.get({ [BOOKMARKS_KEY]: [], [BOOKMARK_SHELF_COLLAPSED_KEY]: false }, (items) => {
+      chrome.storage.local.get({ [BOOKMARKS_KEY]: [] }, (items) => {
         void chrome.runtime?.lastError;
         bookmarks = sanitizeBookmarks(items && items[BOOKMARKS_KEY]);
-        bookmarkShelfCollapsed = !!(items && items[BOOKMARK_SHELF_COLLAPSED_KEY]);
         if (done) done();
       });
     } catch (e) {
@@ -4732,7 +4752,7 @@
     closeFavoritePicker();
     if (!favoriteOnly) {
       syncBookmarkButtons();
-      renderBookmarkShelf();
+      syncHomeBookmarkButton();
     }
     refreshBookmarkLogMenu();
     if (bookmarkPageOpen) renderBookmarkPage();
@@ -4961,7 +4981,7 @@
   }
 
   // Thẻ của 1 video (gộp tất cả bookmark của video đó).
-  function buildBookmarkGroupCard(group, compact) {
+  function buildBookmarkGroupCard(group) {
     const items = group.items;
     const multi = items.length > 1;
     const single = multi ? null : items[0];
@@ -4969,7 +4989,7 @@
     const primary = items.reduce((a, b) => (b.addedAt > a.addedAt ? b : a), items[0]);
 
     const card = document.createElement('div');
-    card.className = compact ? 'yt-aid-bm-card yt-aid-bm-card-compact' : 'yt-aid-bm-card';
+    card.className = 'yt-aid-bm-card';
     card.dataset.videoId = group.id;
 
     const thumbLink = document.createElement('a');
@@ -4991,8 +5011,7 @@
 
     const info = document.createElement('div');
     info.className = 'yt-aid-bm-info';
-    const useBookmarkName = compact && single;
-    const titleText = useBookmarkName ? bookmarkDisplayName(single) : (group.title || group.id);
+    const titleText = group.title || group.id;
     const titleLink = document.createElement('a');
     titleLink.className = 'yt-aid-bm-title';
     titleLink.href = bookmarkUrl(primary);
@@ -5001,13 +5020,6 @@
     titleLink.addEventListener('click', (e) => openBookmark(e, primary));
     info.appendChild(titleLink);
 
-    if (useBookmarkName && single.name && single.title) {
-      const sub = document.createElement('div');
-      sub.className = 'yt-aid-bm-channel';
-      sub.textContent = single.title;
-      sub.title = single.title;
-      info.appendChild(sub);
-    }
     if (group.channel) {
       const ch = document.createElement('div');
       ch.className = 'yt-aid-bm-channel';
@@ -5015,172 +5027,60 @@
       info.appendChild(ch);
     }
 
-    if (compact && multi) {
-      // Dải Trang chủ: hiện các mốc thời gian dạng chip để nhảy thẳng tới mốc cần xem.
-      const chips = document.createElement('div');
-      chips.className = 'yt-aid-bm-chips';
-      const MAX_CHIPS = 5;
-      items.slice(0, MAX_CHIPS).forEach((bm) => {
-        const chip = document.createElement('a');
-        chip.className = 'yt-aid-bm-chip';
-        chip.href = bookmarkUrl(bm);
-        chip.textContent = formatVideoTime(bm.time);
-        chip.title = bm.name || defaultBookmarkLabel(bm);
-        chip.addEventListener('click', (e) => openBookmark(e, bm));
-        chips.appendChild(chip);
-      });
-      if (items.length > MAX_CHIPS) {
-        const more = document.createElement('button');
-        more.type = 'button';
-        more.className = 'yt-aid-bm-chip yt-aid-bm-chip-more';
-        more.textContent = `+${items.length - MAX_CHIPS}`;
-        more.title = T('Xem tất cả bookmark');
-        more.addEventListener('click', (e) => {
-          e.preventDefault();
-          openBookmarkPage();
-        });
-        chips.appendChild(more);
-      }
-      info.appendChild(chips);
-    }
+    // Trang Bookmark: liệt kê từng bookmark của video để đổi tên / xóa.
+    const rows = document.createElement('div');
+    rows.className = 'yt-aid-bm-rows';
+    items.forEach((bm) => rows.appendChild(buildBookmarkRow(bm)));
+    info.appendChild(rows);
 
-    if (!compact) {
-      // Trang Bookmark: liệt kê từng bookmark của video để đổi tên / xóa.
-      const rows = document.createElement('div');
-      rows.className = 'yt-aid-bm-rows';
-      items.forEach((bm) => rows.appendChild(buildBookmarkRow(bm)));
-      info.appendChild(rows);
+    const clearVideo = document.createElement('button');
+    clearVideo.type = 'button';
+    clearVideo.className = 'yt-aid-bm-danger-btn yt-aid-bm-video-clear';
+    clearVideo.title = T('Xóa tất cả bookmark của video này');
+    clearVideo.appendChild(svgIcon(TRASH_ICON));
+    const clearVideoText = document.createElement('span');
+    clearVideoText.textContent = T('Xóa tất cả ({0})', [items.length]);
+    clearVideo.appendChild(clearVideoText);
+    clearVideo.addEventListener('click', () => removeVideoBookmarks(group.id));
+    info.appendChild(clearVideo);
 
-      const clearVideo = document.createElement('button');
-      clearVideo.type = 'button';
-      clearVideo.className = 'yt-aid-bm-danger-btn yt-aid-bm-video-clear';
-      clearVideo.title = T('Xóa tất cả bookmark của video này');
-      clearVideo.appendChild(svgIcon(TRASH_ICON));
-      const clearVideoText = document.createElement('span');
-      clearVideoText.textContent = T('Xóa tất cả ({0})', [items.length]);
-      clearVideo.appendChild(clearVideoText);
-      clearVideo.addEventListener('click', () => removeVideoBookmarks(group.id));
-      info.appendChild(clearVideo);
-    }
     card.appendChild(info);
-
-    if (!compact) return card;
-
-    const actions = document.createElement('div');
-    actions.className = 'yt-aid-bm-actions';
-    if (compact && single) {
-      actions.appendChild(makeIconButton('yt-aid-bm-action', T('Đổi tên bookmark'), EDIT_ICON, () => startInlineRename(titleLink, single)));
-      actions.appendChild(makeIconButton('yt-aid-bm-action yt-aid-bm-action-danger', T('Xóa bookmark'), CLOSE_ICON, () => removeBookmark(single.uid)));
-    } else {
-      actions.appendChild(makeIconButton(
-        'yt-aid-bm-action yt-aid-bm-action-danger',
-        multi ? T('Xóa {0} bookmark của video', [items.length]) : T('Xóa bookmark'),
-        TRASH_ICON,
-        () => removeVideoBookmarks(group.id)
-      ));
-    }
-    card.appendChild(actions);
     return card;
   }
 
-  // --- Dải bookmark trên Trang chủ ---
-  function removeBookmarkShelf() {
-    document.querySelectorAll('#yt-aid-bookmark-shelf').forEach((el) => el.remove());
+  // --- Nút Xem Bookmark trên Trang chủ ---
+  function buildHomeBookmarkButton() {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'yt-aid-home-bookmark-btn';
+    btn.className = 'yt-aid-pill-btn yt-aid-home-bookmark-btn';
+    btn.appendChild(svgIcon(BOOKMARK_ICON_OUTLINE));
+    const label = document.createElement('span');
+    btn.appendChild(label);
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openBookmarkPage();
+    });
+    syncHomeBookmarkButton(btn);
+    return btn;
   }
 
-  function setBookmarkShelfCollapsed(collapsed) {
-    bookmarkShelfCollapsed = !!collapsed;
-    safeSetStorage({ [BOOKMARK_SHELF_COLLAPSED_KEY]: bookmarkShelfCollapsed });
-    syncBookmarkShelfVisibility();
-  }
-
-  function syncBookmarkShelfVisibility() {
-    const shelf = document.getElementById('yt-aid-bookmark-shelf');
-    if (!shelf) return;
-    const row = shelf.querySelector('.yt-aid-bm-shelf-row');
-    if (row) row.hidden = bookmarkShelfCollapsed;
-    shelf.classList.toggle('yt-aid-bm-shelf-collapsed', bookmarkShelfCollapsed);
-    const toggle = shelf.querySelector('.yt-aid-bm-shelf-toggle');
-    if (!toggle) return;
-    toggle.title = T(bookmarkShelfCollapsed ? 'Hiển thị video bookmark' : 'Ẩn video bookmark');
-    toggle.setAttribute('aria-expanded', bookmarkShelfCollapsed ? 'false' : 'true');
-    toggle.querySelector('path').setAttribute('d', bookmarkShelfCollapsed ? EYE_ICON : EYE_OFF_ICON);
-    toggle.querySelector('span').textContent = T(bookmarkShelfCollapsed ? 'Hiện' : 'Ẩn');
-  }
-
-  function renderBookmarkShelf() {
-    const shelf = document.getElementById('yt-aid-bookmark-shelf');
-    if (!shelf) return;
-    if (!bookmarks.length) {
-      shelf.remove();
-      return;
+  function syncHomeBookmarkButton(targetBtn) {
+    const btn = targetBtn || document.getElementById('yt-aid-home-bookmark-btn');
+    if (!btn) return;
+    const count = bookmarks.length;
+    const label = btn.querySelector('span');
+    if (label) {
+      label.textContent = count > 0
+        ? T('Xem bookmark ({0})', [count])
+        : T('Xem bookmark');
     }
-
-    shelf.textContent = '';
-    const header = document.createElement('div');
-    header.className = 'yt-aid-bm-shelf-header';
-    const title = document.createElement('div');
-    title.className = 'yt-aid-bm-shelf-title';
-    title.appendChild(svgIcon(BOOKMARK_ICON_FILLED));
-    const titleText = document.createElement('span');
-    const shelfGroups = groupBookmarksByVideo(bookmarks);
-    titleText.textContent = shelfGroups.length === bookmarks.length
-      ? T('Bookmark ({0})', [bookmarks.length])
-      : T('Bookmark ({0} video · {1} mốc)', [shelfGroups.length, bookmarks.length]);
-    title.appendChild(titleText);
-    header.appendChild(title);
-
-    const headerActions = document.createElement('div');
-    headerActions.className = 'yt-aid-bm-shelf-header-actions';
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'yt-aid-bm-link-btn yt-aid-bm-shelf-toggle';
-    toggle.title = T(bookmarkShelfCollapsed ? 'Hiển thị video bookmark' : 'Ẩn video bookmark');
-    toggle.setAttribute('aria-expanded', bookmarkShelfCollapsed ? 'false' : 'true');
-    toggle.appendChild(svgIcon(bookmarkShelfCollapsed ? EYE_ICON : EYE_OFF_ICON));
-    const toggleText = document.createElement('span');
-    toggleText.textContent = T(bookmarkShelfCollapsed ? 'Hiện' : 'Ẩn');
-    toggle.appendChild(toggleText);
-    toggle.addEventListener('click', () => setBookmarkShelfCollapsed(!bookmarkShelfCollapsed));
-    headerActions.appendChild(toggle);
-
-    const more = document.createElement('button');
-    more.type = 'button';
-    more.className = 'yt-aid-bm-link-btn';
-    more.textContent = T('Xem tất cả');
-    more.addEventListener('click', openBookmarkPage);
-    headerActions.appendChild(more);
-    header.appendChild(headerActions);
-    shelf.appendChild(header);
-
-    const row = document.createElement('div');
-    row.className = 'yt-aid-bm-shelf-row';
-    row.hidden = bookmarkShelfCollapsed;
-    shelf.classList.toggle('yt-aid-bm-shelf-collapsed', bookmarkShelfCollapsed);
-    shelfGroups.slice(0, BOOKMARK_SHELF_MAX).forEach((g) => row.appendChild(buildBookmarkGroupCard(g, true)));
-    shelf.appendChild(row);
-  }
-
-  function injectBookmarkShelf() {
-    if (window.location.pathname !== '/' || !bookmarks.length) {
-      removeBookmarkShelf();
-      return;
+    btn.title = T('Mở danh sách video đã lưu bookmark');
+    const path = btn.querySelector('path');
+    if (path) {
+      path.setAttribute('d', count > 0 ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE);
     }
-    const grid = document.querySelector('ytd-browse[page-subtype="home"] ytd-rich-grid-renderer') ||
-      document.querySelector('ytd-rich-grid-renderer');
-    if (!grid) return;
-
-    let shelf = document.getElementById('yt-aid-bookmark-shelf');
-    if (shelf && shelf.parentElement === grid) return;
-    if (shelf) shelf.remove();
-
-    shelf = document.createElement('section');
-    shelf.id = 'yt-aid-bookmark-shelf';
-    shelf.className = 'yt-aid-bm-shelf';
-    const contents = grid.querySelector(':scope > #contents');
-    if (contents) grid.insertBefore(shelf, contents);
-    else grid.insertBefore(shelf, grid.firstChild);
-    renderBookmarkShelf();
   }
 
   // --- Log bookmark của 1 video (dropdown trên Watch page) ---
@@ -5372,7 +5272,7 @@
       const signature = JSON.stringify(group);
       let cached = bookmarkPageCards.get(group.id);
       if (!cached || cached.signature !== signature) {
-        cached = { signature, card: buildBookmarkGroupCard(group, false) };
+        cached = { signature, card: buildBookmarkGroupCard(group) };
         bookmarkPageCards.set(group.id, cached);
       }
       return cached.card;
@@ -5497,7 +5397,7 @@
 
   function injectBookmarkUi() {
     injectGuideEntries();
-    injectBookmarkShelf();
+    syncHomeBookmarkButton();
     syncBookmarkButtons();
   }
 
@@ -5512,14 +5412,6 @@
           if (!sameBookmarks(next, bookmarks)) {
             bookmarks = next;
             syncBookmarkUi();
-            injectBookmarkShelf();
-          }
-        }
-        if (changes[BOOKMARK_SHELF_COLLAPSED_KEY]) {
-          const next = !!changes[BOOKMARK_SHELF_COLLAPSED_KEY].newValue;
-          if (next !== bookmarkShelfCollapsed) {
-            bookmarkShelfCollapsed = next;
-            syncBookmarkShelfVisibility();
           }
         }
       });
@@ -5544,7 +5436,7 @@
     setInterval(() => {
       if (document.visibilityState === 'hidden') return;
       injectGuideEntries(true);
-      injectBookmarkShelf();
+      syncHomeBookmarkButton();
     }, 1500);
   }
 

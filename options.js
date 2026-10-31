@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableAdSkip: true,
     enableHideAds: true,
     enableShortsAutoScroll: false,
+    enableAnimations: true,
     hideButtonNames: false,
     shortcutKeys: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_KEYS } : { ...FALLBACK_SHORTCUT_KEYS },
     shortcutTaps: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_TAPS } : { ...FALLBACK_SHORTCUT_TAPS }
@@ -54,7 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
     enableMediaDownload: document.getElementById('enableMediaDownload'),
     enableAdSkip: document.getElementById('enableAdSkip'),
     enableHideAds: document.getElementById('enableHideAds'),
-    enableShortsAutoScroll: document.getElementById('enableShortsAutoScroll')
+    enableShortsAutoScroll: document.getElementById('enableShortsAutoScroll'),
+    enableAnimations: document.getElementById('enableAnimations')
   };
 
   const statusMsg = document.getElementById('statusMsg');
@@ -343,6 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.keys(toggleInputs).forEach((key) => {
         if (toggleInputs[key]) toggleInputs[key].checked = !!items[key];
       });
+      document.body.classList.toggle('yt-aid-no-animations', !toggleInputs.enableAnimations?.checked);
 
       syncKeybindVisibility();
 
@@ -373,7 +376,12 @@ document.addEventListener('DOMContentLoaded', () => {
   Object.keys(toggleInputs).forEach((key) => {
     const el = toggleInputs[key];
     if (!el) return;
-    el.addEventListener('change', () => saveCurrentSettings());
+    el.addEventListener('change', () => {
+      if (key === 'enableAnimations') {
+        document.body.classList.toggle('yt-aid-no-animations', !el.checked);
+      }
+      saveCurrentSettings();
+    });
   });
 
   if (keybindTapsEl) {
@@ -399,6 +407,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (changes.enableShortcuts && toggleInputs.enableShortcuts) {
         toggleInputs.enableShortcuts.checked = !!changes.enableShortcuts.newValue;
         syncKeybindVisibility();
+      }
+      if (changes.enableAnimations && toggleInputs.enableAnimations) {
+        toggleInputs.enableAnimations.checked = !!changes.enableAnimations.newValue;
+        document.body.classList.toggle('yt-aid-no-animations', !changes.enableAnimations.newValue);
       }
     });
   } catch (e) { }

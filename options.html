@@ -636,6 +636,13 @@
       color: var(--yt-text-primary);
       border-color: var(--yt-border-hover);
     }
+
+    body.yt-aid-no-animations *,
+    body.yt-aid-no-animations *::before,
+    body.yt-aid-no-animations *::after {
+      transition: none !important;
+      animation: none !important;
+    }
   </style>
 </head>
 <body>
@@ -849,6 +856,23 @@
         </div>
         <div class="switch">
           <input type="checkbox" id="enableToasts">
+          <span class="slider"></span>
+        </div>
+      </label>
+
+      <!-- 12. Button Effects & Animations -->
+      <label class="toggle-card">
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title" data-i18n="Hiệu ứng & hoạt ảnh nút">Hiệu ứng & hoạt ảnh nút</div>
+            <div class="toggle-desc" data-i18n="Tắt để tăng hiệu năng, phản hồi tức thì không trễ hình.">Tắt để tăng hiệu năng, phản hồi tức thì không trễ hình.</div>
+          </div>
+        </div>
+        <div class="switch">
+          <input type="checkbox" id="enableAnimations">
           <span class="slider"></span>
         </div>
       </label>
