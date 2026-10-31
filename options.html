@@ -351,6 +351,17 @@
     }
 
     /* Keybind editor */
+    #keybindSection {
+      transition: opacity 0.25s ease, filter 0.25s ease;
+    }
+
+    #keybindSection.is-disabled {
+      opacity: 0.35;
+      pointer-events: none;
+      filter: grayscale(80%);
+      user-select: none;
+    }
+
     .keybind-card {
       background: var(--yt-surface);
       border: 1px solid var(--yt-border);

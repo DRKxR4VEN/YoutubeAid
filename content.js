@@ -229,6 +229,13 @@
   }
 
   function rebuildShortcutKeymap() {
+    if (!settings.enableShortcuts) {
+      shortcutKeymap = {};
+      shortcutKeySet = new Set();
+      resetKeyBuffer();
+      return;
+    }
+
     const keys = sanitizeShortcutKeys(settings.shortcutKeys);
     settings.shortcutKeys = keys;
     const taps = sanitizeShortcutTaps(settings.shortcutTaps);
@@ -245,7 +252,6 @@
 
     shortcutKeymap = map;
     shortcutKeySet = new Set(Object.keys(map));
-    if (!settings.enableShortcuts) resetKeyBuffer();
   }
 
   // "HH" / "HHH" — used in shortcut toasts so they match the user's binding
@@ -1173,6 +1179,7 @@
   }
 
   function executeShortcut(actionId) {
+    if (!settings.enableShortcuts) return;
     switch (actionId) {
       case 'shorts':
         navigateToShorts();

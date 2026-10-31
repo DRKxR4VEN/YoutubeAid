@@ -329,6 +329,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function syncKeybindVisibility() {
+    if (!keybindSection) return;
+    const isEnabled = toggleInputs.enableShortcuts ? toggleInputs.enableShortcuts.checked : true;
+    keybindSection.classList.toggle('is-disabled', !isEnabled);
+  }
+
   function loadSettings() {
     chrome.storage.local.get(DEFAULTS, (items) => {
       if (I18N) I18N.setLanguage(items.language);
@@ -337,6 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.keys(toggleInputs).forEach((key) => {
         if (toggleInputs[key]) toggleInputs[key].checked = !!items[key];
       });
+
+      syncKeybindVisibility();
 
       currentShortcutTaps = SHORTCUTS
         ? SHORTCUTS.sanitizeTaps(items.shortcutTaps)
@@ -354,6 +362,8 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.keys(toggleInputs).forEach((key) => {
       if (toggleInputs[key]) current[key] = toggleInputs[key].checked;
     });
+
+    syncKeybindVisibility();
 
     chrome.storage.local.set(current, () => {
       if (showSaved) showStatus('Đã tự động lưu cài đặt!');
@@ -379,12 +389,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Another tab (or the popup) changed the language while this page is open.
+  // Another tab (or the popup) changed settings while this page is open.
   try {
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== 'local' || !changes.language || !I18N) return;
-      if (changes.language.newValue === I18N.getLanguage()) return;
-      applyLanguage(changes.language.newValue);
+      if (areaName !== 'local') return;
+      if (changes.language && I18N && changes.language.newValue !== I18N.getLanguage()) {
+        applyLanguage(changes.language.newValue);
+      }
+      if (changes.enableShortcuts && toggleInputs.enableShortcuts) {
+        toggleInputs.enableShortcuts.checked = !!changes.enableShortcuts.newValue;
+        syncKeybindVisibility();
+      }
     });
   } catch (e) { }
 
