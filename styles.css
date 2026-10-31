@@ -410,6 +410,8 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 #yt-aid-random-home {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 12px 24px;
   font-family: var(--yta-font-family);
 }
@@ -1034,103 +1036,16 @@ html:not([dark]) .yt-aid-channel-btn:hover {
 
 
 /* ========================================================
-   9. BOOKMARK (toolbar button, home shelf, sidebar entry, page)
+   9. BOOKMARK (toolbar button, sidebar entry, page)
    ======================================================== */
 
-/* --- Home feed shelf --- */
-.yt-aid-bm-shelf {
-  display: block;
-  flex: 0 0 100%;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  padding: 12px 24px 4px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--yta-border-subtle);
-  font-family: var(--yta-font-family);
-  color: var(--yta-text-primary);
-}
-
-.yt-aid-bm-shelf-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.yt-aid-bm-shelf-header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.yt-aid-bm-shelf-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.yt-aid-bm-shelf-toggle svg {
-  width: 18px;
-  height: 18px;
-}
-
-.yt-aid-bm-shelf-collapsed {
-  padding-bottom: 8px;
-}
-
-.yt-aid-bm-shelf-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.yt-aid-bm-shelf-title svg {
-  width: 20px;
-  height: 20px;
-  color: var(--yta-brand-blue);
-}
-
-.yt-aid-bm-link-btn {
-  border: 0;
-  background: transparent;
-  color: var(--yta-brand-blue);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 6px 10px;
-  border-radius: var(--yta-radius-pill);
-  cursor: pointer;
-}
-
-.yt-aid-bm-link-btn:hover {
-  background: var(--yta-bg-hover);
-}
-
-.yt-aid-bm-shelf-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px 16px;
-  padding-bottom: 16px;
-}
-
-.yt-aid-bm-shelf-row[hidden] {
-  display: none;
-}
-
-/* --- Cards (shelf + page) --- */
+/* --- Cards (page) --- */
 .yt-aid-bm-card {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-}
-
-.yt-aid-bm-card-compact {
-  width: 100%;
 }
 
 .yt-aid-bm-thumb {
@@ -1731,38 +1646,6 @@ html:not([dark]) .yt-aid-channel-btn:hover {
   font-weight: 600;
 }
 
-.yt-aid-bm-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.yt-aid-bm-chip {
-  display: inline-block;
-  padding: 2px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: rgba(62, 166, 255, 0.16);
-  color: var(--yta-brand-blue);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 18px;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.yt-aid-bm-chip:hover {
-  background: rgba(62, 166, 255, 0.3);
-}
-
-.yt-aid-bm-chip-more {
-  background: var(--yta-bg-hover);
-  color: var(--yta-text-secondary);
-}
-
 .yt-aid-bm-rows {
   display: flex;
   flex-direction: column;
@@ -2017,7 +1900,10 @@ html[data-yt-aid-ad] .html5-video-player::after {
 /* Thanh random nằm ngoài lưới video, chiếm cả hàng và căn giữa */
 #yt-aid-random-home {
   display: flex !important;
+  align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
   width: 100%;
   box-sizing: border-box;
   margin: 8px 0 !important;
@@ -2585,3 +2471,25 @@ html[data-yt-aid-ad] .html5-video-player::after {
   width: 15px;
   height: 15px;
 }
+
+/* ========================================================
+   PERFORMANCE MODE (DISABLE ALL ANIMATIONS & TRANSITIONS)
+   ======================================================== */
+body.yt-aid-no-animations [class*="yt-aid-"],
+body.yt-aid-no-animations [class*="yt-aid-"] *,
+body.yt-aid-no-animations [id^="yt-aid-"],
+body.yt-aid-no-animations [id^="yt-aid-"] *,
+body.yt-aid-no-animations .yt-aid-switch-slider::before {
+  transition: none !important;
+  animation: none !important;
+  backdrop-filter: none !important;
+}
+
+body.yt-aid-no-animations .yt-aid-pill-btn:active,
+body.yt-aid-no-animations .yt-aid-newtab-btn:active,
+body.yt-aid-no-animations .yt-aid-newtab-btn:hover svg,
+body.yt-aid-no-animations .yt-aid-queue-btn:active,
+body.yt-aid-no-animations .yt-aid-toast-clickable-icon:hover {
+  transform: none !important;
+}
+
