@@ -2,7 +2,7 @@
 
 Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: tải Video MP4 & Âm thanh MP3 tốc độ cao, quản lý hàng đợi tải ngầm (Download Queue), sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm (thay thế hoặc nối thêm nội dung cũ), clean link không query tracking, tải ảnh bìa thumbnail/avatar/banner có cắt ảnh tuỳ ý, hệ thống phím tắt điều hướng tức thì (SPA) có thể tùy chỉnh số lần bấm, tự động lặp lại video (Auto Loop, không lặp quảng cáo), tự động bỏ qua quảng cáo kèm hiệu ứng xoay buffer, ẩn banner quảng cáo cột phải, và tự động lướt Shorts. Phím tắt cũng hoạt động trên **music.youtube.com**. Toàn bộ giao diện có thể chuyển đổi giữa **Tiếng Việt** và **English**.
 
-**Phiên bản hiện tại:** 1.17.1
+**Phiên bản hiện tại:** 1.17.2
 
 ---
 
@@ -121,6 +121,10 @@ Nút **Tools** trên thanh công cụ Watch page mở dropdown tập hợp các 
 ---
 
 ## Thay Đổi Gần Đây
+
+### v1.17.2
+- **Bảng điều khiển tinh gọn (Dashboard 2 cột):** Sắp xếp lại thứ tự 11 tính năng chính theo nhóm logic trực quan (Quảng cáo, Phát lại, Tiện ích, Sao chép, Dán & Thông báo).
+- **Mô tả ngắn gọn, dễ hiểu:** Viết lại toàn bộ nhãn và mô tả tính năng ngắn gọn (dưới 15 từ), bỏ thuật ngữ kỹ thuật rườm rà, đồng bộ song ngữ Việt - Anh.
 
 ### v1.17.1
 - **Sắp xếp lại thanh bar:** Cố định thanh công cụ trên 1 hàng ngang duy nhất (`flex-wrap: nowrap`), tối ưu khoảng cách đệm chống tràn nút.

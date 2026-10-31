@@ -655,32 +655,15 @@
     </div>
 
     <div class="card-list">
-      <!-- Auto Loop -->
-      <label class="toggle-card">
-        <div class="toggle-main">
-          <div class="toggle-icon-wrap">
-            <img src="icons/loop.png" alt="" />
-          </div>
-          <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Tự động lặp lại video">Tự động lặp lại video</div>
-            <div class="toggle-desc" data-i18n="Video tự phát lại khi kết thúc, không lặp quảng cáo.">Video tự phát lại khi kết thúc, không lặp quảng cáo.</div>
-          </div>
-        </div>
-        <div class="switch">
-          <input type="checkbox" id="enableLoop">
-          <span class="slider"></span>
-        </div>
-      </label>
-
-      <!-- Auto Skip Ads -->
+      <!-- 1. Auto Skip Ads -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
             <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Tự động bỏ qua quảng cáo">Tự động bỏ qua quảng cáo</div>
-            <div class="toggle-desc" data-i18n="Tự bấm Bỏ qua và tua nhanh quảng cáo, kể cả ở tab khác.">Tự bấm Bỏ qua và tua nhanh quảng cáo, kể cả ở tab khác.</div>
+            <div class="toggle-title" data-i18n="Bỏ qua quảng cáo">Bỏ qua quảng cáo</div>
+            <div class="toggle-desc" data-i18n="Tua nhanh và bỏ qua quảng cáo tự động.">Tua nhanh và bỏ qua quảng cáo tự động.</div>
           </div>
         </div>
         <div class="switch">
@@ -689,7 +672,7 @@
         </div>
       </label>
 
-      <!-- Hide Ad Slots -->
+      <!-- 2. Hide Ad Surfaces -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
@@ -697,7 +680,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Ẩn khung quảng cáo">Ẩn khung quảng cáo</div>
-            <div class="toggle-desc" data-i18n="Ẩn quảng cáo ở feed, banner đầu trang và cạnh video.">Ẩn quảng cáo ở feed, banner đầu trang và cạnh video.</div>
+            <div class="toggle-desc" data-i18n="Ẩn banner và quảng cáo xung quanh video.">Ẩn banner và quảng cáo xung quanh video.</div>
           </div>
         </div>
         <div class="switch">
@@ -706,7 +689,24 @@
         </div>
       </label>
 
-      <!-- Shorts Auto Scroll -->
+      <!-- 3. Auto Loop -->
+      <label class="toggle-card">
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <img src="icons/loop.png" alt="" />
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title" data-i18n="Tự động lặp video">Tự động lặp video</div>
+            <div class="toggle-desc" data-i18n="Phát lại video khi kết thúc, bỏ qua quảng cáo.">Phát lại video khi kết thúc, bỏ qua quảng cáo.</div>
+          </div>
+        </div>
+        <div class="switch">
+          <input type="checkbox" id="enableLoop">
+          <span class="slider"></span>
+        </div>
+      </label>
+
+      <!-- 4. Shorts Auto Scroll -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
@@ -723,7 +723,7 @@
         </div>
       </label>
 
-      <!-- Shortcuts -->
+      <!-- 5. Navigation Shortcuts -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
@@ -731,7 +731,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Phím tắt điều hướng">Phím tắt điều hướng</div>
-            <div class="toggle-desc" data-i18n="Bấm 2–3 lần một phím để mở Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music.">Bấm 2–3 lần một phím để mở Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music.</div>
+            <div class="toggle-desc" data-i18n="Bấm phím 2–3 lần để mở nhanh các trang YouTube.">Bấm phím 2–3 lần để mở nhanh các trang YouTube.</div>
           </div>
         </div>
         <div class="switch">
@@ -740,7 +740,7 @@
         </div>
       </label>
 
-      <!-- Media Download (MP3 / MP4) -->
+      <!-- 6. Media Download (MP3 / MP4) -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
@@ -748,7 +748,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Tải MP3 & MP4">Tải MP3 & MP4</div>
-            <div class="toggle-desc" data-i18n="Tải video MP4 và nhạc MP3 chất lượng cao">Tải video MP4 và nhạc MP3 chất lượng cao</div>
+            <div class="toggle-desc" data-i18n="Tải video và nhạc chất lượng cao.">Tải video và nhạc chất lượng cao.</div>
           </div>
         </div>
         <div class="switch">
@@ -757,15 +757,15 @@
         </div>
       </label>
 
-      <!-- Copy Title Buttons -->
+      <!-- 7. Smart Copy Buttons -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
             <img src="icons/copy.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Bộ nút sao chép thông minh">Bộ nút sao chép thông minh</div>
-            <div class="toggle-desc" data-i18n="Sao chép tiêu đề, tìm kiếm nhanh và thêm nút copy trên mỗi thẻ video.">Sao chép tiêu đề, tìm kiếm nhanh và thêm nút copy trên mỗi thẻ video.</div>
+            <div class="toggle-title" data-i18n="Nút sao chép thông minh">Nút sao chép thông minh</div>
+            <div class="toggle-desc" data-i18n="Thêm nút copy tiêu đề và tìm nhanh trên mỗi video.">Thêm nút copy tiêu đề và tìm nhanh trên mỗi video.</div>
           </div>
         </div>
         <div class="switch">
@@ -774,7 +774,7 @@
         </div>
       </label>
 
-      <!-- Copy on selection -->
+      <!-- 8. Copy on Selection -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
@@ -791,15 +791,15 @@
         </div>
       </label>
 
-      <!-- Auto paste into search -->
+      <!-- 9. Auto Paste into Search -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
             <img src="icons/paste.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Tự dán vào ô tìm kiếm">Tự dán vào ô tìm kiếm</div>
-            <div class="toggle-desc" data-i18n="Click ô tìm kiếm là nội dung vừa copy được dán vào.">Click ô tìm kiếm là nội dung vừa copy được dán vào.</div>
+            <div class="toggle-title" data-i18n="Tự dán vào tìm kiếm">Tự dán vào tìm kiếm</div>
+            <div class="toggle-desc" data-i18n="Dán nội dung đã copy khi bấm ô tìm kiếm.">Dán nội dung đã copy khi bấm ô tìm kiếm.</div>
           </div>
         </div>
         <div class="switch">
@@ -808,7 +808,7 @@
         </div>
       </label>
 
-      <!-- Replace previously auto-pasted content -->
+      <!-- 10. Replace Pasted Text -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
@@ -816,7 +816,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Thay nội dung đã dán">Thay nội dung đã dán</div>
-            <div class="toggle-desc" data-i18n="Bật: thay nội dung cũ. Tắt: nối thêm vào sau.">Bật: thay nội dung cũ. Tắt: nối thêm vào sau.</div>
+            <div class="toggle-desc" data-i18n="Bật: thay thế nội dung cũ; Tắt: nối thêm.">Bật: thay thế nội dung cũ; Tắt: nối thêm.</div>
           </div>
         </div>
         <div class="switch">
@@ -825,15 +825,15 @@
         </div>
       </label>
 
-      <!-- Toast Notifications -->
+      <!-- 11. Toast Notifications -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
             <img src="icons/bell.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Thông báo nổi (Toast)">Thông báo nổi (Toast)</div>
-            <div class="toggle-desc" data-i18n="Hiện thông báo nhỏ khi thao tác thành công.">Hiện thông báo nhỏ khi thao tác thành công.</div>
+            <div class="toggle-title" data-i18n="Thông báo nổi">Thông báo nổi</div>
+            <div class="toggle-desc" data-i18n="Hiện thông báo nhỏ sau mỗi thao tác.">Hiện thông báo nhỏ sau mỗi thao tác.</div>
           </div>
         </div>
         <div class="switch">
