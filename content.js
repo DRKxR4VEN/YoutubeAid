@@ -898,6 +898,10 @@
     const video = audioRateTrackedVideo;
     if (!video) return;
     if (Math.abs(video.playbackRate - audioRateApplied) < 0.001) return;
+    // Ad skip drives this same <video> to 8x while an ad plays. That burst is
+    // not a user speed choice: adopting it would clamp the slider to the max
+    // notch and leave it stuck there once the ad ends.
+    if (adSkipState) return;
 
     const rate = sanitizeAudioRate(video.playbackRate);
     audioRateApplied = rate;
