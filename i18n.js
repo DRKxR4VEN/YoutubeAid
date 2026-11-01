@@ -110,7 +110,7 @@
     /* ---------- Toasts: shortcut / clipboard / copy ---------- */
     ['Auto Loop đang bật', 'Auto Loop is on'],
     ['Auto Loop đang tắt', 'Auto Loop is off'],
-    ['Không tăng được âm lượng: trình duyệt hoặc tiện ích khác đang giữ âm thanh video.', 'Cannot boost the volume: the browser or another extension is holding the video audio.'],
+    ['Không áp dụng được hiệu ứng âm thanh: trình duyệt hoặc tiện ích khác đang giữ âm thanh video.', 'Cannot apply audio effects: the browser or another extension is holding the video audio.'],
     ['Phím tắt [{0}]: Mở Shorts gợi ý [{1}]', 'Shortcut [{0}]: open suggested Shorts [{1}]'],
     ['Phím tắt [{0}]: Chuyển sang YouTube Shorts', 'Shortcut [{0}]: switching to YouTube Shorts'],
     ['Phím tắt [{0}]: Về trang chủ', 'Shortcut [{0}]: going to Home'],
@@ -228,6 +228,9 @@
     ['Copy nội dung mới sẽ thay nội dung cũ; tắt để nối thêm vào sau', 'A new copy replaces the old text; turn off to append after it'],
     ['Tăng âm lượng video', 'Boost video volume'],
     ['Vượt 100% của YouTube, tối đa 150%', 'Above YouTube 100%, up to 150%'],
+    ['Tốc độ phát (slowed / sped up)', 'Playback rate (slowed / sped up)'],
+    ['Mức reverb', 'Reverb level'],
+    ['Đặt lại âm thanh về mặc định', 'Reset audio to defaults'],
 
     /* ---------- Sidebar / feed cards / home flyout ---------- */
     ['Copy tiêu đề', 'Copy title'],
@@ -316,9 +319,9 @@
     ['Bookmark ({0} video · {1} mốc)', 'Bookmarks ({0} videos · {1} marks)'],
     ['{0} video · {1} bookmark', '{0} videos · {1} bookmarks'],
     ['{0} bookmark', '{0} bookmarks'],
-    ['Hiệu ứng & hoạt ảnh nút', 'Button effects & animations'],
-    ['Tắt để tăng hiệu năng, phản hồi tức thì không trễ hình.', 'Turn off to boost performance with instant response.'],
-    ['Tắt để tăng hiệu năng và giảm tải GPU', 'Turn off to boost performance and reduce GPU load'],
+    ['Chế độ hiệu năng', 'Performance mode'],
+    ['Bật để giảm hiệu ứng, phản hồi tức thì không trễ hình.', 'Turn on to cut effects for instant response with no frame lag.'],
+    ['Bật để giảm hiệu ứng, tăng hiệu năng và giảm tải GPU', 'Turn on to cut effects, boost performance and reduce GPU load'],
     ['Xem bookmark', 'View bookmarks'],
     ['Xem bookmark ({0})', 'View bookmarks ({0})'],
     ['Mở danh sách video đã lưu bookmark', 'Open saved bookmark videos']

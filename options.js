@@ -59,6 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
     enableAnimations: document.getElementById('enableAnimations')
   };
 
+  // The "Chế độ hiệu năng" card shows the inverse of enableAnimations: checked
+  // means performance mode on, i.e. effects and animations off.
+  const INVERTED_TOGGLES = new Set(['enableAnimations']);
+
   const statusMsg = document.getElementById('statusMsg');
   const btnReset = document.getElementById('btnReset');
   const keybindActionsEl = document.getElementById('keybindActions');
@@ -343,9 +347,9 @@ document.addEventListener('DOMContentLoaded', () => {
       applyLanguage(items.language);
 
       Object.keys(toggleInputs).forEach((key) => {
-        if (toggleInputs[key]) toggleInputs[key].checked = !!items[key];
+        if (toggleInputs[key]) toggleInputs[key].checked = INVERTED_TOGGLES.has(key) ? !items[key] : !!items[key];
       });
-      document.body.classList.toggle('yt-aid-no-animations', !toggleInputs.enableAnimations?.checked);
+      document.body.classList.toggle('yt-aid-no-animations', !!toggleInputs.enableAnimations?.checked);
 
       syncKeybindVisibility();
 
@@ -363,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const current = {};
 
     Object.keys(toggleInputs).forEach((key) => {
-      if (toggleInputs[key]) current[key] = toggleInputs[key].checked;
+      if (toggleInputs[key]) current[key] = INVERTED_TOGGLES.has(key) ? !toggleInputs[key].checked : toggleInputs[key].checked;
     });
 
     syncKeybindVisibility();
@@ -378,7 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!el) return;
     el.addEventListener('change', () => {
       if (key === 'enableAnimations') {
-        document.body.classList.toggle('yt-aid-no-animations', !el.checked);
+        document.body.classList.toggle('yt-aid-no-animations', el.checked);
       }
       saveCurrentSettings();
     });
@@ -409,8 +413,9 @@ document.addEventListener('DOMContentLoaded', () => {
         syncKeybindVisibility();
       }
       if (changes.enableAnimations && toggleInputs.enableAnimations) {
-        toggleInputs.enableAnimations.checked = !!changes.enableAnimations.newValue;
-        document.body.classList.toggle('yt-aid-no-animations', !changes.enableAnimations.newValue);
+        const perfOn = !changes.enableAnimations.newValue;
+        toggleInputs.enableAnimations.checked = perfOn;
+        document.body.classList.toggle('yt-aid-no-animations', perfOn);
       }
     });
   } catch (e) { }

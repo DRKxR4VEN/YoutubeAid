@@ -97,6 +97,8 @@
     enableAnimations: true,
     hideButtonNames: false,
     audioBoost: 100,
+    audioRate: 1,
+    audioReverb: 0,
     randomVideo: { video: true, shorts: true, music: true, feed: true },
     shortcutKeys: { ...DEFAULT_SHORTCUT_KEYS },
     shortcutTaps: { ...DEFAULT_SHORTCUT_TAPS }
@@ -113,6 +115,17 @@
       return '';
     }
   })();
+
+  // Photo frame + save arrow: reads as "save the thumbnail", so it never gets
+  // confused with the plain download arrow used for MP4/MP3.
+  const THUMBNAIL_ICON_SVG = [
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">',
+    '<rect x="2.9" y="4.2" width="14.2" height="11.6" rx="2"/>',
+    '<circle cx="7.4" cy="8.6" r="1.15" fill="currentColor" stroke="none"/>',
+    '<path d="m4.4 13.9 3.2-3.2 2.9 2.9 2.3-2.3 3.6 3.6"/>',
+    '<path d="M18.6 13.9v6.7m0 0-2.4-2.4M18.6 20.6l2.4-2.4"/>',
+    '</svg>'
+  ].join('');
 
   // Last text copied by the extension — feeds the auto-paste search box.
   // Mirrored to chrome.storage.local so it survives page reloads and is
@@ -148,6 +161,10 @@
         settings.enableCleanLink = true;
         settings.enableThumbnailDownload = true;
         settings.audioBoost = sanitizeAudioBoost(settings.audioBoost);
+        // Slowed/sped is a per-video preference: never restore a stale rate,
+        // every video starts at natural speed x1.
+        settings.audioRate = 1;
+        settings.audioReverb = sanitizeAudioReverb(settings.audioReverb);
         settings.randomVideo = sanitizeRandomVideoOptions(settings.randomVideo);
         if (I18N) I18N.setLanguage(settings.language);
         if (record && !restoreLastCopied(record)) safeRemoveStorage(LAST_COPIED_KEY);
@@ -183,8 +200,14 @@
         }
         if (key === 'audioBoost') {
           settings.audioBoost = sanitizeAudioBoost(change.newValue);
-          syncAudioBoost();
-          syncAudioBoostUi();
+          syncAudioEngine();
+          syncAudioUi();
+          continue;
+        }
+        if (key === 'audioReverb') {
+          settings.audioReverb = sanitizeAudioReverb(change.newValue);
+          syncAudioEngine();
+          syncAudioUi();
           continue;
         }
         if (key === 'randomVideo') {
@@ -294,8 +317,8 @@
     }
     if (!changedKeys) {
       document.body.classList.remove('yt-aid-hide-clean-link', 'yt-aid-hide-thumb-btn');
-      syncAudioBoost();
-      syncAudioBoostUi();
+      syncAudioEngine();
+      syncAudioUi();
     }
     if (changed('enableAnimations')) {
       document.body.classList.toggle('yt-aid-no-animations', !settings.enableAnimations);
@@ -346,7 +369,7 @@
     // Mỗi bước chạy riêng: một bước lỗi không làm mất các tính năng phía sau (nút random, v.v.).
     [
       initVideoLoopMonitor,
-      initAudioBoost,
+      initAudioEngine,
       initClipboardCopyTracking,
       rebuildShortcutKeymap,
       initShortcutSystem,
@@ -750,15 +773,32 @@
   }
 
   // ==========================================
-  // 3B. AUDIO BOOST (gain above YouTube's 100%)
+  // 3B. AUDIO ENGINE (boost, slowed/sped rate, reverb)
   // ==========================================
   const AUDIO_BOOST_MIN = 100;
   const AUDIO_BOOST_MAX = 150;
   const AUDIO_BOOST_STEP = 5;
+  const AUDIO_RATE_MIN = 0.6;
+  const AUDIO_RATE_MAX = 1.5;
+  const AUDIO_RATE_STEP = 0.05;
+  const AUDIO_REVERB_MIN = 0;
+  const AUDIO_REVERB_MAX = 100;
+  const AUDIO_REVERB_STEP = 5;
 
   let audioBoostState = null;
   let audioBoostGestureArmed = false;
   let audioBoostFailedVideo = null;
+  let audioRateTrackedVideo = null;
+  let audioRateApplied = 1;
+  let audioRateVideoId = null;
+
+  function currentWatchVideoId() {
+    try {
+      return new URL(location.href).searchParams.get('v') || location.pathname;
+    } catch (e) {
+      return location.pathname;
+    }
+  }
 
   function sanitizeAudioBoost(value) {
     const level = Math.round(Number(value));
@@ -766,8 +806,44 @@
     return Math.min(AUDIO_BOOST_MAX, Math.max(AUDIO_BOOST_MIN, level));
   }
 
+  function sanitizeAudioRate(value) {
+    const rate = Math.round(Number(value) * 100) / 100;
+    if (!Number.isFinite(rate)) return 1;
+    return Math.min(AUDIO_RATE_MAX, Math.max(AUDIO_RATE_MIN, rate));
+  }
+
+  function sanitizeAudioReverb(value) {
+    const level = Math.round(Number(value));
+    if (!Number.isFinite(level)) return AUDIO_REVERB_MIN;
+    return Math.min(AUDIO_REVERB_MAX, Math.max(AUDIO_REVERB_MIN, level));
+  }
+
   function audioBoostLevel() {
     return sanitizeAudioBoost(settings.audioBoost);
+  }
+
+  function audioRateValue() {
+    return sanitizeAudioRate(settings.audioRate);
+  }
+
+  function audioReverbValue() {
+    return sanitizeAudioReverb(settings.audioReverb);
+  }
+
+  function formatAudioRate(rate) {
+    return `x${rate.toFixed(2)}`;
+  }
+
+  // Custom-styled ranges draw their colored fill from a --p CSS var (0-100%),
+  // so the UI has to keep it in sync with the value.
+  function rangeFillPercent(value, min, max) {
+    const span = max - min;
+    if (!span) return 0;
+    return ((value - min) / span) * 100;
+  }
+
+  function setRangeFill(el, value, min, max) {
+    if (el) el.style.setProperty('--p', `${rangeFillPercent(value, min, max)}%`);
   }
 
   function getBoostVideo() {
@@ -781,6 +857,53 @@
     } catch (e) {
       return false;
     }
+  }
+
+  // Slowed/sped-up the way music edits sound: pitch follows the rate instead
+  // of being pitch-corrected, so x0.8 drops the key and x1.2 lifts it.
+  function applyAudioRate() {
+    const video = getBoostVideo();
+    if (!video) return;
+
+    // A different video always starts at natural speed; slowed/sped never
+    // carries over from the previous video.
+    const vid = currentWatchVideoId();
+    if (vid !== audioRateVideoId) {
+      audioRateVideoId = vid;
+      settings.audioRate = 1;
+    }
+
+    if (audioRateTrackedVideo !== video) {
+      if (audioRateTrackedVideo) {
+        audioRateTrackedVideo.removeEventListener('ratechange', handleExternalRateChange);
+      }
+      audioRateTrackedVideo = video;
+      video.addEventListener('ratechange', handleExternalRateChange);
+    }
+
+    try {
+      video.preservesPitch = false;
+      video.webkitPreservesPitch = false;
+      video.mozPreservesPitch = false;
+    } catch (e) { }
+
+    const rate = audioRateValue();
+    audioRateApplied = rate;
+    if (Math.abs(video.playbackRate - rate) > 0.001) video.playbackRate = rate;
+  }
+
+  // YouTube's own speed menu writes the same property; adopt external changes
+  // (clamped into our slider range) so the two controls never fight.
+  function handleExternalRateChange() {
+    const video = audioRateTrackedVideo;
+    if (!video) return;
+    if (Math.abs(video.playbackRate - audioRateApplied) < 0.001) return;
+
+    const rate = sanitizeAudioRate(video.playbackRate);
+    audioRateApplied = rate;
+    settings.audioRate = rate;
+    if (Math.abs(video.playbackRate - rate) > 0.001) video.playbackRate = rate;
+    syncAudioUi();
   }
 
   function audioBoostGain(state) {
@@ -802,6 +925,47 @@
     state.level = level;
     audioBoostGain(state);
     if (level > AUDIO_BOOST_MIN && state.context.state === 'suspended') {
+      state.context.resume().catch(() => { });
+    }
+  }
+
+  function createReverbImpulse(context) {
+    const seconds = 1.9;
+    const decay = 2.8;
+    const rate = context.sampleRate;
+    const length = Math.max(1, Math.floor(rate * seconds));
+    const buffer = context.createBuffer(2, length, rate);
+    for (let channel = 0; channel < 2; channel++) {
+      const data = buffer.getChannelData(channel);
+      for (let i = 0; i < length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      }
+    }
+    return buffer;
+  }
+
+  // Parallel send: the dry signal stays untouched, the convolver tail is mixed
+  // in on top. At 0% the send is disconnected so the convolver costs nothing.
+  function setAudioReverb(state, level) {
+    state.reverb = level;
+    const on = level > AUDIO_REVERB_MIN;
+
+    if (on && !state.reverbOn) {
+      state.limiter.connect(state.convolver);
+      state.wet.connect(state.context.destination);
+      state.reverbOn = true;
+    } else if (!on && state.reverbOn) {
+      try { state.limiter.disconnect(state.convolver); } catch (e) { }
+      try { state.wet.disconnect(); } catch (e) { }
+      state.reverbOn = false;
+    }
+
+    if (state.reverbOn) {
+      const now = state.context.currentTime;
+      state.wet.gain.cancelScheduledValues(now);
+      state.wet.gain.setTargetAtTime(level / 100, now, 0.05);
+    }
+    if (on && state.context.state === 'suspended') {
       state.context.resume().catch(() => { });
     }
   }
@@ -837,11 +1001,20 @@
     limiter.ratio.value = 1;
     limiter.threshold.value = 0;
 
+    const convolver = context.createConvolver();
+    convolver.buffer = createReverbImpulse(context);
+    const wet = context.createGain();
+    wet.gain.value = 0;
+    convolver.connect(wet);
+
     source.connect(gain);
     gain.connect(limiter);
     limiter.connect(context.destination);
 
-    audioBoostState = { video, context, source, gain, limiter, level: AUDIO_BOOST_MIN };
+    audioBoostState = {
+      video, context, source, gain, limiter, convolver, wet,
+      reverbOn: false, level: AUDIO_BOOST_MIN, reverb: AUDIO_REVERB_MIN
+    };
     return audioBoostState;
   }
 
@@ -852,12 +1025,14 @@
     try { state.source.disconnect(); } catch (e) { }
     try { state.gain.disconnect(); } catch (e) { }
     try { state.limiter.disconnect(); } catch (e) { }
+    try { state.convolver.disconnect(); } catch (e) { }
+    try { state.wet.disconnect(); } catch (e) { }
     try { state.context.close(); } catch (e) { }
   }
 
   // Called from a real user gesture (slider) so the AudioContext is allowed to
   // start. Returns null when the video cannot be routed through Web Audio.
-  function applyAudioBoostNow() {
+  function applyAudioGraphNow() {
     const video = getBoostVideo();
     if (!video) return null;
     // The marked element belongs to a player YouTube already detached; keeping
@@ -866,14 +1041,16 @@
     if (audioBoostFailedVideo === video) return null;
 
     const level = audioBoostLevel();
+    const reverb = audioReverbValue();
     if (audioBoostState && audioBoostState.video !== video) {
       // YouTube swapped the player element; the old one is out of the page.
       releaseAudioGraph();
     }
 
-    if (level <= AUDIO_BOOST_MIN) {
+    if (level <= AUDIO_BOOST_MIN && reverb <= AUDIO_REVERB_MIN) {
       if (audioBoostState && audioBoostState.video === video) {
         setAudioBoostLevel(audioBoostState, AUDIO_BOOST_MIN);
+        setAudioReverb(audioBoostState, AUDIO_REVERB_MIN);
       }
       return audioBoostState;
     }
@@ -884,11 +1061,12 @@
 
     if (!state) {
       audioBoostFailedVideo = video;
-      showToast('Không tăng được âm lượng: trình duyệt hoặc tiện ích khác đang giữ âm thanh video.', 'warning', 3200);
+      showToast('Không áp dụng được hiệu ứng âm thanh: trình duyệt hoặc tiện ích khác đang giữ âm thanh video.', 'warning', 3200);
       return null;
     }
 
     setAudioBoostLevel(state, level);
+    setAudioReverb(state, reverb);
     return state;
   }
 
@@ -904,7 +1082,7 @@
       document.removeEventListener('pointerdown', onGesture, true);
       document.removeEventListener('keydown', onGesture, true);
       document.removeEventListener('touchstart', onGesture, true);
-      applyAudioBoostNow();
+      applyAudioGraphNow();
     };
 
     document.addEventListener('pointerdown', onGesture, true);
@@ -912,10 +1090,12 @@
     document.addEventListener('touchstart', onGesture, true);
   }
 
-  function syncAudioBoost() {
+  function syncAudioEngine() {
     if (IS_MUSIC_SITE) return;
     // Nothing to route while the tab is in the background.
     if (document.visibilityState === 'hidden') return;
+
+    applyAudioRate();
 
     const video = getBoostVideo();
     if (!video) {
@@ -923,39 +1103,60 @@
       return;
     }
 
+    const needsGraph = audioBoostLevel() > AUDIO_BOOST_MIN || audioReverbValue() > AUDIO_REVERB_MIN;
+
     if (audioBoostState) {
       if (audioBoostState.video === video) {
+        // A media element routed through Web Audio can never return to the
+        // native path, so "idle" means unity passthrough (still audible).
+        // Tearing the graph down here would mute the video permanently.
         setAudioBoostLevel(audioBoostState, audioBoostLevel());
+        setAudioReverb(audioBoostState, audioReverbValue());
         return;
       }
-      // Player swapped while the level sits at 100%: nothing will call
-      // applyAudioBoostNow, so drop the stale graph here.
+      // Player swapped while everything sits at defaults: nothing will call
+      // applyAudioGraphNow, so drop the stale graph here.
       if (!audioBoostState.video.isConnected) releaseAudioGraph();
     }
 
-    if (audioBoostLevel() <= AUDIO_BOOST_MIN) return;
+    if (!needsGraph) return;
 
     if (pageHasUserActivation()) {
-      applyAudioBoostNow();
+      applyAudioGraphNow();
     } else {
       armAudioBoostGesture();
     }
   }
 
-  function syncAudioBoostUi() {
-    const range = document.getElementById('yt-aid-audio-boost');
-    if (!range) return;
+  function syncAudioUi() {
     const level = audioBoostLevel();
-    if (range.value !== String(level)) range.value = String(level);
-    const valueEl = document.getElementById('yt-aid-audio-boost-value');
-    if (valueEl) valueEl.textContent = `${level}%`;
+    const rate = audioRateValue();
+    const reverb = audioReverbValue();
+
+    const boostRange = document.getElementById('yt-aid-audio-boost');
+    if (boostRange && boostRange.value !== String(level)) boostRange.value = String(level);
+    setRangeFill(boostRange, level, AUDIO_BOOST_MIN, AUDIO_BOOST_MAX);
+    const boostValue = document.getElementById('yt-aid-audio-boost-value');
+    if (boostValue) boostValue.textContent = `${level}%`;
+
+    const rateRange = document.getElementById('yt-aid-audio-rate');
+    if (rateRange && rateRange.value !== String(rate)) rateRange.value = String(rate);
+    setRangeFill(rateRange, rate, AUDIO_RATE_MIN, AUDIO_RATE_MAX);
+    const rateValue = document.getElementById('yt-aid-audio-rate-value');
+    if (rateValue) rateValue.textContent = formatAudioRate(rate);
+
+    const reverbRange = document.getElementById('yt-aid-audio-reverb');
+    if (reverbRange && reverbRange.value !== String(reverb)) reverbRange.value = String(reverb);
+    setRangeFill(reverbRange, reverb, AUDIO_REVERB_MIN, AUDIO_REVERB_MAX);
+    const reverbValue = document.getElementById('yt-aid-audio-reverb-value');
+    if (reverbValue) reverbValue.textContent = `${reverb}%`;
   }
 
-  function initAudioBoost() {
-    syncAudioBoost();
-    window.addEventListener('yt-navigate-finish', syncAudioBoost);
-    document.addEventListener('yt-page-data-updated', syncAudioBoost);
-    document.addEventListener('visibilitychange', syncAudioBoost);
+  function initAudioEngine() {
+    syncAudioEngine();
+    window.addEventListener('yt-navigate-finish', syncAudioEngine);
+    document.addEventListener('yt-page-data-updated', syncAudioEngine);
+    document.addEventListener('visibilitychange', syncAudioEngine);
   }
 
   // ==========================================
@@ -2641,7 +2842,7 @@
       <div class="yt-aid-media-menu-divider"></div>
 
       <button type="button" class="yt-aid-media-menu-item" data-action="thumbnail" data-label="Thumbnail">
-        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        ${THUMBNAIL_ICON_SVG}
         <span class="yt-aid-media-menu-label">${T('Tải ảnh bìa thumbnail (có cắt ảnh)')}</span>
         <span class="yt-aid-media-menu-tag">IMG</span>
       </button>
@@ -2978,7 +3179,7 @@
     toolbar.dataset.ytAidVersion = EXT_VERSION;
 
     toolbar.innerHTML = `
-      <div class="yt-aid-toolbar-left">
+      <div class="yt-aid-toolbar-main">
         <!-- Copy Title Split Button Group -->
         <div class="yt-aid-split-group" id="yt-aid-copy-title-group">
           <!-- 1. Copy Title Pure -->
@@ -3026,9 +3227,31 @@
           <svg class="yt-aid-chevron" viewBox="0 0 24 24"><path fill="currentColor" d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
         </button>
         ` : ''}
+        <div class="yt-aid-audio-cluster yt-aid-boost-cluster" title="${T('Tăng âm lượng video')}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c4.01.91 7 4.49 7 8.77s-2.99 7.86-7 8.77v-2.06c2.89-.86 5-3.54 5-6.71s-2.11-5.85-5-6.71z"/></svg>
+          <input type="range" id="yt-aid-audio-boost" min="${AUDIO_BOOST_MIN}" max="${AUDIO_BOOST_MAX}" step="${AUDIO_BOOST_STEP}" value="${audioBoostLevel()}" style="--p:${rangeFillPercent(audioBoostLevel(), AUDIO_BOOST_MIN, AUDIO_BOOST_MAX)}%" aria-label="${T('Tăng âm lượng video')}">
+          <span class="yt-aid-audio-value" id="yt-aid-audio-boost-value">${audioBoostLevel()}%</span>
+        </div>
       </div>
 
-      <div class="yt-aid-toolbar-right">
+      <div class="yt-aid-toolbar-row">
+      <div class="yt-aid-audio-cluster yt-aid-fx-cluster">
+        <span class="yt-aid-fx-field" title="${T('Tốc độ phát (slowed / sped up)')}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 4a10 10 0 0 0-9.95 11h2.02A8 8 0 1 1 21.93 15h2.02A10 10 0 0 0 12 4z"/><path fill="currentColor" d="m16.24 6.34-4.95 4.95a2 2 0 1 0 1.42 1.42l4.95-4.95z"/></svg>
+          <input type="range" id="yt-aid-audio-rate" min="${AUDIO_RATE_MIN}" max="${AUDIO_RATE_MAX}" step="${AUDIO_RATE_STEP}" value="${audioRateValue()}" style="--p:${rangeFillPercent(audioRateValue(), AUDIO_RATE_MIN, AUDIO_RATE_MAX)}%" aria-label="${T('Tốc độ phát (slowed / sped up)')}">
+          <span class="yt-aid-audio-value" id="yt-aid-audio-rate-value">${formatAudioRate(audioRateValue())}</span>
+        </span>
+        <span class="yt-aid-fx-field" title="${T('Mức reverb')}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 9.5v5"/><path d="M9 7v10"/><path d="M13 4.8c2.6 2.2 2.6 12.2 0 14.4"/><path d="M17 2.6c3.8 3.4 3.8 15.4 0 18.8"/></svg>
+          <input type="range" id="yt-aid-audio-reverb" min="${AUDIO_REVERB_MIN}" max="${AUDIO_REVERB_MAX}" step="${AUDIO_REVERB_STEP}" value="${audioReverbValue()}" style="--p:${rangeFillPercent(audioReverbValue(), AUDIO_REVERB_MIN, AUDIO_REVERB_MAX)}%" aria-label="${T('Mức reverb')}">
+          <span class="yt-aid-audio-value" id="yt-aid-audio-reverb-value">${audioReverbValue()}%</span>
+        </span>
+        <button type="button" class="yt-aid-fx-reset" id="yt-aid-audio-reset" title="${T('Đặt lại âm thanh về mặc định')}" aria-label="${T('Đặt lại âm thanh về mặc định')}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.15.68 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        </button>
+      </div>
+
+      <div class="yt-aid-toolbar-preferences">
         <!-- Auto Loop Toggle Button -->
         <button class="yt-aid-pill-btn yt-aid-loop-indicator ${settings.enableLoop ? 'active' : ''}" id="yt-aid-btn-toggle-loop" title="${settings.enableLoop ? 'Auto Loop đang bật' : 'Auto Loop đang tắt'}">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
@@ -3048,13 +3271,15 @@
           <span>Hide Button Name</span>
         </button>
       </div>
+      </div>
     `;
 
-    toolbar.querySelector('.yt-aid-toolbar-right').prepend(buildRandomVideoControl());
+    toolbar.querySelector('.yt-aid-toolbar-preferences').prepend(buildRandomVideoControl());
     titleContainer.appendChild(toolbar);
     localizeTree(toolbar);
     syncRandomVideoUi();
     syncButtonNamesUi();
+    syncAudioUi();
 
     // 1. Copy Pure
     toolbar.querySelector('#yt-aid-btn-copy-pure').addEventListener('click', () => {
@@ -3125,6 +3350,79 @@
         }));
       });
     }
+
+    // Inline audio controls: boost, slowed/sped rate and reverb send.
+    const boostRange = toolbar.querySelector('#yt-aid-audio-boost');
+    const boostValue = toolbar.querySelector('#yt-aid-audio-boost-value');
+    boostRange.addEventListener('input', (e) => {
+      const level = sanitizeAudioBoost(e.target.value);
+      settings.audioBoost = level;
+      if (boostValue) boostValue.textContent = `${level}%`;
+      setRangeFill(boostRange, level, AUDIO_BOOST_MIN, AUDIO_BOOST_MAX);
+
+      if (level <= AUDIO_BOOST_MIN) {
+        syncAudioEngine();
+        return;
+      }
+
+      if (!applyAudioGraphNow()) {
+        settings.audioBoost = AUDIO_BOOST_MIN;
+        boostRange.value = String(AUDIO_BOOST_MIN);
+        if (boostValue) boostValue.textContent = `${AUDIO_BOOST_MIN}%`;
+        setRangeFill(boostRange, AUDIO_BOOST_MIN, AUDIO_BOOST_MIN, AUDIO_BOOST_MAX);
+      }
+    });
+    boostRange.addEventListener('change', () => {
+      safeSetStorage({ audioBoost: settings.audioBoost });
+    });
+
+    const rateRange = toolbar.querySelector('#yt-aid-audio-rate');
+    const rateValue = toolbar.querySelector('#yt-aid-audio-rate-value');
+    rateRange.addEventListener('input', (e) => {
+      const rate = sanitizeAudioRate(e.target.value);
+      settings.audioRate = rate;
+      if (rateValue) rateValue.textContent = formatAudioRate(rate);
+      setRangeFill(rateRange, rate, AUDIO_RATE_MIN, AUDIO_RATE_MAX);
+      applyAudioRate();
+    });
+
+    const reverbRange = toolbar.querySelector('#yt-aid-audio-reverb');
+    const reverbValue = toolbar.querySelector('#yt-aid-audio-reverb-value');
+    reverbRange.addEventListener('input', (e) => {
+      const level = sanitizeAudioReverb(e.target.value);
+      settings.audioReverb = level;
+      if (reverbValue) reverbValue.textContent = `${level}%`;
+      setRangeFill(reverbRange, level, AUDIO_REVERB_MIN, AUDIO_REVERB_MAX);
+
+      if (level <= AUDIO_REVERB_MIN) {
+        syncAudioEngine();
+        return;
+      }
+
+      if (!applyAudioGraphNow()) {
+        settings.audioReverb = AUDIO_REVERB_MIN;
+        reverbRange.value = String(AUDIO_REVERB_MIN);
+        if (reverbValue) reverbValue.textContent = `${AUDIO_REVERB_MIN}%`;
+        setRangeFill(reverbRange, AUDIO_REVERB_MIN, AUDIO_REVERB_MIN, AUDIO_REVERB_MAX);
+      }
+    });
+    reverbRange.addEventListener('change', () => {
+      safeSetStorage({ audioReverb: settings.audioReverb });
+    });
+
+    toolbar.querySelector('#yt-aid-audio-reset').addEventListener('click', () => {
+      settings.audioBoost = AUDIO_BOOST_MIN;
+      settings.audioRate = 1;
+      settings.audioReverb = AUDIO_REVERB_MIN;
+      audioRateApplied = 1;
+      safeSetStorage({ audioBoost: AUDIO_BOOST_MIN, audioReverb: AUDIO_REVERB_MIN });
+      applyAudioRate();
+      syncAudioEngine();
+      syncAudioUi();
+      // The player can bounce its remembered speed back onto the element just
+      // after a reset; re-assert the defaults once to win that race.
+      setTimeout(() => { applyAudioRate(); syncAudioUi(); }, 400);
+    });
 
     // Toggle Auto Loop
     const loopBtn = toolbar.querySelector('#yt-aid-btn-toggle-loop');
@@ -3227,7 +3525,7 @@
     if (autoPasteReplaceToggle) autoPasteReplaceToggle.checked = !!settings.enableAutoPasteReplace;
 
     const animToggle = document.getElementById('yt-aid-toggle-animations');
-    if (animToggle) animToggle.checked = !!settings.enableAnimations;
+    if (animToggle) animToggle.checked = !settings.enableAnimations;
 
     syncButtonNamesUi();
   }
@@ -3295,25 +3593,14 @@
 
       <label class="yt-aid-tools-item">
         <span class="yt-aid-tools-text">
-          <span class="yt-aid-tools-name">Hiệu ứng & hoạt ảnh nút</span>
-          <span class="yt-aid-tools-desc">Tắt để tăng hiệu năng và giảm tải GPU</span>
+          <span class="yt-aid-tools-name">Chế độ hiệu năng</span>
+          <span class="yt-aid-tools-desc">Bật để giảm hiệu ứng, tăng hiệu năng và giảm tải GPU</span>
         </span>
         <span class="yt-aid-switch">
-          <input type="checkbox" id="yt-aid-toggle-animations"${checked(settings.enableAnimations)}>
+          <input type="checkbox" id="yt-aid-toggle-animations"${checked(!settings.enableAnimations)}>
           <span class="yt-aid-switch-slider"></span>
         </span>
       </label>
-
-      <div class="yt-aid-tools-item yt-aid-tools-boost">
-        <span class="yt-aid-tools-text">
-          <span class="yt-aid-tools-name">Tăng âm lượng video</span>
-          <span class="yt-aid-tools-desc">Vượt 100% của YouTube, tối đa 150%</span>
-        </span>
-        <span class="yt-aid-boost">
-          <input type="range" id="yt-aid-audio-boost" min="${AUDIO_BOOST_MIN}" max="${AUDIO_BOOST_MAX}" step="${AUDIO_BOOST_STEP}" value="${audioBoostLevel()}" aria-label="Tăng âm lượng video">
-          <span class="yt-aid-boost-value" id="yt-aid-audio-boost-value">${audioBoostLevel()}%</span>
-        </span>
-      </div>
     `;
 
     menu.querySelector('#yt-aid-toggle-selection-copy').addEventListener('change', (e) => {
@@ -3326,30 +3613,8 @@
       updateSetting('enableAutoPasteReplace', e.target.checked);
     });
     menu.querySelector('#yt-aid-toggle-animations').addEventListener('change', (e) => {
-      updateSetting('enableAnimations', e.target.checked);
-      document.body.classList.toggle('yt-aid-no-animations', !e.target.checked);
-    });
-
-    const boostRange = menu.querySelector('#yt-aid-audio-boost');
-    const boostValue = menu.querySelector('#yt-aid-audio-boost-value');
-    boostRange.addEventListener('input', (e) => {
-      const level = sanitizeAudioBoost(e.target.value);
-      settings.audioBoost = level;
-      if (boostValue) boostValue.textContent = `${level}%`;
-
-      if (level <= AUDIO_BOOST_MIN) {
-        syncAudioBoost();
-        return;
-      }
-
-      if (!applyAudioBoostNow()) {
-        settings.audioBoost = AUDIO_BOOST_MIN;
-        boostRange.value = String(AUDIO_BOOST_MIN);
-        if (boostValue) boostValue.textContent = `${AUDIO_BOOST_MIN}%`;
-      }
-    });
-    boostRange.addEventListener('change', () => {
-      safeSetStorage({ audioBoost: settings.audioBoost });
+      updateSetting('enableAnimations', !e.target.checked);
+      document.body.classList.toggle('yt-aid-no-animations', e.target.checked);
     });
 
     return localizeTree(menu);
@@ -3478,21 +3743,26 @@
       cardBar.dataset.ytAidVersion = EXT_VERSION;
 
       cardBar.innerHTML = `
-        <button class="yt-aid-mini-action yt-aid-copy-pure" title="Copy tiêu đề">
-          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-        </button>
-        <button class="yt-aid-mini-action yt-aid-copy-enter" title="Copy & tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)">
-          <svg viewBox="0 0 24 24">
-            <path fill="currentColor" d="M3 2h7a2 2 0 0 1 2 2v1h-2V4H3v9h1v2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 4h6a2 2 0 0 1 2 2v1h-2V8H6v7h2v2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
-            <path fill="currentColor" d="M17 2a3 3 0 1 0 2 5.2l2.3 2.3 1.4-1.4-2.3-2.3A3 3 0 0 0 17 2zm0 1.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
-            <path fill="currentColor" d="M19 14v3H12.8l2.6-2.6-1.4-1.4L9 18l5 5 1.4-1.4-2.6-2.6H21v-5h-2z"/>
-          </svg>
-        </button>
-        <button class="yt-aid-mini-action yt-aid-clean-link" title="Copy liên kết sạch">
-          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
-        </button>
-        <button class="yt-aid-mini-action yt-aid-thumb" title="Tải ảnh bìa thumbnail">
-          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        <div class="yt-aid-side-actions">
+          <button class="yt-aid-mini-action yt-aid-copy-pure" title="Copy tiêu đề">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          </button>
+          <button class="yt-aid-mini-action yt-aid-copy-enter" title="Copy & tự động tìm kiếm trực tiếp (Ctrl+Click mở tab mới)">
+            <svg viewBox="0 0 24 24">
+              <path fill="currentColor" d="M3 2h7a2 2 0 0 1 2 2v1h-2V4H3v9h1v2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 4h6a2 2 0 0 1 2 2v1h-2V8H6v7h2v2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
+              <path fill="currentColor" d="M17 2a3 3 0 1 0 2 5.2l2.3 2.3 1.4-1.4-2.3-2.3A3 3 0 0 0 17 2zm0 1.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
+              <path fill="currentColor" d="M19 14v3H12.8l2.6-2.6-1.4-1.4L9 18l5 5 1.4-1.4-2.6-2.6H21v-5h-2z"/>
+            </svg>
+          </button>
+          <button class="yt-aid-mini-action yt-aid-clean-link" title="Copy liên kết sạch">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+          </button>
+          <button class="yt-aid-mini-action yt-aid-thumb" title="Tải ảnh bìa thumbnail">
+            ${THUMBNAIL_ICON_SVG}
+          </button>
+        </div>
+        <button type="button" class="yt-aid-side-trigger" title="${T('Công cụ video')}" aria-label="${T('Công cụ video')}" aria-haspopup="true">
+          ${homeTriggerSvg()}
         </button>
       `;
 
@@ -3663,22 +3933,26 @@
 
     buttons.push(`
       <button type="button" class="yt-aid-flyout-btn yt-aid-thumb" title="Tải ảnh bìa thumbnail" aria-label="Tải ảnh bìa thumbnail">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        ${THUMBNAIL_ICON_SVG}
       </button>
     `);
 
     if (settings.enableMediaDownload) {
       buttons.push(`
-        <button type="button" class="yt-aid-flyout-btn yt-aid-media-dl" title="${T('Tải MP3 / MP4')}" aria-label="${T('Tải MP3 / MP4')}">
+        <button type="button" class="yt-aid-flyout-btn yt-aid-media-dl" title="${T('Tải video / âm thanh')}" aria-label="${T('Tải video / âm thanh')}" aria-haspopup="menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        </button>
+        <button type="button" class="yt-aid-flyout-btn yt-aid-mp3-dl" title="${T('Tải MP3')}" aria-label="${T('Tải MP3')}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
         </button>
       `);
     }
 
     const btnCount = buttons.length;
-    panel.classList.remove('yt-aid-flyout-5', 'yt-aid-flyout-6');
+    panel.classList.remove('yt-aid-flyout-3', 'yt-aid-flyout-5', 'yt-aid-flyout-6');
     if (btnCount >= 6) panel.classList.add('yt-aid-flyout-6');
-    else if (btnCount >= 5) panel.classList.add('yt-aid-flyout-5');
+    else if (btnCount === 5) panel.classList.add('yt-aid-flyout-5');
+    else if (btnCount === 3) panel.classList.add('yt-aid-flyout-3');
 
     panel.innerHTML = buttons.join('');
     panel.dataset.ytAidConfig = homeFlyoutConfig();
@@ -3750,6 +4024,23 @@
     const mediaDlBtn = panel.querySelector('.yt-aid-media-dl');
     if (mediaDlBtn) {
       mediaDlBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const data = flyoutData();
+        if (!data.url) {
+          showToast(T('Không tìm thấy liên kết video'), 'warning');
+          return;
+        }
+        // Same quality menu as the watch page: MP4 resolutions, MP3 and the
+        // thumbnail cropper. The flyout closes so only the menu stays on top.
+        toggleDropdown(e.currentTarget, () => buildMediaQualityMenu({ url: data.url, title: data.title }));
+        closeHomeFlyout();
+      });
+    }
+
+    const mp3Btn = panel.querySelector('.yt-aid-mp3-dl');
+    if (mp3Btn) {
+      mp3Btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const data = flyoutData();

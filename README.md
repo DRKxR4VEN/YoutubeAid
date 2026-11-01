@@ -10,12 +10,13 @@ Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nh
 
 - **Tải Video MP4 & Nhạc MP3:** Tải nhanh video chất lượng cao (1080p, 720p, 480p, 360p) hoặc file âm thanh MP3 (320kbps).
 - **Tải xuống dưới nền & Hàng đợi (Download Queue):** Bấm nút ✕ trên modal để tiếp tục tải ngầm, click vào biểu tượng ℹ màu xanh để mở danh sách tác vụ đang tải, hỗ trợ tạm dừng / tiếp tục và hủy tác vụ bằng icon trực quan.
-- **Thanh công cụ thẳng hàng:** Toolbar trên trang xem video luôn giữ trên 1 dòng duy nhất, chống tràn và không rớt dòng.
+- **Thanh công cụ linh hoạt:** Toolbar trang xem video tách nhóm thao tác / tiện ích, tự xuống dòng gọn khi cửa sổ hẹp, không tràn ngang; chế độ ẩn tên nút thu thanh về đúng kích thước nội dung.
 - **Copy thông minh:** Copy Title, Copy + Search + Enter, Copy Link sạch (không tracking) trên Watch page, sidebar, Trang chủ và feed tìm kiếm.
 - **Copy khi bôi đen:** kéo chọn text là tự động sao chép kèm toast xác nhận.
 - **Auto paste:** click ô tìm kiếm để dán nội dung vừa copy (thay thế hoặc nối thêm).
 - **Thumbnail & ảnh kênh:** gộp chung menu tải xuống với MP3/MP4; tải ảnh bìa chất lượng cao nhất kèm hộp thoại cắt ảnh; tải avatar/banner kênh.
-- **Audio Boost:** tăng âm lượng video **100–150%** bằng Web Audio (gain + limiter), tự áp dụng lại khi chuyển video.
+- **Audio Boost:** thanh trượt tăng âm lượng **100–150%** nằm ngay trên thanh công cụ Watch page (Web Audio gain + limiter), tự áp dụng lại khi chuyển video.
+- **Slowed / Sped + Reverb:** thanh trượt tốc độ **x0.6 – x1.5** theo nấc 0.05 (x1 = bình thường, kéo trái chậm kiểu slowed, kéo phải nhanh kiểu sped up, cao độ đổi theo như bản nhạc slowed) kèm thanh reverb **0–100%** theo nấc 5% ngay cạnh; nút **reset** tròn cuối cụm đưa mọi thứ về mặc định. Tốc độ luôn bắt đầu lại ở x1 cho mỗi video mới. Các thanh trượt dùng track bo tròn tô màu thương hiệu kèm vạch kẻ chia nấc theo phong cách YouTube.
 - **Auto Loop:** tự lặp video, không lặp quảng cáo, không nhảy sang video kế tiếp trong playlist.
 - **Phím tắt điều hướng:** Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music — tùy chỉnh phím a–z và 2/3 lần bấm; hoạt động cả trên YouTube Music.
 - **Bookmark mốc thời gian:** lưu/đổi tên/xóa/yêu thích bookmark, log theo video, dải bookmark trên Trang chủ, trang lưu trữ ở thanh bên và hoàn tác 5 giây khi xóa.
@@ -44,7 +45,8 @@ Nút **Tải xuống (Download)** trên thanh công cụ Watch page gộp chung 
 Tiêm tự động vào **Watch page (dưới tiêu đề)** và **Sidebar (video liên quan)**:
 - **Copy Title**: Sao chép nguyên bản tiêu đề video vào Clipboard.
 - **Copy + Search + Enter**: Sao chép tiêu đề, tự động điền vào thanh tìm kiếm và thực hiện tìm kiếm trực tiếp ngay trên trang hiện tại. Đi kèm nút mở sang tab mới riêng biệt (`↗`) hoặc dùng phím tắt `Ctrl + Click`.
-- **Home page / Search feed**: mỗi thẻ video có **một nút tròn nhỏ cố định ở góc dưới-phải** (icon lưới 2×2). Bấm vào nút là xổ ra **popover 2×2 gồm 4 nút icon tinh gọn** — Copy tiêu đề, Copy + tìm kiếm ngay, Copy link sạch và Tải ảnh bìa.
+- **Sidebar (video liên quan):** mỗi card có **một nút tròn nhỏ** (icon lưới 2×2) y như ở Trang chủ; hover vào nút là **hàng nút tiện ích xổ ngang** gọn gàng — Copy tiêu đề, Copy + tìm kiếm, Copy link sạch và Tải ảnh bìa.
+- **Home page / Search feed**: mỗi thẻ video có **một nút tròn nhỏ cố định ở góc dưới-phải** (icon lưới 2×2). Bấm vào nút là xổ ra **popover 3×2 gồm 6 nút icon tinh gọn** — Copy tiêu đề, Copy + tìm kiếm ngay, Copy link sạch, Tải ảnh bìa (icon ảnh + mũi tên tải), Tải video/âm thanh (mở đúng menu chất lượng như trang Watch) và Tải MP3 nhanh.
 
 ### 3. Copy Khi Bôi Đen (Copy on Select)
 - Giữ chuột kéo bôi xanh một đoạn text bất kỳ trên YouTube (mô tả video, bình luận, tiêu đề...) là đoạn đó **được sao chép ngay** vào Clipboard.
@@ -63,7 +65,14 @@ Nút **Tools** trên thanh công cụ Watch page mở dropdown tập hợp các 
 - Tự động copy khi bôi đen
 - Tự động dán vào ô tìm kiếm
 - Thay nội dung đã dán trước đó (tắt để nối thêm, tự chèn khoảng trắng)
-- **Tăng âm lượng video:** thanh trượt **100–150%**, áp dụng tức thì cho video đang phát bằng Web Audio API (gain + limiter) chống rè tiếng.
+- **Chế độ hiệu năng:** bật để giảm hiệu ứng & hoạt ảnh, phản hồi tức thì và giảm tải GPU.
+
+### 5b. Cụm điều khiển âm thanh trên thanh công cụ
+- **Tăng âm lượng video:** thanh trượt **100–150%** ở cuối hàng trên, áp dụng tức thì bằng Web Audio API (gain + limiter) chống rè tiếng.
+- **Slowed / sped up:** thanh trượt **x0.6 – x1.5** theo nấc 0.05; mốc x1 là tốc độ gốc, kéo sang trái để chậm kiểu slowed (hạ cao độ), sang phải để nhanh kiểu sped up. Đồng bộ hai chiều với menu tốc độ của YouTube.
+- **Reverb:** thanh trượt **0–100%** theo nấc 5% thêm đuôi vang (convolver) trộn song song vào tín hiệu gốc; 0% là tắt hoàn toàn.
+- **Nút reset:** nút tròn cuối cụm đưa boost về 100%, tốc độ về x1 và reverb về 0% chỉ bằng một lần bấm.
+- **Ổn định:** mỗi video mới luôn bắt đầu ở tốc độ x1 (không mang giá trị cũ sang); khi đưa reverb/boost về mặc định, mạch âm thanh giữ đường truyền unity nên video **không bao giờ bị mất tiếng**.
 
 ### 6. Tự Động Lặp Lại Video (Auto Loop)
 - Tự động kích hoạt `video.loop = true` khi xem video trên YouTube.
@@ -114,13 +123,29 @@ Nút **Tools** trên thanh công cụ Watch page mở dropdown tập hợp các 
 - Tự động chuyển tiếp sang video Shorts tiếp theo khi xem xong video hiện tại, rảnh tay thưởng thức video ngắn.
 
 ### 14. Bố Cục Thanh Bar & Tùy Biến Giao Diện
-- **Thanh Bar Thẳng Hàng:** Thiết kế `nowrap` gọn gàng, tất cả nút bấm nằm cùng trên 1 hàng, không bao giờ bị nhảy dòng làm vỡ bố cục.
-- **Ẩn/Hiện Tên Nút:** Nhấn nút **Ẩn tên nút (Hide Button Name)** để thu gọn thanh bar về icon tối giản.
+- **Bố cục hai hàng cố định:** hàng trên gồm thao tác trên video (sao chép tiêu đề, tìm kiếm nhanh, link sạch, bookmark, tải xuống) bên trái và thanh tăng âm lượng bên phải; hàng dưới gồm cụm slowed/reverb bên trái và tiện ích (video ngẫu nhiên, tự động lặp, công cụ, ẩn/hiện tên) bên phải. Khi cửa sổ hẹp, các nhóm tự xuống hàng thay vì tràn hay phải cuộn ngang.
+- **Ẩn/Hiện Tên Nút:** Nhấn nút **Ẩn tên nút (Hide Button Name)** để thu gọn thanh bar về icon tối giản; thanh bar giữ nguyên lưới hai hàng nên nút này luôn nằm đúng một vị trí dù đang bật hay tắt, nút đổi lại tên nút được tô xanh để dễ tìm.
 - **Đa Ngôn Ngữ:** Chuyển đổi linh hoạt giữa Tiếng Việt và English cho 100% thành phần giao diện.
 
 ---
 
 ## Thay Đổi Gần Đây
+
+### v1.17.4
+- **Boost âm lượng ra thanh công cụ:** thanh trượt 100–150% nằm cuối hàng trên của toolbar Watch page, không còn ẩn trong menu Tools.
+- **Slowed / sped up + reverb:** cụm thanh trượt mới ở hàng dưới — tốc độ x0.6–x1.5 (x1 = gốc, pitch đổi theo kiểu slowed/sped) và reverb 0–100% (convolver Web Audio).
+- **Sidebar tiện lợi hơn:** mỗi video đề xuất có nút tròn tiện ích giống Trang chủ; hover mở hàng nút xổ ngang thay vì bày sẵn 4 nút.
+- **Đổi tên tính năng:** "Hiệu ứng & hoạt ảnh nút" thành **"Chế độ hiệu năng"** (bật = giảm hiệu ứng, tăng hiệu năng).
+- **Thanh trượt theo nấc cố định:** boost (nấc 5%), slowed/sped (nấc 0.05x) và reverb (nấc 5%) kéo khớp từng nấc thay vì trôi tự do.
+- **Bố cục toolbar ổn định:** cụm slowed/reverb + tiện ích luôn chung hàng dưới (không còn hàng thừa); nút ẩn/hiện tên giữ nguyên vị trí khi bật/tắt.
+- **Sửa mất tiếng:** đưa reverb/boost về mặc định không còn làm video câm lặng hay báo lỗi "tiện ích khác giữ âm thanh" (mạch Web Audio giữ đường truyền unity thay vì bị hủy).
+- **Tốc độ theo từng video:** mỗi video mới bắt đầu ở x1; thêm nút **reset** tròn cạnh cụm slowed/sped để đưa boost/tốc độ/reverb về mặc định.
+- **Giao diện thanh trượt kiểu YouTube:** boost / slowed / reverb dùng track bo tròn với phần tô màu thương hiệu (đỏ cho boost, xanh cho tốc độ & reverb), núm trắng và các vạch kẻ nhỏ chia từng nấc; thanh trượt co giãn lấp đầy khoảng trống còn dư trên hàng và không bị thu nhỏ khi ẩn/hiện tên nút.
+
+### v1.17.3
+- **Bố cục thanh công cụ Watch page:** chia thành nhóm thao tác và nhóm tiện ích, giãn khoảng cách thoáng hơn; khi hẹp, nhóm tiện ích tự xuống hàng căn phải thay vì chen chút/tràn ngang. Chế độ ẩn tên nút co thanh bar vừa đúng nội dung.
+- **Popover thẻ video trên Home/Search:** thêm nút **Tải video/âm thanh** mở đúng menu chất lượng (MP4 1080p/720p/480p/360p, MP3, thumbnail) như trang Watch; tách riêng nút MP3 nhanh.
+- **Icon tải thumbnail mới:** biểu tượng khung ảnh kèm mũi tên tải, dùng thống nhất ở popover Home, menu tải xuống Watch page và thanh công cụ video liên quan.
 
 ### v1.17.2
 - **Bảng điều khiển tinh gọn (Dashboard 2 cột):** Sắp xếp lại thứ tự 11 tính năng chính theo nhóm logic trực quan (Quảng cáo, Phát lại, Tiện ích, Sao chép, Dán & Thông báo).

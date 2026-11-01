@@ -25,6 +25,10 @@
   --yta-brand-blue: #3ea6ff;
   --yta-brand-green: #2ba640;
 
+  /* Custom range slider: muted unfilled track + dark notch dividers. */
+  --yta-range-track: rgba(255, 255, 255, 0.20);
+  --yta-range-tick: rgba(0, 0, 0, 0.5);
+
   --yta-radius-sm: 6px;
   --yta-radius-md: 10px;
   --yta-radius-pill: 9999px;
@@ -47,6 +51,9 @@ html:not([dark]) {
   --yta-text-primary: #0f0f0f;
   --yta-text-secondary: #606060;
   --yta-text-muted: #909090;
+
+  --yta-range-track: rgba(0, 0, 0, 0.14);
+  --yta-range-tick: rgba(0, 0, 0, 0.3);
 }
 
 /* Visibility toggles via settings */
@@ -151,20 +158,34 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 /* ========================================================
    3. WATCH PAGE TOOLBAR
    ======================================================== */
+/* The bar wraps as a whole: per-video actions stay on the left, utilities are
+   pushed right and drop to a second, right-aligned row on narrow layouts.
+   Nothing is allowed to scroll sideways or spill out of the card. */
 .yt-aid-watch-toolbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 8px;
   margin-bottom: 6px;
   padding: 6px 8px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--yta-border-subtle);
-  border-radius: var(--yta-radius-pill);
+  border-radius: 14px;
   font-family: var(--yta-font-family);
   animation: ytAidFadeIn 0.2s ease;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* Second row: slowed/sped + reverb on the left, utilities pinned right so the
+   name-toggle keeps the same spot in both label and icon mode. */
+.yt-aid-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
 }
 
 @keyframes ytAidFadeIn {
@@ -172,23 +193,32 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.yt-aid-toolbar-left,
-.yt-aid-toolbar-right {
+.yt-aid-toolbar-main,
+.yt-aid-toolbar-preferences {
   display: flex;
-  align-items: center;
-  gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.yt-aid-toolbar-preferences {
+  margin-left: auto;
+  justify-content: flex-end;
 }
 
 /* YouTube Native Pill Buttons */
 .yt-aid-pill-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  height: 30px;
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.08);
   color: var(--yta-text-primary);
   border: 1px solid transparent;
-  padding: 6px 12px;
+  padding: 0 11px;
   font-size: 12px;
   font-weight: 500;
   border-radius: var(--yta-radius-pill);
@@ -196,11 +226,12 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   transition: background-color 0.15s ease, transform 0.1s ease;
   user-select: none;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .yt-aid-pill-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
 }
 
@@ -220,6 +251,7 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   border-radius: var(--yta-radius-pill);
   border: 1px solid var(--yta-border-subtle);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .yt-aid-split-group .yt-aid-pill-btn {
@@ -234,7 +266,7 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 }
 
 .yt-aid-split-group .yt-aid-pill-sub {
-  padding: 6px 12px;
+  padding: 0 11px;
   font-size: 12px;
   color: var(--yta-text-primary);
 }
@@ -249,11 +281,14 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  height: 30px;
+  min-width: 30px;
+  box-sizing: border-box;
   background: transparent;
   color: var(--yta-text-secondary);
   border: none;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 6px 7px;
+  padding: 0 8px;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
   line-height: 1;
@@ -264,8 +299,8 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 }
 
 .yt-aid-newtab-btn svg {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   opacity: 0.75;
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
@@ -466,36 +501,174 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   outline-offset: -2px;
 }
 
-.yt-aid-tools-boost {
-  cursor: default;
-}
-
-.yt-aid-tools-boost:hover {
-  background: transparent;
-}
-
-.yt-aid-boost {
+/* Inline audio clusters on the watch toolbar: boost rides the first row's
+   right edge, the slowed/sped + reverb pair opens the second row. */
+.yt-aid-audio-cluster {
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--yta-border-subtle);
+  border-radius: var(--yta-radius-pill);
   flex-shrink: 0;
 }
 
-.yt-aid-boost input[type="range"] {
-  width: 88px;
+.yt-aid-audio-cluster > svg,
+.yt-aid-fx-field > svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--yta-text-secondary);
+}
+
+/* Boost rides row 1 pinned to the right edge; the fx pair opens row 2 on the
+   left. The sliders use a viewport-based width (never tied to the button
+   labels), so they look identical in label and icon mode and hiding names
+   never resizes them. The width is sized to swallow the leftover space on a
+   typical window. */
+/* Boost rides row 1 and stretches to swallow the leftover space; the fx pair
+   does the same on row 2. Both grow AND shrink (with a small floor) so the
+   toolbar keeps its two-row grid at any width instead of wrapping. */
+.yt-aid-boost-cluster {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.yt-aid-fx-cluster {
+  flex: 1 1 260px;
+  min-width: 0;
+  gap: 8px;
+}
+
+.yt-aid-fx-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* YouTube-themed range: brand-colored fill up to --p, muted track after, and
+   a 1px notch divider every --tick. --p is driven from JS; --tick/--yta-fill
+   are set per slider below. */
+.yt-aid-audio-cluster input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1 1 72px;
+  min-width: 40px;
   height: 16px;
   margin: 0;
-  accent-color: var(--yta-brand-red);
+  background: transparent;
   cursor: pointer;
 }
 
-.yt-aid-boost-value {
-  min-width: 34px;
+.yt-aid-audio-cluster input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(to right,
+      var(--yta-range-tick) 0 1px,
+      transparent 1px var(--tick)),
+    linear-gradient(to right,
+      var(--yta-fill) 0 var(--p),
+      var(--yta-range-track) var(--p) 100%);
+}
+
+.yt-aid-audio-cluster input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -3.5px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s ease;
+}
+
+.yt-aid-audio-cluster input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+.yt-aid-audio-cluster input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+.yt-aid-audio-cluster input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--yta-range-track);
+}
+
+.yt-aid-audio-cluster input[type="range"]::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--yta-fill);
+}
+
+.yt-aid-audio-cluster input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Fill color + notch period per slider (boost: 11 stops, rate: 19, reverb: 21). */
+#yt-aid-audio-boost {
+  --yta-fill: var(--yta-brand-red);
+  --tick: 10%;
+}
+
+#yt-aid-audio-rate {
+  --yta-fill: var(--yta-brand-blue);
+  --tick: 5.5556%;
+}
+
+#yt-aid-audio-reverb {
+  --yta-fill: var(--yta-brand-blue);
+  --tick: 5%;
+}
+
+.yt-aid-audio-value {
+  min-width: 36px;
   font-size: 11.5px;
   font-weight: 600;
   color: var(--yta-text-primary);
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+.yt-aid-fx-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--yta-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.yt-aid-fx-reset:hover,
+.yt-aid-fx-reset:focus-visible {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-fx-reset svg {
+  width: 13px;
+  height: 13px;
 }
 
 /* ========================================================
@@ -794,6 +967,7 @@ html.yt-aid-crop-open {
   z-index: 2;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
   margin-top: 4px;
   opacity: 0.6;
@@ -806,6 +980,69 @@ yt-lockup-view-model:hover .yt-aid-sidebar-bar {
   opacity: 1;
 }
 
+/* Same round utility trigger as the home cards; hovering it unfolds the
+   action row sideways instead of stacking buttons over the card. */
+.yt-aid-side-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+
+.yt-aid-side-trigger svg {
+  width: 15px;
+  height: 15px;
+}
+
+.yt-aid-side-trigger:hover,
+.yt-aid-side-trigger:focus-visible,
+.yt-aid-sidebar-bar:hover .yt-aid-side-trigger {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+html:not([dark]) .yt-aid-side-trigger {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+html:not([dark]) .yt-aid-side-trigger:hover,
+html:not([dark]) .yt-aid-side-trigger:focus-visible,
+html:not([dark]) .yt-aid-sidebar-bar:hover .yt-aid-side-trigger {
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.22);
+  color: #0f0f0f;
+}
+
+.yt-aid-side-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: max-width 0.18s ease, opacity 0.15s ease;
+}
+
+.yt-aid-sidebar-bar:hover .yt-aid-side-actions,
+.yt-aid-sidebar-bar:focus-within .yt-aid-side-actions {
+  max-width: 160px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .yt-aid-mini-action {
   display: inline-flex;
   align-items: center;
@@ -813,6 +1050,7 @@ yt-lockup-view-model:hover .yt-aid-sidebar-bar {
   width: 26px;
   height: 26px;
   padding: 0;
+  flex-shrink: 0;
   border-radius: var(--yta-radius-sm);
   background: rgba(255, 255, 255, 0.08);
   color: var(--yta-text-secondary);
@@ -1819,54 +2057,6 @@ html[data-yt-aid-ad] .html5-video-player::after {
    Mặc định hiện đầy đủ tên nút. Nút "Hide Button Name" thu gọn cả
    thanh về icon; chính nút bật/tắt vẫn giữ nhãn để lần bấm sau rõ ràng.
    ======================================================== */
-.yt-aid-watch-toolbar {
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  overflow-x: auto !important;
-  scrollbar-width: none !important; /* An thanh cuon neu co */
-  gap: 4px;
-  margin-top: 6px;
-  margin-bottom: 4px;
-  padding: 3px 6px;
-}
-.yt-aid-watch-toolbar::-webkit-scrollbar {
-  display: none !important;
-}
-
-.yt-aid-watch-toolbar .yt-aid-toolbar-left,
-.yt-aid-watch-toolbar .yt-aid-toolbar-right {
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  flex-shrink: 0 !important;
-  gap: 4px;
-}
-
-.yt-aid-watch-toolbar .yt-aid-toolbar-right {
-  margin-left: auto;
-}
-
-.yt-aid-watch-toolbar .yt-aid-pill-btn {
-  padding: 3px 7px;
-  font-size: 11px;
-  gap: 4px;
-  white-space: nowrap !important;
-  flex-shrink: 0 !important;
-}
-
-.yt-aid-watch-toolbar .yt-aid-split-group {
-  flex-shrink: 0 !important;
-  white-space: nowrap !important;
-}
-
-.yt-aid-watch-toolbar .yt-aid-split-group .yt-aid-pill-btn {
-  padding: 3px 7px;
-  font-size: 11px;
-  white-space: nowrap !important;
-}
-
 .yt-aid-watch-toolbar .yt-aid-tools-btn .yt-aid-chevron {
   width: 12px;
   height: 12px;
@@ -1883,8 +2073,10 @@ html[data-yt-aid-ad] .html5-video-player::after {
 }
 
 .yt-aid-hide-names .yt-aid-pill-btn:not(.yt-aid-name-toggle) {
-  padding: 6px 9px;
-  gap: 4px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  gap: 0;
 }
 
 .yt-aid-hide-names .yt-aid-pill-btn:not(.yt-aid-name-toggle) > span {
@@ -1892,9 +2084,41 @@ html[data-yt-aid-ad] .html5-video-player::after {
 }
 
 .yt-aid-hide-names .yt-aid-pill-btn:not(.yt-aid-name-toggle) svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
+
+.yt-aid-hide-names .yt-aid-pill-btn:not(.yt-aid-name-toggle) svg.yt-aid-chevron {
+  display: none;
+}
+
+/* Icon mode keeps the same two-row grid as label mode (utilities stay pinned
+   right) so the name-toggle never changes position when toggling. */
+
+.yt-aid-hide-names .yt-aid-name-toggle {
+  border-color: rgba(62, 166, 255, 0.45);
+  color: var(--yta-brand-blue);
+}
+
+/* In icon mode the segmented groups lose their labels too, so their inner
+   buttons have to become square and the group keeps a single pill outline. */
+.yt-aid-hide-names .yt-aid-split-group .yt-aid-pill-btn {
+  width: 30px;
+  padding: 0;
+}
+
+.yt-aid-hide-names .yt-aid-newtab-btn {
+  min-width: 30px;
+  padding: 0 7px;
+}
+
+.yt-aid-hide-names .yt-aid-bookmark-log-btn > span {
+  display: none;
+}
+
+/* The audio clusters/sliders are intentionally NOT re-sized in icon mode: they
+   keep the exact same flex sizing as label mode so hiding names never shrinks
+   or shifts them. Only the button labels around them collapse. */
 
 
 /* Thanh random nằm ngoài lưới video, chiếm cả hàng và căn giữa */
@@ -2230,6 +2454,7 @@ html[data-yt-aid-ad] .html5-video-player::after {
   border-color: rgba(255, 255, 255, 0.25);
 }
 
+.yt-aid-home-flyout.yt-aid-flyout-3,
 .yt-aid-home-flyout.yt-aid-flyout-5,
 .yt-aid-home-flyout.yt-aid-flyout-6 {
   grid-template-columns: repeat(3, 34px);
