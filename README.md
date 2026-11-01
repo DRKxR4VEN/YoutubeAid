@@ -2,7 +2,7 @@
 
 Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: tải Video MP4 & Âm thanh MP3 tốc độ cao, quản lý hàng đợi tải ngầm (Download Queue), sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm (thay thế hoặc nối thêm nội dung cũ), clean link không query tracking, tải ảnh bìa thumbnail/avatar/banner có cắt ảnh tuỳ ý, hệ thống phím tắt điều hướng tức thì (SPA) có thể tùy chỉnh số lần bấm, tự động lặp lại video (Auto Loop, không lặp quảng cáo), tự động bỏ qua quảng cáo kèm hiệu ứng xoay buffer, ẩn banner quảng cáo cột phải, và tự động lướt Shorts. Phím tắt cũng hoạt động trên **music.youtube.com**. Toàn bộ giao diện có thể chuyển đổi giữa **Tiếng Việt** và **English**.
 
-**Phiên bản hiện tại:** 1.17.2
+**Phiên bản hiện tại:** 1.17.3
 
 ---
 
@@ -143,6 +143,8 @@ Nút **Tools** trên thanh công cụ Watch page mở dropdown tập hợp các 
 - **Giao diện thanh trượt kiểu YouTube:** boost / slowed / reverb dùng track bo tròn với phần tô màu thương hiệu (đỏ cho boost, xanh cho tốc độ & reverb), núm trắng và các vạch kẻ nhỏ chia từng nấc; thanh trượt co giãn lấp đầy khoảng trống còn dư trên hàng và không bị thu nhỏ khi ẩn/hiện tên nút.
 
 ### v1.17.3
+- **Sửa lỗi hiển thị video đề xuất cột phải:** Khắc phục triệt để tình trạng mất/trống danh sách video liên quan ở cột bên phải (`#secondary`) trên trang xem video khi bật tính năng "Ẩn khung quảng cáo".
+- **Tối ưu bộ lọc quảng cáo:** Ẩn chính xác các thẻ banner quảng cáo ("Được tài trợ", companion ads, panel ads) mà không ảnh hưởng đến container chứa video đề xuất gốc của YouTube; tự động phục hồi giao diện tức thì khi tắt tính năng.
 - **Bố cục thanh công cụ Watch page:** chia thành nhóm thao tác và nhóm tiện ích, giãn khoảng cách thoáng hơn; khi hẹp, nhóm tiện ích tự xuống hàng căn phải thay vì chen chút/tràn ngang. Chế độ ẩn tên nút co thanh bar vừa đúng nội dung.
 - **Popover thẻ video trên Home/Search:** thêm nút **Tải video/âm thanh** mở đúng menu chất lượng (MP4 1080p/720p/480p/360p, MP3, thumbnail) như trang Watch; tách riêng nút MP3 nhanh.
 - **Icon tải thumbnail mới:** biểu tượng khung ảnh kèm mũi tên tải, dùng thống nhất ở popover Home, menu tải xuống Watch page và thanh công cụ video liên quan.

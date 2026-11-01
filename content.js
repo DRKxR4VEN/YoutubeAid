@@ -5996,8 +5996,18 @@
     }
   }
 
+  function clearHiddenAdElements() {
+    document.querySelectorAll('[data-yt-aid-hidden-ad]').forEach((el) => {
+      el.style.removeProperty('display');
+      el.removeAttribute('data-yt-aid-hidden-ad');
+    });
+  }
+
   function syncAdSkipSettings() {
     document.body.classList.toggle('yt-aid-hide-ads', !!settings.enableHideAds);
+    if (!settings.enableHideAds) {
+      clearHiddenAdElements();
+    }
     if (IS_MUSIC_SITE) return;
     if (!settings.enableAdSkip) {
       const player = getPlayerElement();
@@ -6010,21 +6020,35 @@
   }
 
   function removeSecondaryAdBanners() {
-    if (!settings.enableHideAds) return;
+    if (!settings.enableHideAds) {
+      clearHiddenAdElements();
+      return;
+    }
     try {
       const adSlots = document.querySelectorAll(
         'ytd-ad-slot-renderer, ' +
-        '#secondary ytd-ad-slot-renderer, ' +
-        '#secondary-inner ytd-ad-slot-renderer, ' +
+        'ytd-companion-slot-renderer, ' +
+        'ytd-action-companion-ad-renderer, ' +
+        'ytd-in-feed-ad-layout-renderer, ' +
+        'ytd-promoted-sparkles-web-renderer, ' +
+        'ytd-compact-promoted-video-renderer, ' +
         'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"], ' +
-        '#panels:has(ytd-ads-engagement-panel-content-renderer), ' +
+        'ytd-engagement-panel-section-list-renderer:has(ytd-ads-engagement-panel-content-renderer), ' +
         '#masthead-ad'
       );
       adSlots.forEach((slot) => {
-        slot.style.setProperty('display', 'none', 'important');
-        const parentSection = slot.closest('ytd-item-section-renderer, ytd-rich-item-renderer, ytd-rich-section-renderer');
-        if (parentSection && parentSection.querySelectorAll('ytd-video-renderer, ytd-rich-grid-media').length === 0) {
-          parentSection.style.setProperty('display', 'none', 'important');
+        if (slot.style.getPropertyValue('display') !== 'none') {
+          slot.style.setProperty('display', 'none', 'important');
+          slot.setAttribute('data-yt-aid-hidden-ad', '1');
+        }
+        const parentCard = slot.closest('ytd-rich-item-renderer');
+        if (
+          parentCard &&
+          !parentCard.closest('#secondary, ytd-watch-next-secondary-results-renderer') &&
+          !parentCard.querySelector('ytd-rich-grid-media, yt-lockup-view-model, ytd-video-renderer, ytd-reel-item-renderer, ytd-shorts-lockup-view-model')
+        ) {
+          parentCard.style.setProperty('display', 'none', 'important');
+          parentCard.setAttribute('data-yt-aid-hidden-ad', '1');
         }
       });
     } catch (e) { }
