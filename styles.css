@@ -25,9 +25,18 @@
   --yta-brand-blue: #3ea6ff;
   --yta-brand-green: #2ba640;
 
-  /* Custom range slider: muted unfilled track + dark notch dividers. */
+  /* Range slider: muted unfilled track. */
   --yta-range-track: rgba(255, 255, 255, 0.20);
-  --yta-range-tick: rgba(0, 0, 0, 0.5);
+
+  /* Global UI scale (dashboard). 1 = 100%. Drives `zoom` on injected roots
+     and the /scale correction on viewport-sized caps. */
+  --yta-ui-scale: 1;
+
+  /* Audio slider accents: volume, bass, speed, space. */
+  --yta-fx-volume: #ff4d4d;
+  --yta-fx-bass: #a474fd;
+  --yta-fx-speed: #3ea6ff;
+  --yta-fx-space: #35d6c4;
 
   --yta-radius-sm: 6px;
   --yta-radius-md: 10px;
@@ -53,7 +62,35 @@ html:not([dark]) {
   --yta-text-muted: #909090;
 
   --yta-range-track: rgba(0, 0, 0, 0.14);
-  --yta-range-tick: rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================================
+   1b. GLOBAL UI SCALE
+   ========================================================
+   `zoom` (not `transform`) is used because it reflows: text wraps, buttons
+   resize and the panel grid stays intact at every step, which `transform:
+   scale()` cannot do. zoom also multiplies the element's own left/top/right/
+   bottom offsets, so the JS positioners divide their pixel values back down
+   (unscalePx) and the viewport caps below divide only their vw/vh term.
+   Full-viewport backdrops are deliberately excluded — only their dialog
+   child is zoomed. */
+html.yt-aid-ui-scaled .yt-aid-watch-toolbar,
+html.yt-aid-ui-scaled .yt-aid-sidebar-bar,
+html.yt-aid-ui-scaled .yt-aid-home-trigger,
+html.yt-aid-ui-scaled .yt-aid-channel-actions,
+html.yt-aid-ui-scaled .yt-aid-home-flyout,
+html.yt-aid-ui-scaled .yt-aid-tools-menu,
+html.yt-aid-ui-scaled .yt-aid-toast-container,
+html.yt-aid-ui-scaled #yt-aid-random-home,
+html.yt-aid-ui-scaled .yt-aid-guide-entry,
+html.yt-aid-ui-scaled .yt-aid-mini-entry,
+html.yt-aid-ui-scaled .yt-aid-bm-page,
+html.yt-aid-ui-scaled .yt-aid-queue-drawer,
+html.yt-aid-ui-scaled .yt-aid-bm-favorite-picker,
+html.yt-aid-ui-scaled .yt-aid-crop-dialog,
+html.yt-aid-ui-scaled .yt-aid-dl-dialog,
+html.yt-aid-ui-scaled .yt-aid-bm-confirm {
+  zoom: var(--yta-ui-scale);
 }
 
 /* Visibility toggles via settings */
@@ -66,32 +103,35 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 
 /* ========================================================
    2. TOAST NOTIFICATION SYSTEM
-   ======================================================== */
+   ========================================================
+   Toasts sit over the page, so each one is a single short line: fixed
+   height, ellipsised text and a small footprint so they never cover the
+   player or the sidebar. */
 .yt-aid-toast-container {
   position: fixed;
-  bottom: 24px;
-  left: 24px;
+  bottom: 16px;
+  left: 16px;
   z-index: 9999999;
   display: flex;
   flex-direction: column-reverse;
-  gap: 8px;
+  gap: 6px;
   pointer-events: none;
 }
 
 .yt-aid-toast {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   background: rgba(18, 18, 18, 0.95);
   color: #f1f1f1;
-  padding: 10px 16px;
-  border-radius: var(--yta-radius-md);
+  padding: 5px 10px;
+  border-radius: 8px;
   border: 1px solid var(--yta-border);
   box-shadow: var(--yta-shadow-md);
   font-family: var(--yta-font-family);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  max-width: 400px;
+  max-width: 260px;
   transform: translateY(16px) scale(0.96);
   opacity: 0;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
@@ -108,9 +148,15 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   opacity: 0;
 }
 
+.yt-aid-toast-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .yt-aid-toast-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 13px;
+  height: 13px;
   display: block;
 }
 
@@ -127,23 +173,27 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 }
 
 .yt-aid-toast-message {
-  line-height: 1.4;
-  word-break: break-word;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .yt-aid-toast-action {
-  margin-left: 4px;
-  padding: 4px 10px;
+  margin-left: 2px;
+  padding: 2px 8px;
   border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s ease;
+  flex-shrink: 0;
 }
 
 .yt-aid-toast-action:hover {
@@ -467,7 +517,7 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 .yt-aid-random-menu {
   width: 280px;
   min-width: 0;
-  max-width: calc(100vw - 36px);
+  max-width: calc(100vw / var(--yta-ui-scale) - 36px);
 }
 
 .yt-aid-random-option > input {
@@ -501,174 +551,240 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   outline-offset: -2px;
 }
 
-/* Inline audio clusters on the watch toolbar: boost rides the first row's
-   right edge, the slowed/sped + reverb pair opens the second row. */
-.yt-aid-audio-cluster {
+/* ========================================================
+   2b. WATCH TOOLBAR — UNIFIED AUDIO PANEL
+   ========================================================
+   One card holding the four sliders (volume, bass, speed, reverb) in a 2 x 2
+   grid that collapses to a single column once the toolbar gets narrow. The
+   panel owns the leftover width of the second row so the toolbar never
+   wraps, and each slider carries its own accent colour so the four read as
+   distinct controls instead of one grey strip. */
+.yt-aid-audio-panel {
+  --fx-accent: var(--yta-brand-blue);
   display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 30px;
-  padding: 0 10px;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 440px;
+  /* A zoom step changes how many CSS pixels the toolbar row gets, so the
+     panel pins a floor: it keeps its two-column grid at every size and only
+     gives up when the row itself is narrower than the floor. */
+  min-width: min(440px, 100%);
+  padding: 7px 10px 8px;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--yta-border-subtle);
-  border-radius: var(--yta-radius-pill);
-  flex-shrink: 0;
+  border-radius: 12px;
+  container-type: inline-size;
+  transition: background 0.18s ease, border-color 0.18s ease;
 }
 
-.yt-aid-audio-cluster > svg,
-.yt-aid-fx-field > svg {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
+.yt-aid-audio-panel.is-active {
+  background: rgba(62, 166, 255, 0.10);
+  border-color: rgba(62, 166, 255, 0.42);
+}
+
+.yt-aid-audio-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   color: var(--yta-text-secondary);
 }
 
-/* Boost rides row 1 pinned to the right edge; the fx pair opens row 2 on the
-   left. The sliders use a viewport-based width (never tied to the button
-   labels), so they look identical in label and icon mode and hiding names
-   never resizes them. The width is sized to swallow the leftover space on a
-   typical window. */
-/* Boost rides row 1 and stretches to swallow the leftover space; the fx pair
-   does the same on row 2. Both grow AND shrink (with a small floor) so the
-   toolbar keeps its two-row grid at any width instead of wrapping. */
-.yt-aid-boost-cluster {
-  flex: 1 1 220px;
-  min-width: 0;
+.yt-aid-audio-head > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--yta-brand-blue);
 }
 
-.yt-aid-fx-cluster {
-  flex: 1 1 260px;
-  min-width: 0;
-  gap: 8px;
+.yt-aid-audio-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.yt-aid-fx-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-/* YouTube-themed range: brand-colored fill up to --p, muted track after, and
-   a 1px notch divider every --tick. --p is driven from JS; --tick/--yta-fill
-   are set per slider below. */
-.yt-aid-audio-cluster input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  flex: 1 1 72px;
-  min-width: 40px;
-  height: 16px;
-  margin: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.yt-aid-audio-cluster input[type="range"]::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 999px;
-  background:
-    repeating-linear-gradient(to right,
-      var(--yta-range-tick) 0 1px,
-      transparent 1px var(--tick)),
-    linear-gradient(to right,
-      var(--yta-fill) 0 var(--p),
-      var(--yta-range-track) var(--p) 100%);
-}
-
-.yt-aid-audio-cluster input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 13px;
-  height: 13px;
-  margin-top: -3.5px;
-  border: none;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-  transition: transform 0.12s ease;
-}
-
-.yt-aid-audio-cluster input[type="range"]:hover::-webkit-slider-thumb {
-  transform: scale(1.12);
-}
-
-.yt-aid-audio-cluster input[type="range"]:active::-webkit-slider-thumb {
-  transform: scale(1.2);
-}
-
-.yt-aid-audio-cluster input[type="range"]::-moz-range-track {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--yta-range-track);
-}
-
-.yt-aid-audio-cluster input[type="range"]::-moz-range-progress {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--yta-fill);
-}
-
-.yt-aid-audio-cluster input[type="range"]::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
-  border: none;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-}
-
-/* Fill color + notch period per slider (boost: 11 stops, rate: 19, reverb: 21). */
-#yt-aid-audio-boost {
-  --yta-fill: var(--yta-brand-red);
-  --tick: 10%;
-}
-
-#yt-aid-audio-rate {
-  --yta-fill: var(--yta-brand-blue);
-  --tick: 5.5556%;
-}
-
-#yt-aid-audio-reverb {
-  --yta-fill: var(--yta-brand-blue);
-  --tick: 5%;
-}
-
-.yt-aid-audio-value {
-  min-width: 36px;
-  font-size: 11.5px;
+.yt-aid-audio-flag {
+  display: none;
+  padding: 1px 7px;
+  border-radius: var(--yta-radius-pill);
+  background: rgba(62, 166, 255, 0.20);
+  color: var(--yta-brand-blue);
+  font-size: 10px;
   font-weight: 600;
-  color: var(--yta-text-primary);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+  white-space: nowrap;
 }
 
-.yt-aid-fx-reset {
+.yt-aid-audio-panel.is-active .yt-aid-audio-flag {
+  display: inline-block;
+}
+
+.yt-aid-audio-reset {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 22px;
   height: 22px;
+  margin-left: auto;
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.10);
   color: var(--yta-text-secondary);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-.yt-aid-fx-reset:hover,
-.yt-aid-fx-reset:focus-visible {
-  background: rgba(255, 255, 255, 0.2);
+.yt-aid-audio-reset:hover,
+.yt-aid-audio-reset:focus-visible {
+  background: rgba(255, 255, 255, 0.20);
   color: var(--yta-text-primary);
+  transform: rotate(-45deg);
 }
 
-.yt-aid-fx-reset svg {
+.yt-aid-audio-reset svg {
   width: 13px;
   height: 13px;
+}
+
+.yt-aid-audio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 16px;
+  min-width: 0;
+}
+
+/* One row per slider: accent icon, name, track, value readout. */
+.yt-aid-fx-field {
+  display: grid;
+  grid-template-columns: 15px auto minmax(44px, 1fr) 38px;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  --fx-accent: var(--yta-brand-blue);
+}
+
+.yt-aid-fx-field:has(#yt-aid-audio-boost) { --fx-accent: var(--yta-fx-volume); }
+.yt-aid-fx-field:has(#yt-aid-audio-bass) { --fx-accent: var(--yta-fx-bass); }
+.yt-aid-fx-field:has(#yt-aid-audio-rate) { --fx-accent: var(--yta-fx-speed); }
+.yt-aid-fx-field:has(#yt-aid-audio-reverb) { --fx-accent: var(--yta-fx-space); }
+
+.yt-aid-fx-icon {
+  display: inline-flex;
+  color: var(--fx-accent);
+  opacity: 0.9;
+}
+
+.yt-aid-fx-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.yt-aid-fx-name {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--yta-text-secondary);
+  white-space: nowrap;
+}
+
+.yt-aid-fx-value {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fx-accent);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Range: a slim rounded track whose filled portion carries the slider's
+   accent, and a white thumb ringed in the same colour. --p is set by JS. */
+.yt-aid-audio-panel input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.yt-aid-audio-panel input[type="range"]::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(to right,
+    var(--fx-accent) 0 var(--p),
+    var(--yta-range-track) var(--p) 100%);
+}
+
+.yt-aid-audio-panel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4.5px;
+  border: 3px solid var(--fx-accent);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  transition: transform 0.12s ease;
+}
+
+.yt-aid-audio-panel input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.yt-aid-audio-panel input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.28);
+}
+
+.yt-aid-audio-panel input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(62, 166, 255, 0.35);
+}
+
+.yt-aid-audio-panel input[type="range"]::-moz-range-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--yta-range-track);
+}
+
+.yt-aid-audio-panel input[type="range"]::-moz-range-progress {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--fx-accent);
+}
+
+.yt-aid-audio-panel input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--fx-accent);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
+/* Narrow toolbar / high UI scale: stack the four sliders in one column. */
+@container (max-width: 439px) {
+  .yt-aid-audio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+html:not([dark]) .yt-aid-audio-panel {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+html:not([dark]) .yt-aid-audio-panel.is-active {
+  background: rgba(62, 166, 255, 0.12);
+}
+
+html:not([dark]) .yt-aid-audio-reset {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+html:not([dark]) .yt-aid-audio-reset:hover {
+  background: rgba(0, 0, 0, 0.14);
 }
 
 /* ========================================================
@@ -701,8 +817,8 @@ html.yt-aid-crop-open {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: min(94vw, 1040px);
-  max-height: 94vh;
+  width: min(calc(94vw / var(--yta-ui-scale)), 1040px);
+  max-height: calc(94vh / var(--yta-ui-scale));
   padding: 16px;
   color: var(--yta-text-primary);
   background: var(--yta-bg-menu);
@@ -777,7 +893,7 @@ html.yt-aid-crop-open {
 .yt-aid-crop-image {
   display: block;
   max-width: 100%;
-  max-height: calc(94vh - 240px);
+  max-height: calc(94vh / var(--yta-ui-scale) - 240px);
   border-radius: 4px;
   user-select: none;
   pointer-events: none;
@@ -909,7 +1025,7 @@ html.yt-aid-crop-open {
   }
 
   .yt-aid-crop-image {
-    max-height: calc(94vh - 300px);
+    max-height: calc(94vh / var(--yta-ui-scale) - 300px);
   }
 }
 
@@ -1038,7 +1154,8 @@ html:not([dark]) .yt-aid-sidebar-bar:hover .yt-aid-side-trigger {
 
 .yt-aid-sidebar-bar:hover .yt-aid-side-actions,
 .yt-aid-sidebar-bar:focus-within .yt-aid-side-actions {
-  max-width: 160px;
+  /* 6 buttons x 26px + 5 gaps x 4px when the media tools are enabled. */
+  max-width: 184px;
   opacity: 1;
   pointer-events: auto;
 }
@@ -1441,7 +1558,7 @@ html:not([dark]) .yt-aid-channel-btn:hover {
 
 .yt-aid-bm-search {
   width: 260px;
-  max-width: 40vw;
+  max-width: calc(40vw / var(--yta-ui-scale));
   padding: 8px 14px;
   border: 1px solid var(--yta-border);
   border-radius: var(--yta-radius-pill);
@@ -1791,7 +1908,7 @@ html:not([dark]) .yt-aid-channel-btn:hover {
 /* --- Log bookmark của video (dropdown) --- */
 .yt-aid-bm-log-menu {
   width: 380px;
-  max-width: calc(100vw - 24px);
+  max-width: calc(100vw / var(--yta-ui-scale) - 24px);
 }
 
 .yt-aid-bm-log-list {
@@ -2480,7 +2597,7 @@ html[data-yt-aid-ad] .html5-video-player::after {
   bottom: 24px;
   left: 24px;
   width: 360px;
-  max-width: calc(100vw - 48px);
+  max-width: calc(100vw / var(--yta-ui-scale) - 48px);
   max-height: 480px;
   background: rgba(18, 18, 18, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.15);

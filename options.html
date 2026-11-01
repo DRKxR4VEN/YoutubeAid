@@ -33,9 +33,11 @@
       color: var(--yt-text-primary);
       font-family: var(--yt-font);
       line-height: 1.45;
-      padding: 18px 22px;
-      min-width: 560px;
-      max-width: 860px;
+      padding: 14px 16px;
+      /* The dashboard is a popup: keep it wide enough that the feature grid
+         never has to collapse into a single column. */
+      min-width: 640px;
+      max-width: 800px;
       margin: 0 auto;
       user-select: none;
     }
@@ -46,8 +48,8 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding-bottom: 14px;
-      margin-bottom: 18px;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
       border-bottom: 1px solid var(--yt-border);
     }
 
@@ -96,7 +98,7 @@
       color: var(--yt-text-muted);
     }
 
-    @media (max-width: 660px) {
+    @media (max-width: 520px) {
       .lang-label {
         display: none;
       }
@@ -136,16 +138,16 @@
 
     /* Section */
     section {
-      margin-bottom: 20px;
+      margin-bottom: 14px;
     }
 
     .section-title {
-      font-size: 12.5px;
+      font-size: 11.5px;
       font-weight: 600;
       color: var(--yt-text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -158,15 +160,24 @@
       display: block;
     }
 
+    .section-title svg {
+      width: 15px;
+      height: 15px;
+      opacity: 0.85;
+      display: block;
+      flex-shrink: 0;
+    }
+
     /* Toggle Cards */
-    /* Main features: two compact columns */
+    /* Main features: two compact columns, six rows. One line per card so the
+       whole list stays readable inside the 800px popup height. */
     .card-list {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      gap: 8px;
     }
 
-    @media (max-width: 660px) {
+    @media (max-width: 520px) {
       .card-list {
         grid-template-columns: 1fr;
       }
@@ -176,11 +187,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      gap: 8px;
       background: var(--yt-surface);
       border: 1px solid var(--yt-border);
       border-radius: var(--yt-radius-md);
-      padding: 10px 12px;
+      padding: 7px 10px;
       transition: background-color 0.15s ease, border-color 0.15s ease;
       cursor: pointer;
     }
@@ -193,15 +204,15 @@
     .toggle-main {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       flex: 1;
       min-width: 0;
       padding-right: 4px;
     }
 
     .toggle-icon-wrap {
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
       border-radius: var(--yt-radius-sm);
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.06);
@@ -213,12 +224,14 @@
 
     .toggle-icon-wrap svg {
       display: block;
+      width: 14px;
+      height: 14px;
       color: rgba(255, 255, 255, 0.95);
     }
 
     .toggle-icon-wrap img {
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
       opacity: 0.95;
       display: block;
     }
@@ -226,27 +239,34 @@
     .toggle-info {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 1px;
+      min-width: 0;
     }
 
     .toggle-title {
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--yt-text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .toggle-desc {
-      font-size: 11.5px;
+      font-size: 10.5px;
       color: var(--yt-text-secondary);
-      line-height: 1.35;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* Switch - Red when active */
     .switch {
       position: relative;
       display: inline-block;
-      width: 36px;
-      height: 20px;
+      width: 32px;
+      height: 18px;
       flex-shrink: 0;
     }
 
@@ -268,8 +288,8 @@
     .slider:before {
       position: absolute;
       content: "";
-      height: 14px;
-      width: 14px;
+      height: 12px;
+      width: 12px;
       left: 3px;
       bottom: 3px;
       background-color: #ffffff;
@@ -283,7 +303,7 @@
     }
 
     input:checked + .slider:before {
-      transform: translateX(16px);
+      transform: translateX(14px);
     }
 
     /* Shortcut Table */
@@ -680,8 +700,8 @@
             <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Bỏ qua quảng cáo">Bỏ qua quảng cáo</div>
-            <div class="toggle-desc" data-i18n="Tua nhanh và bỏ qua quảng cáo tự động.">Tua nhanh và bỏ qua quảng cáo tự động.</div>
+            <div class="toggle-title" data-i18n="Bỏ quảng cáo">Bỏ quảng cáo</div>
+            <div class="toggle-desc" data-i18n="Tua nhanh, tự bấm Bỏ qua.">Tua nhanh, tự bấm Bỏ qua.</div>
           </div>
         </div>
         <div class="switch">
@@ -697,8 +717,8 @@
             <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.8 11.8 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Ẩn khung quảng cáo">Ẩn khung quảng cáo</div>
-            <div class="toggle-desc" data-i18n="Ẩn banner và quảng cáo xung quanh video.">Ẩn banner và quảng cáo xung quanh video.</div>
+            <div class="toggle-title" data-i18n="Ẩn quảng cáo">Ẩn quảng cáo</div>
+            <div class="toggle-desc" data-i18n="Ẩn banner và ad quanh video.">Ẩn banner và ad quanh video.</div>
           </div>
         </div>
         <div class="switch">
@@ -714,8 +734,8 @@
             <img src="icons/loop.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Tự động lặp video">Tự động lặp video</div>
-            <div class="toggle-desc" data-i18n="Phát lại video khi kết thúc, bỏ qua quảng cáo.">Phát lại video khi kết thúc, bỏ qua quảng cáo.</div>
+            <div class="toggle-title" data-i18n="Lặp video">Lặp video</div>
+            <div class="toggle-desc" data-i18n="Phát lại khi kết thúc, bỏ quảng cáo.">Phát lại khi kết thúc, bỏ quảng cáo.</div>
           </div>
         </div>
         <div class="switch">
@@ -728,11 +748,11 @@
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7.41 18.59L8.83 20 12 16.83 15.17 20 16.59 18.59 12 14zM7.41 12.59L8.83 14 12 10.83 15.17 14 16.59 12.59 12 8z"/></svg>
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Tự động lướt Shorts">Tự động lướt Shorts</div>
-            <div class="toggle-desc" data-i18n="Xem hết một Short thì tự chuyển sang Short kế tiếp.">Xem hết một Short thì tự chuyển sang Short kế tiếp.</div>
+            <div class="toggle-title" data-i18n="Lướt Shorts">Lướt Shorts</div>
+            <div class="toggle-desc" data-i18n="Hết một Short, tự sang Short kế.">Hết một Short, tự sang Short kế.</div>
           </div>
         </div>
         <div class="switch">
@@ -749,7 +769,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Phím tắt điều hướng">Phím tắt điều hướng</div>
-            <div class="toggle-desc" data-i18n="Bấm phím 2–3 lần để mở nhanh các trang YouTube.">Bấm phím 2–3 lần để mở nhanh các trang YouTube.</div>
+            <div class="toggle-desc" data-i18n="Bấm 2–3 lần để mở trang.">Bấm 2–3 lần để mở trang.</div>
           </div>
         </div>
         <div class="switch">
@@ -766,7 +786,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Tải MP3 & MP4">Tải MP3 & MP4</div>
-            <div class="toggle-desc" data-i18n="Tải video và nhạc chất lượng cao.">Tải video và nhạc chất lượng cao.</div>
+            <div class="toggle-desc" data-i18n="Tải video, nhạc chất lượng cao.">Tải video, nhạc chất lượng cao.</div>
           </div>
         </div>
         <div class="switch">
@@ -782,8 +802,8 @@
             <img src="icons/copy.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Nút sao chép thông minh">Nút sao chép thông minh</div>
-            <div class="toggle-desc" data-i18n="Thêm nút copy tiêu đề và tìm nhanh trên mỗi video.">Thêm nút copy tiêu đề và tìm nhanh trên mỗi video.</div>
+            <div class="toggle-title" data-i18n="Nút copy">Nút copy</div>
+            <div class="toggle-desc" data-i18n="Copy tiêu đề, tìm nhanh.">Copy tiêu đề, tìm nhanh.</div>
           </div>
         </div>
         <div class="switch">
@@ -799,8 +819,8 @@
             <img src="icons/copy.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Sao chép khi bôi đen">Sao chép khi bôi đen</div>
-            <div class="toggle-desc" data-i18n="Bôi xanh đoạn text là sao chép ngay.">Bôi xanh đoạn text là sao chép ngay.</div>
+            <div class="toggle-title" data-i18n="Copy khi bôi đen">Copy khi bôi đen</div>
+            <div class="toggle-desc" data-i18n="Bôi đen là copy ngay.">Bôi đen là copy ngay.</div>
           </div>
         </div>
         <div class="switch">
@@ -817,7 +837,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Tự dán vào tìm kiếm">Tự dán vào tìm kiếm</div>
-            <div class="toggle-desc" data-i18n="Dán nội dung đã copy khi bấm ô tìm kiếm.">Dán nội dung đã copy khi bấm ô tìm kiếm.</div>
+            <div class="toggle-desc" data-i18n="Bấm ô tìm kiếm là dán.">Bấm ô tìm kiếm là dán.</div>
           </div>
         </div>
         <div class="switch">
@@ -834,7 +854,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Thay nội dung đã dán">Thay nội dung đã dán</div>
-            <div class="toggle-desc" data-i18n="Bật: thay thế nội dung cũ; Tắt: nối thêm.">Bật: thay thế nội dung cũ; Tắt: nối thêm.</div>
+            <div class="toggle-desc" data-i18n="Bật: thay · Tắt: nối thêm.">Bật: thay · Tắt: nối thêm.</div>
           </div>
         </div>
         <div class="switch">
@@ -850,8 +870,8 @@
             <img src="icons/bell.png" alt="" />
           </div>
           <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Thông báo nổi">Thông báo nổi</div>
-            <div class="toggle-desc" data-i18n="Hiện thông báo nhỏ sau mỗi thao tác.">Hiện thông báo nhỏ sau mỗi thao tác.</div>
+            <div class="toggle-title" data-i18n="Thông báo toast">Thông báo toast</div>
+            <div class="toggle-desc" data-i18n="Báo nhỏ sau mỗi thao tác.">Báo nhỏ sau mỗi thao tác.</div>
           </div>
         </div>
         <div class="switch">
@@ -868,7 +888,7 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Chế độ hiệu năng">Chế độ hiệu năng</div>
-            <div class="toggle-desc" data-i18n="Bật để giảm hiệu ứng, phản hồi tức thì không trễ hình.">Bật để giảm hiệu ứng, phản hồi tức thì không trễ hình.</div>
+            <div class="toggle-desc" data-i18n="Giảm hiệu ứng, tăng hiệu năng.">Giảm hiệu ứng, tăng hiệu năng.</div>
           </div>
         </div>
         <div class="switch">
@@ -876,6 +896,43 @@
           <span class="slider"></span>
         </div>
       </label>
+
+      <!-- 13. Anti accidental tab close -->
+      <label class="toggle-card">
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm3.5 6.6-1.4 1.4L12 10.1l-2.1 1.9-1.4-1.4L10 7.5 8.5 5.4H10l2 1.9 2-1.9h1.5l-1.4 2.1 1.4 1.1z"/></svg>
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title" data-i18n="Chống tắt nhầm tab">Chống tắt nhầm tab</div>
+            <div class="toggle-desc" data-i18n="Hỏi lại khi vô tình tắt hoặc tải trang.">Hỏi lại khi vô tình tắt hoặc tải trang.</div>
+          </div>
+        </div>
+        <div class="switch">
+          <input type="checkbox" id="enableCloseGuard">
+          <span class="slider"></span>
+        </div>
+      </label>
+    </div>
+  </section>
+
+  <!-- Appearance -->
+  <section id="appearanceSection">
+    <div class="section-title">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      <span data-i18n="Giao diện">Giao diện</span>
+    </div>
+
+    <div class="keybind-card">
+      <div class="keybind-taps" id="uiScaleSteps" role="group" data-i18n-aria="Cỡ giao diện tiện ích" aria-label="Cỡ giao diện tiện ích">
+        <span class="keybind-taps-label" data-i18n="Cỡ giao diện">Cỡ giao diện</span>
+        <button type="button" class="keybind-tap" data-scale="90">90%</button>
+        <button type="button" class="keybind-tap" data-scale="100">100%</button>
+        <button type="button" class="keybind-tap" data-scale="110">110%</button>
+        <button type="button" class="keybind-tap" data-scale="120">120%</button>
+        <button type="button" class="keybind-tap" data-scale="130">130%</button>
+        <span class="keybind-taps-desc" data-i18n="Áp dụng cho toàn bộ nút và chữ của tiện ích.">Áp dụng cho toàn bộ nút và chữ của tiện ích.</span>
+      </div>
     </div>
   </section>
 

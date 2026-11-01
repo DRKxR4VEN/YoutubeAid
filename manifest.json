@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Youtube Aid",
-  "version": "1.17.4",
-  "description": "Tiện ích mở rộng YouTube: Tải video MP4 & âm thanh MP3 chất lượng cao, copy title thông minh, Clean link không tracking, phím tắt tùy chỉnh trên YouTube & YouTube Music, tự động copy/dán khi bôi đen, tải ảnh bìa/avatar/banner có cắt ảnh và tự động lặp video (bỏ qua quảng cáo), bookmark video xem sau.",
+  "version": "1.18.0",
+  "description": "Trợ lý YouTube gọn nhẹ: bỏ quảng cáo, lặp video, tải MP3/MP4, copy tiêu đề và link sạch, cắt ảnh bìa, bookmark, phím tắt.",
   "permissions": [
     "storage",
     "clipboardWrite",

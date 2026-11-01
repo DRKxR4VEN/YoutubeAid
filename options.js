@@ -39,6 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
     enableHideAds: true,
     enableShortsAutoScroll: false,
     enableAnimations: true,
+    enableCloseGuard: false,
+    uiScale: 100,
     hideButtonNames: false,
     shortcutKeys: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_KEYS } : { ...FALLBACK_SHORTCUT_KEYS },
     shortcutTaps: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_TAPS } : { ...FALLBACK_SHORTCUT_TAPS }
@@ -56,7 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
     enableAdSkip: document.getElementById('enableAdSkip'),
     enableHideAds: document.getElementById('enableHideAds'),
     enableShortsAutoScroll: document.getElementById('enableShortsAutoScroll'),
-    enableAnimations: document.getElementById('enableAnimations')
+    enableAnimations: document.getElementById('enableAnimations'),
+    enableCloseGuard: document.getElementById('enableCloseGuard')
   };
 
   // The "Chế độ hiệu năng" card shows the inverse of enableAnimations: checked
@@ -341,6 +344,37 @@ document.addEventListener('DOMContentLoaded', () => {
     keybindSection.classList.toggle('is-disabled', !isEnabled);
   }
 
+  // UI scale: five fixed steps, +10% each. Anything else falls back to 100%
+  // so a hand-edited storage value can never leave the pages unscaled.
+  const UI_SCALE_STEPS = [90, 100, 110, 120, 130];
+  const uiScaleStepsEl = document.getElementById('uiScaleSteps');
+  let currentUiScale = 100;
+
+  function sanitizeUiScale(value) {
+    const numeric = Number(value);
+    return UI_SCALE_STEPS.includes(numeric) ? numeric : 100;
+  }
+
+  function refreshUiScaleState() {
+    if (!uiScaleStepsEl) return;
+    uiScaleStepsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
+      const isActive = sanitizeUiScale(btn.dataset.scale) === currentUiScale;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+  }
+
+  function handleUiScalePick(scale) {
+    const next = sanitizeUiScale(scale);
+    if (next === currentUiScale) return;
+    currentUiScale = next;
+    refreshUiScaleState();
+    chrome.storage.local.set({ uiScale: next }, () => {
+      void chrome.runtime?.lastError;
+      showStatus(T('Đã đặt cỡ giao diện thành {0}%.', [next]));
+    });
+  }
+
   function loadSettings() {
     chrome.storage.local.get(DEFAULTS, (items) => {
       if (I18N) I18N.setLanguage(items.language);
@@ -352,6 +386,9 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.classList.toggle('yt-aid-no-animations', !!toggleInputs.enableAnimations?.checked);
 
       syncKeybindVisibility();
+
+      currentUiScale = sanitizeUiScale(items.uiScale);
+      refreshUiScaleState();
 
       currentShortcutTaps = SHORTCUTS
         ? SHORTCUTS.sanitizeTaps(items.shortcutTaps)
@@ -394,6 +431,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (uiScaleStepsEl) {
+    uiScaleStepsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
+      btn.addEventListener('click', () => handleUiScalePick(Number(btn.dataset.scale)));
+    });
+  }
+
   langButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!I18N || btn.dataset.lang === I18N.getLanguage()) return;
@@ -416,6 +459,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const perfOn = !changes.enableAnimations.newValue;
         toggleInputs.enableAnimations.checked = perfOn;
         document.body.classList.toggle('yt-aid-no-animations', perfOn);
+      }
+      if (changes.enableCloseGuard && toggleInputs.enableCloseGuard) {
+        toggleInputs.enableCloseGuard.checked = !!changes.enableCloseGuard.newValue;
+      }
+      if (changes.uiScale) {
+        currentUiScale = sanitizeUiScale(changes.uiScale.newValue);
+        refreshUiScaleState();
       }
     });
   } catch (e) { }
