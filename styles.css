@@ -32,11 +32,10 @@
      and the /scale correction on viewport-sized caps. */
   --yta-ui-scale: 1;
 
-  /* Audio slider accents: volume, bass, speed, space. */
-  --yta-fx-volume: #ff4d4d;
-  --yta-fx-bass: #a474fd;
-  --yta-fx-speed: #3ea6ff;
-  --yta-fx-space: #35d6c4;
+  /* Slider fill + thumb: theme-neutral so the audio card reads like YouTube's
+     own controls instead of a rainbow of feature colours. */
+  --yta-range-fill: rgba(255, 255, 255, 0.85);
+  --yta-range-thumb: #f1f1f1;
 
   --yta-radius-sm: 6px;
   --yta-radius-md: 10px;
@@ -62,6 +61,8 @@ html:not([dark]) {
   --yta-text-muted: #909090;
 
   --yta-range-track: rgba(0, 0, 0, 0.14);
+  --yta-range-fill: #606060;
+  --yta-range-thumb: #0f0f0f;
 }
 
 /* ========================================================
@@ -554,33 +555,32 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 /* ========================================================
    2b. WATCH TOOLBAR — UNIFIED AUDIO PANEL
    ========================================================
-   One card holding the four sliders (volume, bass, speed, reverb) in a 2 x 2
-   grid that collapses to a single column once the toolbar gets narrow. The
-   panel owns the leftover width of the second row so the toolbar never
-   wraps, and each slider carries its own accent colour so the four read as
-   distinct controls instead of one grey strip. */
+   One card holding the four sliders (volume, bass, speed, reverb), stacked
+   so each track stays long and easy to drag precisely. The panel owns a
+   fixed width so toggling the button names can never stretch or squeeze it
+   — the prefs cluster on the same row absorbs the leftover space instead.
+   Colours stay neutral (theme text, white/gray fill) so the card blends
+   into YouTube instead of shouting over it. */
 .yt-aid-audio-panel {
-  --fx-accent: var(--yta-brand-blue);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  flex: 1 1 440px;
-  /* A zoom step changes how many CSS pixels the toolbar row gets, so the
-     panel pins a floor: it keeps its two-column grid at every size and only
-     gives up when the row itself is narrower than the floor. */
-  min-width: min(440px, 100%);
+  /* Fixed footprint: identical in label and icon mode at every width.
+     Capped at 440px but always leaves ~560px of the row for the prefs
+     cluster, so the two-row layout survives typical window sizes. */
+  flex: 0 0 auto;
+  width: min(440px, max(240px, calc(100% - 560px)));
   padding: 7px 10px 8px;
   box-sizing: border-box;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--yta-border-subtle);
   border-radius: 12px;
-  container-type: inline-size;
   transition: background 0.18s ease, border-color 0.18s ease;
 }
 
 .yt-aid-audio-panel.is-active {
-  background: rgba(62, 166, 255, 0.10);
-  border-color: rgba(62, 166, 255, 0.42);
+  background: rgba(62, 166, 255, 0.07);
+  border-color: rgba(62, 166, 255, 0.28);
 }
 
 .yt-aid-audio-head {
@@ -589,13 +589,6 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   gap: 6px;
   min-width: 0;
   color: var(--yta-text-secondary);
-}
-
-.yt-aid-audio-head > svg {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  color: var(--yta-brand-blue);
 }
 
 .yt-aid-audio-title {
@@ -652,35 +645,21 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 
 .yt-aid-audio-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3px 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
   min-width: 0;
 }
 
-/* One row per slider: accent icon, name, track, value readout. */
+/* One row per slider: name, track, value readout. No decorative icons —
+   the labels alone identify each control. The four rows stack in a single
+   column so every track stays long (~300px) and the 0.05x / 5% notches stay
+   easy to hit precisely. */
 .yt-aid-fx-field {
   display: grid;
-  grid-template-columns: 15px auto minmax(44px, 1fr) 38px;
+  grid-template-columns: 52px minmax(0, 1fr) 56px;
   align-items: center;
   gap: 7px;
   min-width: 0;
-  --fx-accent: var(--yta-brand-blue);
-}
-
-.yt-aid-fx-field:has(#yt-aid-audio-boost) { --fx-accent: var(--yta-fx-volume); }
-.yt-aid-fx-field:has(#yt-aid-audio-bass) { --fx-accent: var(--yta-fx-bass); }
-.yt-aid-fx-field:has(#yt-aid-audio-rate) { --fx-accent: var(--yta-fx-speed); }
-.yt-aid-fx-field:has(#yt-aid-audio-reverb) { --fx-accent: var(--yta-fx-space); }
-
-.yt-aid-fx-icon {
-  display: inline-flex;
-  color: var(--fx-accent);
-  opacity: 0.9;
-}
-
-.yt-aid-fx-icon svg {
-  width: 15px;
-  height: 15px;
 }
 
 .yt-aid-fx-name {
@@ -688,18 +667,115 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   font-weight: 500;
   color: var(--yta-text-secondary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .yt-aid-fx-value {
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--fx-accent);
-  font-variant-numeric: tabular-nums;
+  color: var(--yta-text-primary);
   text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Range: a slim rounded track whose filled portion carries the slider's
-   accent, and a white thumb ringed in the same colour. --p is set by JS. */
+/* Preset chips: one tap applies the genre's typical levels; the active chip
+   lights up while the sliders match its values and a second tap returns
+   everything to defaults. Same neutral tokens as the panel itself. */
+.yt-aid-audio-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.yt-aid-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 9px;
+  border: 1px solid var(--yta-border-subtle);
+  border-radius: var(--yta-radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--yta-text-secondary);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.yt-aid-preset-chip:hover,
+.yt-aid-preset-chip:focus-visible {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-preset-chip.is-active {
+  background: rgba(62, 166, 255, 0.20);
+  border-color: rgba(62, 166, 255, 0.45);
+  color: var(--yta-brand-blue);
+}
+
+html:not([dark]) .yt-aid-preset-chip {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+html:not([dark]) .yt-aid-preset-chip:hover {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+html:not([dark]) .yt-aid-preset-chip.is-active {
+  background: rgba(62, 166, 255, 0.14);
+}
+
+/* Shorts: circular action buttons injected at the top of the engagement
+   rail, matching YouTube's own white icon buttons. */
+.yt-aid-shorts-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #f1f1f1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.yt-aid-shorts-action:hover,
+.yt-aid-shorts-action:focus-visible {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.yt-aid-shorts-action svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* The Shorts audio panel renders inside a dropdown, so the watch-page width
+   formula (which reserves room for the prefs cluster) does not apply there. */
+.yt-aid-shorts-audio-menu {
+  width: 316px;
+  box-sizing: border-box;
+}
+
+.yt-aid-shorts-audio-menu .yt-aid-audio-panel {
+  flex: none;
+  width: 100%;
+}
+
+/* Range: a slim rounded track whose filled portion uses the theme-neutral
+   fill, with a plain thumb. --p is set by JS. */
 .yt-aid-audio-panel input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -714,20 +790,20 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   height: 5px;
   border-radius: 999px;
   background: linear-gradient(to right,
-    var(--fx-accent) 0 var(--p),
+    var(--yta-range-fill) 0 var(--p),
     var(--yta-range-track) var(--p) 100%);
 }
 
 .yt-aid-audio-panel input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -4.5px;
-  border: 3px solid var(--fx-accent);
+  width: 13px;
+  height: 13px;
+  margin-top: -4px;
+  border: none;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  background: var(--yta-range-thumb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   transition: transform 0.12s ease;
 }
 
@@ -752,23 +828,16 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 .yt-aid-audio-panel input[type="range"]::-moz-range-progress {
   height: 5px;
   border-radius: 999px;
-  background: var(--fx-accent);
+  background: var(--yta-range-fill);
 }
 
 .yt-aid-audio-panel input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: 3px solid var(--fx-accent);
+  width: 13px;
+  height: 13px;
+  border: none;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
-}
-
-/* Narrow toolbar / high UI scale: stack the four sliders in one column. */
-@container (max-width: 439px) {
-  .yt-aid-audio-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  background: var(--yta-range-thumb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 html:not([dark]) .yt-aid-audio-panel {
@@ -776,7 +845,7 @@ html:not([dark]) .yt-aid-audio-panel {
 }
 
 html:not([dark]) .yt-aid-audio-panel.is-active {
-  background: rgba(62, 166, 255, 0.12);
+  background: rgba(62, 166, 255, 0.10);
 }
 
 html:not([dark]) .yt-aid-audio-reset {
@@ -2233,9 +2302,9 @@ html[data-yt-aid-ad] .html5-video-player::after {
   display: none;
 }
 
-/* The audio clusters/sliders are intentionally NOT re-sized in icon mode: they
-   keep the exact same flex sizing as label mode so hiding names never shrinks
-   or shifts them. Only the button labels around them collapse. */
+/* The audio panel is intentionally NOT re-sized in icon mode: its width is
+   fixed per the formula above, so hiding names never shrinks, stretches or
+   shifts it — only the button labels around it collapse. */
 
 
 /* Thanh random nằm ngoài lưới video, chiếm cả hàng và căn giữa */

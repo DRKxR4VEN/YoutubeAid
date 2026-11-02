@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Youtube Aid",
-  "version": "1.18.0",
-  "description": "Trợ lý YouTube gọn nhẹ: bỏ quảng cáo, lặp video, tải MP3/MP4, copy tiêu đề và link sạch, cắt ảnh bìa, bookmark, phím tắt.",
+  "name": "Youtube Aid Elite Version",
+  "version": "1.19.0",
+  "description": "Bản Elite dành riêng cho người mua độc lập — tính năng vượt trội, mạnh mẽ và tiện lợi hơn Youtube Aid Premium.",
   "permissions": [
     "storage",
     "clipboardWrite",
@@ -39,7 +39,7 @@
     }
   ],
   "action": {
-    "default_title": "Youtube Aid - Cài đặt & Phím tắt",
+    "default_title": "Youtube Aid Elite Version - Cài đặt & Phím tắt",
     "default_popup": "options.html",
     "default_icon": {
       "16": "icons/icon16.png",

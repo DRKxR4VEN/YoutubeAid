@@ -3,12 +3,12 @@ const path = require('path');
 const zlib = require('zlib');
 
 // Core PNG Generator without any external dependencies
-function createPNG(width, height, drawFn) {
+function createPNG(width, height, drawFn, samples) {
   const stride = width * 4;
   const rawData = Buffer.alloc((stride + 1) * height);
 
-  // 2x2 supersampling for smooth anti-aliased edges
-  const SAMPLES = 2;
+  // Supersampling for smooth anti-aliased edges
+  const SAMPLES = samples || 2;
   const invSamplesSq = 1 / (SAMPLES * SAMPLES);
 
   for (let y = 0; y < height; y++) {
@@ -110,77 +110,111 @@ function isInRoundedRect(px, py, rx, ry, rw, rh, rad) {
 }
 
 // -------------------------------------------------------------
-// 1. DISTINCTIVE YOUTUBE AID EXTENSION LOGO
-// YouTube Red rounded screen with Play triangle & Aid Assistant Cross badge
+// 1. ELITE VERSION EXTENSION LOGO
+// Obsidian tile + gold rim, deep-red play body, ivory triangle,
+// gold sparkles. Bold silhouette so it stays readable at 16px.
 // -------------------------------------------------------------
-function drawYouTubeAid(x, y, w, h) {
+const ELITE = {
+  obsidianHi: [48, 55, 71],
+  obsidianLo: [7, 8, 12],
+  goldHi: [255, 228, 145],
+  goldMid: [214, 178, 76],
+  goldLo: [142, 102, 22],
+  redHi: [255, 46, 62],
+  redLo: [146, 0, 21],
+  goldEdge: [198, 157, 60],
+  ivory: [255, 250, 240],
+};
+
+function mixColor(a, b, t) {
+  const k = Math.max(0, Math.min(1, t));
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * k),
+    Math.round(a[1] + (b[1] - a[1]) * k),
+    Math.round(a[2] + (b[2] - a[2]) * k),
+  ];
+}
+
+// Concave four-point star (astroid) with cusps on the axes.
+function isInSparkle(px, py, cx, cy, rx, ry) {
+  const a = Math.abs(px - cx) / rx;
+  const b = Math.abs(py - cy) / ry;
+  return Math.pow(a, 2 / 3) + Math.pow(b, 2 / 3) <= 1;
+}
+
+function drawEliteIcon(x, y, w, h) {
   const nx = x / w;
   const ny = y / h;
+  // Toolbar sizes drop the hairline gold edge and the small sparkle so the
+  // play button stays the dominant shape.
+  const compact = w <= 32;
 
-  // YouTube outer rounded badge
-  const pad = 0.08;
-  const rad = 0.22;
-  const inScreen = isInRoundedRect(nx, ny, pad, pad * 1.3, 1 - pad * 2, 1 - pad * 2.6, rad);
-
-  if (!inScreen) {
+  // ---- Obsidian tile with a gold rim ----
+  const tile = { x: 0.015, y: 0.015, w: 0.97, h: 0.97, r: 0.22 };
+  if (!isInRoundedRect(nx, ny, tile.x, tile.y, tile.w, tile.h, tile.r)) {
     return [0, 0, 0, 0];
   }
 
-  // YouTube Red gradient
-  const grad = ny * 0.15;
-  const redR = Math.round(255 - grad * 30);
-  const redG = Math.round(0);
-  const redB = Math.round(30 - grad * 20);
+  const rim = compact ? 0.03 : 0.042;
+  const inCore = isInRoundedRect(
+    nx, ny,
+    tile.x + rim, tile.y + rim,
+    tile.w - rim * 2, tile.h - rim * 2,
+    Math.max(0.02, tile.r - rim)
+  );
 
-  // 1. Play Button Triangle (left/center)
-  const triLeft = 0.28;
-  const triRight = 0.54;
-  const triTop = 0.32;
-  const triBottom = 0.68;
-  const triHeight = triBottom - triTop;
+  if (!inCore) {
+    return [...mixColor(ELITE.goldHi, ELITE.goldLo, (nx + ny) / 2), 255];
+  }
 
-  let inPlay = false;
-  if (nx >= triLeft && nx <= triRight) {
-    const progress = (nx - triLeft) / (triRight - triLeft);
-    const curTop = triTop + (triHeight / 2) * progress;
-    const curBottom = triBottom - (triHeight / 2) * progress;
-    if (ny >= curTop && ny <= curBottom) {
-      inPlay = true;
+  // ---- Play body, pushed to the upper-left ----
+  const body = compact
+    ? { x: 0.08, y: 0.165, w: 0.72, h: 0.50, r: 0.175 }
+    : { x: 0.10, y: 0.185, w: 0.685, h: 0.475, r: 0.165 };
+  if (isInRoundedRect(nx, ny, body.x, body.y, body.w, body.h, body.r)) {
+    const edge = 0.013;
+    if (!compact && !isInRoundedRect(
+      nx, ny,
+      body.x + edge, body.y + edge,
+      body.w - edge * 2, body.h - edge * 2,
+      Math.max(0.02, body.r - edge)
+    )) {
+      return [...ELITE.goldEdge, 255];
     }
+
+    // Ivory play triangle, centroid aligned with the body centre
+    const cx = body.x + body.w / 2;
+    const cy = body.y + body.h / 2;
+    const triLeft = cx - 0.07;
+    const triRight = triLeft + 0.21;
+    const triTop = cy - 0.1575;
+    const triBottom = cy + 0.1575;
+
+    if (nx >= triLeft && nx <= triRight) {
+      const progress = (nx - triLeft) / (triRight - triLeft);
+      const halfHeight = (triBottom - triTop) / 2;
+      if (ny >= triTop + halfHeight * progress && ny <= triBottom - halfHeight * progress) {
+        return [...ELITE.ivory, 255];
+      }
+    }
+
+    const depth = (ny - body.y) / body.h;
+    return [...mixColor(ELITE.redHi, ELITE.redLo, depth), 255];
   }
 
-  if (inPlay) {
-    return [255, 255, 255, 255];
+  // ---- Gold sparkles filling the lower-right corner ----
+  const sparkleR = compact ? 0.115 : 0.135;
+  const bigSparkle = isInSparkle(nx, ny, 0.775, 0.78, sparkleR, sparkleR);
+  const smallSparkle = !compact && isInSparkle(nx, ny, 0.60, 0.885, 0.05, 0.05);
+  if (bigSparkle || smallSparkle) {
+    return [...mixColor(ELITE.goldHi, ELITE.goldMid, (nx + ny) / 2), 255];
   }
 
-  // 2. Aid Badge (Right side: Modern helper cross badge)
-  const aidCx = 0.72;
-  const aidCy = 0.50;
-  const aidSize = 0.16;
-  const aidThick = 0.065;
-  const aidRad = 0.02;
-
-  // Horizontal bar of plus
-  const inHBar = isInRoundedRect(
-    nx, ny,
-    aidCx - aidSize, aidCy - aidThick / 2,
-    aidSize * 2, aidThick,
-    aidRad
-  );
-
-  // Vertical bar of plus
-  const inVBar = isInRoundedRect(
-    nx, ny,
-    aidCx - aidThick / 2, aidCy - aidSize,
-    aidThick, aidSize * 2,
-    aidRad
-  );
-
-  if (inHBar || inVBar) {
-    return [255, 255, 255, 255];
-  }
-
-  return [redR, redG, redB, 255];
+  // ---- Obsidian ground, lit from the upper-left ----
+  const gx = (nx - 0.34) / 0.72;
+  const gy = (ny - 0.26) / 0.72;
+  const glow = Math.min(1, Math.sqrt(gx * gx + gy * gy));
+  return [...mixColor(ELITE.obsidianHi, ELITE.obsidianLo, glow), 255];
 }
 
 // -------------------------------------------------------------
@@ -492,15 +526,15 @@ if (!fs.existsSync(iconsDir)) {
   fs.mkdirSync(iconsDir, { recursive: true });
 }
 
-// 1. YouTube Aid Extension Icons (16, 48, 128)
+// 1. Elite Version Extension Icons (16, 48, 128)
 [16, 48, 128].forEach(size => {
-  const buf = createPNG(size, size, drawYouTubeAid);
+  const buf = createPNG(size, size, drawEliteIcon, 4);
   fs.writeFileSync(path.join(iconsDir, `icon${size}.png`), buf);
   console.log(`Generated icon${size}.png`);
 });
 
-// 2. High-res YouTube Aid Logo for Header
-const logoBuf = createPNG(128, 128, drawYouTubeAid);
+// 2. High-res Elite Logo for the dashboard header
+const logoBuf = createPNG(256, 256, drawEliteIcon, 3);
 fs.writeFileSync(path.join(iconsDir, 'youtube_aid.png'), logoBuf);
 console.log('Generated youtube_aid.png');
 

@@ -410,9 +410,12 @@
   let closeGuardHandler = null;
   let leaveIntentHandler = null;
   let lastLeaveIntentAt = 0;
+  let lastReloadIntentAt = 0;
+  let lastOmniboxIntentAt = 0;
 
-  // The prompt is meant for an accidental click on the browser's X, so a
-  // deliberate in-page navigation (clicking a link) must not trigger it.
+  // The prompt is meant for a click on the browser's X, so deliberate page
+  // activity that unloads the document must not trigger it: same-tab link
+  // clicks, reloads (F5 / Ctrl+R) and address-bar navigation (Ctrl+L).
   function watchLeaveIntent() {
     if (leaveIntentHandler) return;
     leaveIntentHandler = (event) => {
@@ -423,6 +426,16 @@
       if (sameTab) lastLeaveIntentAt = Date.now();
     };
     document.addEventListener('click', leaveIntentHandler, true);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'F5') {
+        lastReloadIntentAt = Date.now();
+        return;
+      }
+      if (event.ctrlKey && !event.altKey && !event.metaKey) {
+        if (event.key === 'r' || event.key === 'R') lastReloadIntentAt = Date.now();
+        else if (event.key === 'l' || event.key === 'L') lastOmniboxIntentAt = Date.now();
+      }
+    }, true);
   }
 
   function syncCloseGuard() {
@@ -430,7 +443,10 @@
     if (on && !closeGuardHandler) {
       watchLeaveIntent();
       closeGuardHandler = (event) => {
-        if (Date.now() - lastLeaveIntentAt < 3000) return;
+        const now = Date.now();
+        if (now - lastLeaveIntentAt < 3000) return;
+        if (now - lastReloadIntentAt < 3000) return;
+        if (now - lastOmniboxIntentAt < 3000) return;
         event.preventDefault();
         // Chrome only shows the chooser when the event is marked cancellable.
         event.returnValue = '';
@@ -920,6 +936,12 @@
         id = '';
       }
     }
+    // Scrolling between Shorts updates the URL, so the active reel reads as a
+    // new video and its edit resets exactly like a watch-page one.
+    if (!id && location.pathname.startsWith('/shorts/')) {
+      const match = location.pathname.match(/^\/shorts\/([a-zA-Z0-9_-]{11})/);
+      if (match) id = match[1];
+    }
     return id ? `id:${id}` : '';
   }
 
@@ -974,8 +996,12 @@
     return sanitizeAudioBass(settings.audioBass);
   }
 
-  function formatAudioRate(rate) {
-    return `x${rate.toFixed(2)}`;
+  // The readout names the state instead of the number: x1 is the natural
+  // default, anything else reads as its direction (tăng tốc / làm chậm).
+  function formatAudioRateState(rate) {
+    if (rate > 1) return T('Tăng tốc');
+    if (rate < 1) return T('Làm chậm');
+    return T('Mặc định');
   }
 
   // Custom-styled ranges draw their colored fill from a --p CSS var (0-100%),
@@ -1000,9 +1026,16 @@
   const PREVIEW_VIDEO_SELECTOR = '#inline-player, ytd-video-preview, ytd-reel-item-renderer, ytd-shape';
 
   function playerVideos() {
-    return [...document.querySelectorAll('video.html5-main-video')].filter((v) => (
+    const videos = [...document.querySelectorAll('video.html5-main-video')].filter((v) => (
       v.isConnected && !v.closest(PREVIEW_VIDEO_SELECTOR)
     ));
+    // The Shorts player has its own element that may not carry the main-video
+    // class; the active reel is the one actually on screen.
+    const reel = document.querySelector('ytd-reel-video-renderer[is-active] video');
+    if (reel && reel.isConnected && !reel.closest(PREVIEW_VIDEO_SELECTOR) && !videos.includes(reel)) {
+      videos.push(reel);
+    }
+    return videos;
   }
 
   function getBoostVideo() {
@@ -1011,6 +1044,10 @@
       const fallback = document.querySelector('#movie_player video');
       return fallback && !fallback.closest(PREVIEW_VIDEO_SELECTOR) ? fallback : null;
     }
+    // On Shorts the active reel is the only element that can be producing the
+    // audio the user hears, so it wins over any other candidate.
+    const reel = document.querySelector('ytd-reel-video-renderer[is-active] video');
+    if (reel && all.includes(reel) && reel.getClientRects().length) return reel;
     const visible = all.filter((v) => v.getClientRects().length);
     return visible.find((v) => !v.paused) || visible[0] || all.find((v) => !v.paused) || all[0];
   }
@@ -1397,9 +1434,180 @@
   const AUDIO_SLIDERS = [
     { id: 'boost', min: AUDIO_BOOST_MIN, max: AUDIO_BOOST_MAX, get: audioBoostLevel, show: (v) => `${v}%` },
     { id: 'bass', min: AUDIO_BASS_MIN, max: AUDIO_BASS_MAX, get: audioBassValue, show: (v) => `${v}%` },
-    { id: 'rate', min: AUDIO_RATE_MIN, max: AUDIO_RATE_MAX, get: audioRateValue, show: formatAudioRate },
+    { id: 'rate', min: AUDIO_RATE_MIN, max: AUDIO_RATE_MAX, get: audioRateValue, show: formatAudioRateState },
     { id: 'reverb', min: AUDIO_REVERB_MIN, max: AUDIO_REVERB_MAX, get: audioReverbValue, show: (v) => `${v}%` }
   ];
+
+  // Volume and bass are tone preferences and persist; rate and reverb are
+  // per-video edits that never leave this tab.
+  const AUDIO_CONTROL_BINDINGS = [
+    { id: 'boost', key: 'audioBoost', min: AUDIO_BOOST_MIN, max: AUDIO_BOOST_MAX, sanitize: sanitizeAudioBoost, format: (v) => `${v}%`, persist: true },
+    { id: 'bass', key: 'audioBass', min: AUDIO_BASS_MIN, max: AUDIO_BASS_MAX, sanitize: sanitizeAudioBass, format: (v) => `${v}%`, persist: true },
+    { id: 'rate', key: 'audioRate', min: AUDIO_RATE_MIN, max: AUDIO_RATE_MAX, sanitize: sanitizeAudioRate, format: formatAudioRateState, persist: false },
+    { id: 'reverb', key: 'audioReverb', min: AUDIO_REVERB_MIN, max: AUDIO_REVERB_MAX, sanitize: sanitizeAudioReverb, format: (v) => `${v}%`, persist: false }
+  ];
+
+  // The panel is used in the watch toolbar and as a Shorts dropdown, so the
+  // markup lives here and every host binds the same handlers afterwards.
+  function buildAudioPanelMarkup() {
+    return `
+      <div class="yt-aid-audio-panel" id="yt-aid-audio-panel">
+        <div class="yt-aid-audio-head">
+          <span class="yt-aid-audio-title">${T('Âm thanh')}</span>
+          <span class="yt-aid-audio-flag" id="yt-aid-audio-flag">${T('Đang bật')}</span>
+          <button type="button" class="yt-aid-audio-reset" id="yt-aid-audio-reset" title="${T('Đặt lại âm thanh về mặc định')}" aria-label="${T('Đặt lại âm thanh về mặc định')}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.15.68 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          </button>
+        </div>
+
+        <div class="yt-aid-audio-grid">
+          <label class="yt-aid-fx-field" title="${T('Tăng âm lượng video')}">
+            <span class="yt-aid-fx-name">${T('Âm lượng')}</span>
+            <input type="range" id="yt-aid-audio-boost" min="${AUDIO_BOOST_MIN}" max="${AUDIO_BOOST_MAX}" step="${AUDIO_BOOST_STEP}" value="${audioBoostLevel()}" style="--p:${rangeFillPercent(audioBoostLevel(), AUDIO_BOOST_MIN, AUDIO_BOOST_MAX)}%" aria-label="${T('Tăng âm lượng video')}">
+            <output class="yt-aid-fx-value" id="yt-aid-audio-boost-value">${audioBoostLevel()}%</output>
+          </label>
+
+          <label class="yt-aid-fx-field" title="${T('Tăng âm trầm (bass boosted)')}">
+            <span class="yt-aid-fx-name">${T('Bass')}</span>
+            <input type="range" id="yt-aid-audio-bass" min="${AUDIO_BASS_MIN}" max="${AUDIO_BASS_MAX}" step="${AUDIO_BASS_STEP}" value="${audioBassValue()}" style="--p:${rangeFillPercent(audioBassValue(), AUDIO_BASS_MIN, AUDIO_BASS_MAX)}%" aria-label="${T('Tăng âm trầm (bass boosted)')}">
+            <output class="yt-aid-fx-value" id="yt-aid-audio-bass-value">${audioBassValue()}%</output>
+          </label>
+
+          <label class="yt-aid-fx-field" title="${T('Tốc độ phát (slowed / sped up)')}">
+            <span class="yt-aid-fx-name">${T('Tốc độ')}</span>
+            <input type="range" id="yt-aid-audio-rate" min="${AUDIO_RATE_MIN}" max="${AUDIO_RATE_MAX}" step="${AUDIO_RATE_STEP}" value="${audioRateValue()}" style="--p:${rangeFillPercent(audioRateValue(), AUDIO_RATE_MIN, AUDIO_RATE_MAX)}%" aria-label="${T('Tốc độ phát (slowed / sped up)')}">
+            <output class="yt-aid-fx-value" id="yt-aid-audio-rate-value">${formatAudioRateState(audioRateValue())}</output>
+          </label>
+
+          <label class="yt-aid-fx-field" title="${T('Mức độ vang')}">
+            <span class="yt-aid-fx-name">${T('Độ vang')}</span>
+            <input type="range" id="yt-aid-audio-reverb" min="${AUDIO_REVERB_MIN}" max="${AUDIO_REVERB_MAX}" step="${AUDIO_REVERB_STEP}" value="${audioReverbValue()}" style="--p:${rangeFillPercent(audioReverbValue(), AUDIO_REVERB_MIN, AUDIO_REVERB_MAX)}%" aria-label="${T('Mức độ vang')}">
+            <output class="yt-aid-fx-value" id="yt-aid-audio-reverb-value">${audioReverbValue()}%</output>
+          </label>
+        </div>
+
+        <div class="yt-aid-audio-presets" role="group" aria-label="${T('Preset âm thanh')}">
+          <button type="button" class="yt-aid-preset-chip" data-preset="slowed">slowed + reverb</button>
+          <button type="button" class="yt-aid-preset-chip" data-preset="sped">sped up + reverb</button>
+          <button type="button" class="yt-aid-preset-chip" data-preset="nightcore">nightcore</button>
+          <button type="button" class="yt-aid-preset-chip" data-preset="bass">bass boosted</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Wires sliders, reset and preset chips for any host that renders the audio
+  // panel markup (watch toolbar or Shorts dropdown).
+  function bindAudioControls(scope) {
+    AUDIO_CONTROL_BINDINGS.forEach(({ id, key, min, max, sanitize, format, persist }) => {
+      const range = scope.querySelector(`#yt-aid-audio-${id}`);
+      const valueEl = scope.querySelector(`#yt-aid-audio-${id}-value`);
+      if (!range) return;
+
+      const paint = (value) => {
+        if (valueEl) valueEl.textContent = format(value);
+        setRangeFill(range, value, min, max);
+      };
+
+      range.addEventListener('input', (event) => {
+        const value = sanitize(event.target.value);
+        settings[key] = value;
+        paint(value);
+
+        if (id === 'rate') {
+          applyAudioRate();
+          // Keeps the watchdog running so a later player hand-off cannot
+          // silently drop the edit the user just made.
+          syncAudioEngine();
+        } else if (value > min && !applyAudioGraphNow()) {
+          // This player cannot be routed through Web Audio: put the slider back
+          // so it never claims an effect the video is not actually playing.
+          settings[key] = min;
+          range.value = String(min);
+          paint(min);
+        } else {
+          syncAudioEngine();
+        }
+      });
+
+      if (persist) {
+        range.addEventListener('change', () => safeSetStorage({ [key]: settings[key] }));
+      }
+    });
+
+    // Reset every slider: tone settings go back to their stored defaults, the
+    // per-video edits simply return to natural playback.
+    const resetBtn = scope.querySelector('#yt-aid-audio-reset');
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+      settings.audioBoost = AUDIO_BOOST_MIN;
+      settings.audioBass = AUDIO_BASS_MIN;
+      settings.audioRate = 1;
+      settings.audioReverb = AUDIO_REVERB_MIN;
+      audioRateApplied = 1;
+      safeSetStorage({ audioBoost: AUDIO_BOOST_MIN, audioBass: AUDIO_BASS_MIN });
+      applyAudioRate();
+      syncAudioEngine();
+      syncAudioUi();
+      // The player can bounce its remembered speed back onto the element just
+      // after a reset; re-assert the defaults once to win that race.
+      setTimeout(() => { applyAudioRate(); syncAudioUi(); }, 400);
+    });
+
+    // Audio presets: one tap applies the genre's typical levels; tapping the
+    // active preset again returns every slider to its default.
+    scope.querySelectorAll('.yt-aid-preset-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const preset = AUDIO_PRESETS.find((p) => p.id === chip.dataset.preset);
+        if (!preset) return;
+        const active = activeAudioPreset();
+        const turningOff = !!active && active.id === preset.id;
+
+        settings.audioRate = turningOff ? 1 : preset.rate;
+        settings.audioReverb = turningOff ? AUDIO_REVERB_MIN : preset.reverb;
+        settings.audioBoost = turningOff ? AUDIO_BOOST_MIN : preset.boost;
+        settings.audioBass = turningOff ? AUDIO_BASS_MIN : preset.bass;
+        if (turningOff) audioRateApplied = 1;
+
+        // Route the graph right from this gesture, like the sliders do; if this
+        // player cannot be routed, drop the graph-only levels so the panel
+        // never claims an effect the video is not actually playing.
+        const needsGraph = settings.audioBoost > AUDIO_BOOST_MIN ||
+          settings.audioBass > AUDIO_BASS_MIN ||
+          settings.audioReverb > AUDIO_REVERB_MIN;
+        if (needsGraph && !applyAudioGraphNow()) {
+          settings.audioBoost = AUDIO_BOOST_MIN;
+          settings.audioBass = AUDIO_BASS_MIN;
+          settings.audioReverb = AUDIO_REVERB_MIN;
+        }
+        safeSetStorage({ audioBoost: settings.audioBoost, audioBass: settings.audioBass });
+        syncAudioEngine();
+        syncAudioUi();
+        showToast(turningOff
+          ? T('Đã tắt preset: {0}', [preset.name])
+          : T('Đã áp preset: {0}', [preset.name]), 'info');
+      });
+    });
+  }
+
+  // Presets mirror the levels the slowed+reverb, sped up+reverb, nightcore and
+  // bass-boosted uploads that listeners reach for most average out to, packed
+  // into one tap each. Every value lands on a slider notch so the UI stays exact.
+  const AUDIO_PRESETS = [
+    { id: 'slowed', name: 'slowed + reverb', rate: 0.8, reverb: 35, boost: AUDIO_BOOST_MIN, bass: AUDIO_BASS_MIN },
+    { id: 'sped', name: 'sped up + reverb', rate: 1.25, reverb: 25, boost: AUDIO_BOOST_MIN, bass: AUDIO_BASS_MIN },
+    { id: 'nightcore', name: 'nightcore', rate: 1.3, reverb: AUDIO_REVERB_MIN, boost: AUDIO_BOOST_MIN, bass: AUDIO_BASS_MIN },
+    { id: 'bass', name: 'bass boosted', rate: 1, reverb: AUDIO_REVERB_MIN, boost: 110, bass: 80 }
+  ];
+
+  function activeAudioPreset() {
+    const rate = audioRateValue();
+    const reverb = audioReverbValue();
+    const boost = audioBoostLevel();
+    const bass = audioBassValue();
+    return AUDIO_PRESETS.find((p) => (
+      p.rate === rate && p.reverb === reverb && p.boost === boost && p.bass === bass
+    )) || null;
+  }
 
   function syncAudioUi() {
     AUDIO_SLIDERS.forEach(({ id, min, max, get, show }) => {
@@ -1415,6 +1623,15 @@
 
     const panel = document.getElementById('yt-aid-audio-panel');
     if (panel) panel.classList.toggle('is-active', audioEffectsActive());
+
+    const active = activeAudioPreset();
+    document.querySelectorAll('.yt-aid-preset-chip').forEach((chip) => {
+      const preset = AUDIO_PRESETS.find((p) => p.id === chip.dataset.preset);
+      const isActive = !!active && active.id === chip.dataset.preset;
+      chip.classList.toggle('is-active', isActive);
+      chip.setAttribute('aria-pressed', String(isActive));
+      if (preset) chip.title = isActive ? T('Tắt preset, về mặc định') : T('Áp preset {0}', [preset.name]);
+    });
   }
 
   function initAudioEngine() {
@@ -3076,7 +3293,7 @@
       <button type="button" class="yt-aid-media-menu-item" data-format="1080" data-label="MP4 1080p">
         <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
         <span class="yt-aid-media-menu-label">${T('Video MP4 (1080p Full HD)')}</span>
-        <span class="yt-aid-media-menu-tag">FHD</span>
+        <span class="yt-aid-media-menu-tag recommended">FHD</span>
       </button>
 
       <button type="button" class="yt-aid-media-menu-item" data-format="720" data-label="MP4 720p">
@@ -3109,7 +3326,7 @@
 
       <button type="button" class="yt-aid-media-menu-item" data-action="thumbnail" data-label="Thumbnail">
         ${THUMBNAIL_ICON_SVG}
-        <span class="yt-aid-media-menu-label">${T('Tải ảnh bìa thumbnail (có cắt ảnh)')}</span>
+        <span class="yt-aid-media-menu-label">${T('Tải ảnh bìa thumbnail')}</span>
         <span class="yt-aid-media-menu-tag">IMG</span>
       </button>
     `;
@@ -3317,7 +3534,7 @@
       }, delay);
     };
 
-    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger, #yt-aid-home-bookmark-btn, #yt-aid-random-home';
+    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger, #yt-aid-home-bookmark-btn, #yt-aid-random-home, .yt-aid-shorts-action';
     // Native hosts carry our layout classes but still need reinjection after rerenders.
     const AID_UI_SCOPE = '[class*="yt-aid-"]:not(.yt-aid-home-card-host):not(.yt-aid-channel-actions-host):not(body):not(html), [id^="yt-aid-"]';
     // None of the injection targets live in these subtrees. They are also the
@@ -3412,6 +3629,8 @@
     if (path.startsWith('/watch')) {
       injectWatchPageToolbar();
       if (hasCardTools) injectSidebarButtons(cardRoots);
+    } else if (path.startsWith('/shorts/')) {
+      injectShortsActions();
     } else if (path === '/' || path.startsWith('/results') || path.startsWith('/feed')) {
       if (hasCardTools) injectHomePageCards(cardRoots);
     } else if (isChannelPage()) {
@@ -3503,54 +3722,7 @@
       </div>
 
       <div class="yt-aid-toolbar-row">
-      <div class="yt-aid-audio-panel" id="yt-aid-audio-panel">
-        <div class="yt-aid-audio-head">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v12.27a3.5 3.5 0 1 1-2-3.16V6.5H9a1 1 0 1 1 0-2h3z"/></svg>
-          <span class="yt-aid-audio-title">${T('Âm thanh')}</span>
-          <span class="yt-aid-audio-flag" id="yt-aid-audio-flag">${T('Đang bật')}</span>
-          <button type="button" class="yt-aid-audio-reset" id="yt-aid-audio-reset" title="${T('Đặt lại âm thanh về mặc định')}" aria-label="${T('Đặt lại âm thanh về mặc định')}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.15.68 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-          </button>
-        </div>
-
-        <div class="yt-aid-audio-grid">
-          <label class="yt-aid-fx-field" title="${T('Tăng âm lượng video')}">
-            <span class="yt-aid-fx-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c4.01.91 7 4.49 7 8.77s-2.99 7.86-7 8.77v-2.06c2.89-.86 5-3.54 5-6.71s-2.11-5.85-5-6.71z"/></svg>
-            </span>
-            <span class="yt-aid-fx-name">${T('Âm lượng')}</span>
-            <input type="range" id="yt-aid-audio-boost" min="${AUDIO_BOOST_MIN}" max="${AUDIO_BOOST_MAX}" step="${AUDIO_BOOST_STEP}" value="${audioBoostLevel()}" style="--p:${rangeFillPercent(audioBoostLevel(), AUDIO_BOOST_MIN, AUDIO_BOOST_MAX)}%" aria-label="${T('Tăng âm lượng video')}">
-            <output class="yt-aid-fx-value" id="yt-aid-audio-boost-value">${audioBoostLevel()}%</output>
-          </label>
-
-          <label class="yt-aid-fx-field" title="${T('Tăng âm trầm (bass boosted)')}">
-            <span class="yt-aid-fx-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M2 12c2.2-6.5 4.3-6.5 6.5 0s4.3 6.5 6.5 0 4.3-6.5 6.5 0"/></svg>
-            </span>
-            <span class="yt-aid-fx-name">${T('Bass')}</span>
-            <input type="range" id="yt-aid-audio-bass" min="${AUDIO_BASS_MIN}" max="${AUDIO_BASS_MAX}" step="${AUDIO_BASS_STEP}" value="${audioBassValue()}" style="--p:${rangeFillPercent(audioBassValue(), AUDIO_BASS_MIN, AUDIO_BASS_MAX)}%" aria-label="${T('Tăng âm trầm (bass boosted)')}">
-            <output class="yt-aid-fx-value" id="yt-aid-audio-bass-value">${audioBassValue()}%</output>
-          </label>
-
-          <label class="yt-aid-fx-field" title="${T('Tốc độ phát (slowed / sped up)')}">
-            <span class="yt-aid-fx-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 4a10 10 0 0 0-9.95 11h2.02A8 8 0 1 1 21.93 15h2.02A10 10 0 0 0 12 4z"/><path fill="currentColor" d="m16.24 6.34-4.95 4.95a2 2 0 1 0 1.42 1.42l4.95-4.95z"/></svg>
-            </span>
-            <span class="yt-aid-fx-name">${T('Tốc độ')}</span>
-            <input type="range" id="yt-aid-audio-rate" min="${AUDIO_RATE_MIN}" max="${AUDIO_RATE_MAX}" step="${AUDIO_RATE_STEP}" value="${audioRateValue()}" style="--p:${rangeFillPercent(audioRateValue(), AUDIO_RATE_MIN, AUDIO_RATE_MAX)}%" aria-label="${T('Tốc độ phát (slowed / sped up)')}">
-            <output class="yt-aid-fx-value" id="yt-aid-audio-rate-value">${formatAudioRate(audioRateValue())}</output>
-          </label>
-
-          <label class="yt-aid-fx-field" title="${T('Mức reverb')}">
-            <span class="yt-aid-fx-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 9.5v5"/><path d="M9 7v10"/><path d="M13 4.8c2.6 2.2 2.6 12.2 0 14.4"/><path d="M17 2.6c3.8 3.4 3.8 15.4 0 18.8"/></svg>
-            </span>
-            <span class="yt-aid-fx-name">${T('Reverb')}</span>
-            <input type="range" id="yt-aid-audio-reverb" min="${AUDIO_REVERB_MIN}" max="${AUDIO_REVERB_MAX}" step="${AUDIO_REVERB_STEP}" value="${audioReverbValue()}" style="--p:${rangeFillPercent(audioReverbValue(), AUDIO_REVERB_MIN, AUDIO_REVERB_MAX)}%" aria-label="${T('Mức reverb')}">
-            <output class="yt-aid-fx-value" id="yt-aid-audio-reverb-value">${audioReverbValue()}%</output>
-          </label>
-        </div>
-      </div>
+      ${buildAudioPanelMarkup()}
 
       <div class="yt-aid-toolbar-preferences">
         <!-- Auto Loop Toggle Button -->
@@ -3652,67 +3824,8 @@
       });
     }
 
-    // Inline audio controls. Volume and bass are tone preferences and persist;
-    // rate and reverb are per-video edits that never leave this tab.
-    const AUDIO_CONTROL_BINDINGS = [
-      { id: 'boost', key: 'audioBoost', min: AUDIO_BOOST_MIN, max: AUDIO_BOOST_MAX, sanitize: sanitizeAudioBoost, format: (v) => `${v}%`, persist: true },
-      { id: 'bass', key: 'audioBass', min: AUDIO_BASS_MIN, max: AUDIO_BASS_MAX, sanitize: sanitizeAudioBass, format: (v) => `${v}%`, persist: true },
-      { id: 'rate', key: 'audioRate', min: AUDIO_RATE_MIN, max: AUDIO_RATE_MAX, sanitize: sanitizeAudioRate, format: formatAudioRate, persist: false },
-      { id: 'reverb', key: 'audioReverb', min: AUDIO_REVERB_MIN, max: AUDIO_REVERB_MAX, sanitize: sanitizeAudioReverb, format: (v) => `${v}%`, persist: false }
-    ];
-
-    AUDIO_CONTROL_BINDINGS.forEach(({ id, key, min, max, sanitize, format, persist }) => {
-      const range = toolbar.querySelector(`#yt-aid-audio-${id}`);
-      const valueEl = toolbar.querySelector(`#yt-aid-audio-${id}-value`);
-      if (!range) return;
-
-      const paint = (value) => {
-        if (valueEl) valueEl.textContent = format(value);
-        setRangeFill(range, value, min, max);
-      };
-
-      range.addEventListener('input', (event) => {
-        const value = sanitize(event.target.value);
-        settings[key] = value;
-        paint(value);
-
-        if (id === 'rate') {
-          applyAudioRate();
-          // Keeps the watchdog running so a later player hand-off cannot
-          // silently drop the edit the user just made.
-          syncAudioEngine();
-        } else if (value > min && !applyAudioGraphNow()) {
-          // This player cannot be routed through Web Audio: put the slider back
-          // so it never claims an effect the video is not actually playing.
-          settings[key] = min;
-          range.value = String(min);
-          paint(min);
-        } else {
-          syncAudioEngine();
-        }
-      });
-
-      if (persist) {
-        range.addEventListener('change', () => safeSetStorage({ [key]: settings[key] }));
-      }
-    });
-
-    // Reset every slider: tone settings go back to their stored defaults, the
-    // per-video edits simply return to natural playback.
-    toolbar.querySelector('#yt-aid-audio-reset').addEventListener('click', () => {
-      settings.audioBoost = AUDIO_BOOST_MIN;
-      settings.audioBass = AUDIO_BASS_MIN;
-      settings.audioRate = 1;
-      settings.audioReverb = AUDIO_REVERB_MIN;
-      audioRateApplied = 1;
-      safeSetStorage({ audioBoost: AUDIO_BOOST_MIN, audioBass: AUDIO_BASS_MIN });
-      applyAudioRate();
-      syncAudioEngine();
-      syncAudioUi();
-      // The player can bounce its remembered speed back onto the element just
-      // after a reset; re-assert the defaults once to win that race.
-      setTimeout(() => { applyAudioRate(); syncAudioUi(); }, 400);
-    });
+    // Inline audio controls (sliders, reset, presets) — shared with Shorts.
+    bindAudioControls(toolbar);
 
     // Toggle Auto Loop
     const loopBtn = toolbar.querySelector('#yt-aid-btn-toggle-loop');
@@ -3742,6 +3855,128 @@
       updateSetting('hideButtonNames', !settings.hideButtonNames);
       syncButtonNamesUi();
     });
+  }
+
+  // ----------------------------------------------------
+  // A3. SHORTS PAGE INJECTION (extra volume + downloads)
+  // ----------------------------------------------------
+  function currentShortsId() {
+    const match = window.location.pathname.match(/^\/shorts\/([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : '';
+  }
+
+  function getShortsTitle() {
+    const reel = document.querySelector('ytd-reel-video-renderer[is-active]');
+    if (!reel) return '';
+    const selectors = [
+      'ytd-shorts-video-title yt-formatted-string',
+      'ytd-shorts-video-title #title',
+      'ytd-shorts-video-title h2',
+      'ytd-reel-multi-format-link h2',
+      'ytd-reel-player-header-renderer h2',
+      '#shorts-title yt-formatted-string'
+    ];
+    for (const selector of selectors) {
+      const el = reel.querySelector(selector);
+      const text = el && el.textContent ? el.textContent.trim() : '';
+      if (text) return text;
+    }
+    return '';
+  }
+
+  const SHORTS_ACTION_SVG = {
+    audio: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>',
+    download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>'
+  };
+
+  // The audio panel opens as a dropdown over the Shorts player; the same
+  // markup and bindings as the watch toolbar, just in a narrower popover.
+  function buildShortsAudioMenu() {
+    const menu = document.createElement('div');
+    menu.id = 'yt-aid-shorts-audio-menu';
+    menu.className = 'yt-aid-tools-menu yt-aid-shorts-audio-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = `
+      <div class="yt-aid-tools-title">${T('Âm thanh')} · ${T('Tăng âm lượng video')}</div>
+      ${buildAudioPanelMarkup()}
+    `;
+    bindAudioControls(menu);
+    localizeTree(menu);
+    return menu;
+  }
+
+  // YouTube occasionally relocates the engagement rail (e.g. the
+  // "extract-action-bar" experiment), so search the known spots and fall back
+  // to any visible rail instead of assuming one fixed position.
+  function findShortsActionRail() {
+    const reel = document.querySelector('ytd-reel-video-renderer[is-active]');
+    const candidates = [];
+    if (reel) candidates.push(reel.querySelector('#actions'));
+    document.querySelectorAll('ytd-reel-player-overlay-renderer #actions').forEach((a) => candidates.push(a));
+    document.querySelectorAll('#actions').forEach((a) => {
+      if (!candidates.includes(a)) candidates.push(a);
+    });
+    return candidates.find((a) => {
+      if (!a || !a.isConnected) return false;
+      const r = a.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    }) || null;
+  }
+
+  function injectShortsActions() {
+    if (!window.location.pathname.startsWith('/shorts/')) return;
+    const actions = findShortsActionRail();
+    if (!actions) return;
+
+    let hasCurrent = false;
+    actions.querySelectorAll('.yt-aid-shorts-action').forEach((el) => {
+      if (el.dataset.ytAidVersion === EXT_VERSION) hasCurrent = true;
+      else el.remove();
+    });
+    if (hasCurrent) return;
+
+    // Extra volume: the audio engine already follows the active reel's video,
+    // this button only exposes the panel.
+    const audioBtn = document.createElement('button');
+    audioBtn.type = 'button';
+    audioBtn.className = 'yt-aid-shorts-action';
+    audioBtn.id = 'yt-aid-shorts-audio';
+    audioBtn.dataset.ytAidVersion = EXT_VERSION;
+    audioBtn.title = T('Âm thanh');
+    audioBtn.setAttribute('aria-label', T('Âm thanh'));
+    audioBtn.setAttribute('aria-haspopup', 'true');
+    audioBtn.setAttribute('aria-expanded', 'false');
+    audioBtn.innerHTML = SHORTS_ACTION_SVG.audio;
+    audioBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleDropdown(audioBtn, buildShortsAudioMenu);
+    });
+
+    actions.insertBefore(audioBtn, actions.firstChild);
+
+    // Downloads: the same quality menu as the watch page, pointed at this Short.
+    if (settings.enableMediaDownload || settings.enableThumbnailDownload) {
+      const downloadBtn = document.createElement('button');
+      downloadBtn.type = 'button';
+      downloadBtn.className = 'yt-aid-shorts-action';
+      downloadBtn.id = 'yt-aid-shorts-download';
+      downloadBtn.dataset.ytAidVersion = EXT_VERSION;
+      downloadBtn.title = T('Tải xuống');
+      downloadBtn.setAttribute('aria-label', T('Tải xuống'));
+      downloadBtn.setAttribute('aria-haspopup', 'true');
+      downloadBtn.setAttribute('aria-expanded', 'false');
+      downloadBtn.innerHTML = SHORTS_ACTION_SVG.download;
+      downloadBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const shortsId = currentShortsId();
+        const url = shortsId ? `https://www.youtube.com/watch?v=${shortsId}` : window.location.href;
+        toggleDropdown(downloadBtn, () => buildMediaQualityMenu({
+          url,
+          title: getShortsTitle() || getWatchVideoTitle() || 'YouTube Shorts'
+        }));
+      });
+      actions.insertBefore(downloadBtn, actions.firstChild);
+    }
   }
 
   // ==========================================

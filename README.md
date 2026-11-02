@@ -1,8 +1,10 @@
-# YouTube Aid - Chrome Extension (Manifest V3)
+# Youtube Aid Elite Version - Chrome Extension (Manifest V3)
 
 Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nhập liền mạch vào giao diện gốc của YouTube với bộ công cụ trợ lý hữu ích: tải Video MP4 & Âm thanh MP3 tốc độ cao, quản lý hàng đợi tải ngầm (Download Queue), sao chép tiêu đề thông minh, tự động sao chép khi bôi đen text, dán nhanh vào ô tìm kiếm (thay thế hoặc nối thêm nội dung cũ), clean link không query tracking, tải ảnh bìa thumbnail/avatar/banner có cắt ảnh tuỳ ý, hệ thống phím tắt điều hướng tức thì (SPA) có thể tùy chỉnh số lần bấm, tự động lặp lại video (Auto Loop, không lặp quảng cáo), tự động bỏ qua quảng cáo kèm hiệu ứng xoay buffer, ẩn banner quảng cáo cột phải, và tự động lướt Shorts. Phím tắt cũng hoạt động trên **music.youtube.com**. Toàn bộ giao diện có thể chuyển đổi giữa **Tiếng Việt** và **English**.
 
-**Phiên bản hiện tại:** 1.18.0
+> **Bản Elite dành riêng cho người mua độc lập** — tính năng vượt trội, mạnh mẽ và tiện lợi hơn Youtube Aid Premium.
+
+**Phiên bản hiện tại:** 1.19.0
 
 ---
 
@@ -122,19 +124,40 @@ Bốn thanh trượt nằm chung trong một panel có nhãn **ÂM THANH** (lư�
 - **Hiệu ứng che quảng cáo:** Màn hình đen với vòng xoay đệm (spinner) ở tâm như lúc đang tải mạng, không gây chói mắt.
 - **Ẩn triệt để banner quảng cáo:** Xóa hoàn toàn banner "Được tài trợ" ở cột đề xuất bên phải (`#secondary`), trang chủ và masthead.
 
-### 13. Tự Động Lướt Shorts
+### 13. Tự Lướt Shorts
 - Tự động chuyển tiếp sang video Shorts tiếp theo khi xem xong video hiện tại, rảnh tay thưởng thức video ngắn.
 
 ### 14. Bố Cục Thanh Bar & Tùy Biến Giao Diện
 - **Bố cục hai hàng:** hàng trên là thao tác trên video (sao chép tiêu đề, tìm kiếm nhanh, link sạch, bookmark, tải xuống); hàng dưới đặt **bảng âm thanh** bên trái và cụm tiện ích (video ngẫu nhiên, tự động lặp, công cụ, ẩn/hiện tên) bên phải. Khi cửa sổ hẹp, các nhóm tự xuống hàng thay vì tràn hay phải cuộn ngang.
-- **Ẩn/Hiện Tên Nút:** Nhấn nút **Ẩn tên nút (Hide Button Name)** để thu gọn thanh bar về icon tối giản; thanh bar giữ nguyên lưới hai hàng nên nút này luôn nằm đúng một vị trí dù đang bật hay tắt, nút đổi lại tên nút được tô xanh để dễ tìm.
+- **Ẩn/Hiện Tên Nút:** Nhấn nút **Ẩn tên nút (Hide Button Name)** để thu gọn thanh bar về icon tối giản; thanh bar giữ nguyên lưới hai hàng nên nút này luôn nằm đúng một vị trí dù đang bật hay tắt, nút đổi lại tên nút được tô xanh để dễ tìm. **Bảng âm thanh giữ nguyên kích thước tuyệt đối** khi bật/tắt ẩn tên — không to lên, không nhỏ lại.
 - **Cỡ giao diện 90–130%:** mục **Giao diện → Cỡ giao diện** trên dashboard có 5 nấc (90 / 100 / 110 / 120 / 130%), mỗi nấc thêm 10%, áp dụng cho **toàn bộ** thành phần tiện ích tiêm vào trang: thanh công cụ trang xem, hàng nút trên card sidebar, popover Trang chủ, menu chất lượng, toast, trang Bookmark, drawer hàng đợi và mọi hộp thoại. Cỡ 100% là mặc định; đổi nấc là mọi panel đang mở được đặt lại vị trí ngay, không tràn ngang trang và không cắt chữ.
-- **Chống tắt nhầm tab:** thẻ **Chống tắt nhầm tab** (mặc định tắt) trên dashboard đăng ký một `beforeunload` duy nhất — khi bật, trình duyệt hỏi lại trước lúc vô tình đóng tab hoặc tải trang; tiện ích tự nhận biết cú bấm vào link và **không hỏi** khi chủ đích sang trang khác (của sổ 3 giây).
-- **Đa Ngôn Ngữ:** Chuyển đổi linh hoạt giữa Tiếng Việt và English cho 100% thành phần giao diện.
+- **Chống tắt nhầm tab:** thẻ **Chống tắt nhầm tab** (mặc định tắt) trên dashboard đăng ký một `beforeunload` duy nhất — khi bật, trình duyệt **chỉ hỏi lại khi bấm nút X đóng tab** (hoặc Ctrl+W); tải lại trang (F5 / Ctrl+R), bấm link hay gõ địa chỉ mới (Ctrl+L) đều **không** hỏi.
+- **Đa Ngôn Ngữ:** Chuyển đổi linh hoạt giữa Tiếng Việt, English, 中文 (Tiếng Trung) và Deutsch (Tiếng Đức) cho 100% thành phần giao diện.
 
 ---
 
 ## Thay Đổi Gần Đây
+
+### v1.19.0
+- **Âm thanh & tải xuống ngay trên Shorts:** trang Shorts giờ có hai nút tròn ở đầu hàng tương tác — nút **Âm thanh** mở trọn bảng âm thanh (âm lượng, bass, tốc độ, độ vang + preset) dạng popover ngay trên player và nút **Tải xuống** mở đúng menu chất lượng (MP4 1080p/720p/480p/360p, MP3, thumbnail) cho Short đang xem. Mạch âm thanh tự theo dõi video của reel đang hoạt động; khi lướt sang Short khác, tốc độ/độ vang tự về mặc định như trang xem thường.
+- **4 Preset âm thanh một chạm:** bảng âm thanh có hàng chip **slowed + reverb** (x0.8 + độ vang 35%), **sped up + reverb** (x1.25 + 25%), **nightcore** (x1.3, pitch cao hơn) và **bass boosted** (âm lượng 110% + bass 80%) — mức lấy theo gu nghe đa số từ các bản slowed/sped/nightcore/bass boosted trên YouTube. Bấm chip đang bật lần nữa để tắt, về mặc định.
+- **Thêm tiếng Trung (中文) và tiếng Đức (Deutsch):** bộ từ điển `i18n.js` nâng từ 2 lên 4 ngôn ngữ (Việt, Anh, Trung giản thể, Đức) cho toàn bộ giao diện tiện ích và dashboard; chuyển ngôn ngữ ngay trên header dashboard.
+- **Chống tắt nhầm tab chỉ hỏi khi bấm X:** bỏ hẳn logic hỏi lại khi tải trang — `beforeunload` giờ chỉ kích hoạt khi bấm nút X đóng tab (hoặc Ctrl+W); F5/Ctrl+R, bấm link và gõ địa chỉ mới (Ctrl+L) đều đóng/đi ngay không hỏi. Mô tả thẻ trên dashboard đã sửa cho khớp.
+- **Đổi tên tính năng:** "Lướt Shorts" thành **"Tự lướt Shorts"** trên dashboard.
+- **Menu chất lượng gọn gàng:** badge **FHD** (1080p) chuyển sang màu xanh biển giống badge **HD** (720p); nút tải ảnh bìa bỏ cụm "(có cắt ảnh)" chỉ còn **Tải ảnh bìa thumbnail**.
+- **Bảng âm thanh sạch ở mọi nấc cỡ giao diện:** hàng preset và nội dung panel được kiểm tra ở cả 5 nấc 90–130% — không tràn, không cắt chữ, bảng giữ nguyên kích thước khi ẩn/hiện tên nút.
+
+### v1.18.2
+- **Tái thiết kế bảng âm thanh hòa với theme YouTube:** bỏ toàn bộ icon trang trí (icon đầu dòng của từng thanh trượt và icon header); mỗi dòng giờ gọn gàng theo cấu trúc **nhãn — thanh trượt — giá trị**, nhãn canh thẳng cột cố định nên 4 dòng nhìn đều tăm tắp. Màu sắc chuyển sang **trung tính** ăn theo nền YouTube: thanh trượt tô màu trắng/xám dịu (theo theme tối/sáng), thumb tròn trơn một màu, giá trị dùng màu chữ chính — bỏ hẳn bộ 4 màu sặc sỡ đỏ/tím/xanh/ngọc; chỉ giữ sắc xanh nhạt khi có hiệu ứng đang chạy và vòng focus chuẩn.
+- **Bảng âm thanh kích thước cố định:** panel rộng tối đa 440px và luôn chừa chỗ cho cụm tiện ích cùng hàng (tự thu hẹp tối thiểu 240px khi cửa sổ hẹp) — bấm **Ẩn/Hiện tên nút** không làm bảng to lên hay nhỏ lại, không gian thừa do cụm tiện ích thu lại.
+- **Nhãn Độ vang:** slider reverb đổi tên tiếng Việt thành **Độ vang** (bản tiếng Anh vẫn là Reverb), tooltip thành "Mức độ vang".
+- **Giá trị tốc độ theo trạng thái:** thay vì hiển thị con số kiểu x1.00, nhãn tốc độ hiển thị **Mặc định** khi đang x1, **Tăng tốc** khi trên x1 và **Làm chậm** khi dưới x1 (bản tiếng Anh: Default / Speed up / Slow down).
+
+### v1.18.1
+- **Đổi tên tiện ích:** `manifest.json` dùng tên **Youtube Aid Elite Version** — tên này xuất hiện ở menu extension, trang `chrome://extensions` và tooltip nút trên toolbar (`default_title`).
+- **Mô tả ngắn:** dòng mô tả của tiện ích là *"Bản Elite dành riêng cho người mua độc lập — tính năng vượt trội, mạnh mẽ và tiện lợi hơn Youtube Aid Premium."* (110 ký tự, đúng giới hạn 132 của Chrome Web Store).
+- **Dashboard:** header đổi thành **Youtube Aid Elite Version** kèm dòng định vị ngay dưới tên (trước đây là "Bảng điều khiển & Phím tắt nhanh"), có bản tiếng Anh *"The Elite build, sold standalone — far more powerful and convenient than the regular Youtube Aid Premium."*; tiêu đề tab cũng theo tên mới.
+- **Bộ icon Elite mới:** `generate_icons.js` vẽ lại logo theo hướng "elite" — nền obsidian bo góc có ánh sáng từ góc trên-trái, viền vàng kim gradient, khối play đỏ chuyển sắc viền vàng mảnh, tam giác màu ngà và cặp sao 4 cánh vàng ở góc dưới-phải; xuất lại `icons/icon16.png`, `icon48.png`, `icon128.png` và `icons/youtube_aid.png` (256×256 dùng cho header dashboard). Ở cỡ 16px script tự bỏ các chi tiết mảnh (viền vàng trong khối play + ngôi sao nhỏ) để hình chính vẫn rõ trên toolbar.
 
 ### v1.18.0
 - **Cỡ giao diện tiện ích (5 nấc 90–130%):** dashboard có mục **Giao diện** với hàng nút chọn cỡ; `uiScale` lưu vào `chrome.storage` và bật `--yta-ui-scale` trên `<html>`, `zoom` toàn bộ 16 surface tiêm vào trang (thanh công cụ Watch, hàng nút card sidebar, nút Trang chủ, hành động kênh, popover, menu chất lượng, toast, nút random, mục Bookmark ở guide/sidebar, trang Bookmark, drawer hàng đợi, picker yêu thích và ba hộp thoại). Bốn hàm định vị theo viewport (`toggleDropdown`, `positionHomeFlyout`, picker yêu thích, `positionBookmarkPage`) nay quy đổi px thị giác bằng `unscalePx()`, các giới hạn `vw/vh` được chia lại cho hệ số zoom, và panel âm thanh có `flex-basis/min-width` + container query để giữ đúng hình dạng ở mọi nấc. Kiểm chứng trên trang thật ở cả 5 nấc: menu, toast, popover và trang Bookmark nằm gọn trong viewport, không cuộn ngang, panel vẫn 2 cột.

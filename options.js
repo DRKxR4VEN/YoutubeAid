@@ -101,9 +101,9 @@ document.addEventListener('DOMContentLoaded', () => {
     langButtons.forEach((btn) => {
       btn.classList.toggle('is-active', btn.dataset.lang === I18N.getLanguage());
     });
-    document.title = `YouTube Aid - ${T('Bảng điều khiển & Phím tắt nhanh')}`;
+    document.title = `Youtube Aid Elite Version - ${T('Bảng điều khiển & Phím tắt nhanh')}`;
     try {
-      chrome.action?.setTitle({ title: T('Youtube Aid - Cài đặt & Phím tắt') });
+      chrome.action?.setTitle({ title: T('Youtube Aid Elite Version - Cài đặt & Phím tắt') });
     } catch (e) { }
     clearKeybindError();
     buildKeybindEditor();
