@@ -91,7 +91,7 @@
     enableAutoPasteReplace: true,
     enableThumbnailDownload: true,
     enableMediaDownload: true,
-    enableAdProxy: false,
+    enableAdProxy: true,
     enableShortsAutoScroll: false,
     enableAnimations: true,
     enableCloseGuard: false,

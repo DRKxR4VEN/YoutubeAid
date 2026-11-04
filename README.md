@@ -164,7 +164,7 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 - Lựa chọn nguồn từ feed cá nhân hoặc tìm kiếm công khai.
 
 ### 12. Chặn Quảng Cáo Bằng Proxy
-- **Chặn bằng proxy (mặc định tắt):** Theo cách của Brave Shields: lọc dữ liệu quảng cáo khỏi phản hồi của YouTube trước khi trình phát đọc và chặn request quảng cáo ở tầng mạng, không cần server riêng. Cần tải lại trang YouTube sau khi đổi.
+- **Chặn bằng proxy (mặc định bật):** Theo cách của Brave Shields: lọc dữ liệu quảng cáo khỏi phản hồi của YouTube trước khi trình phát đọc và chặn request quảng cáo ở tầng mạng, không cần server riêng. Cần tải lại trang YouTube sau khi đổi.
 
 ### 13. Tự Lướt Shorts
 - Tự động chuyển tiếp sang video Shorts tiếp theo khi xem xong video hiện tại, rảnh tay thưởng thức video ngắn.
@@ -188,7 +188,7 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 ### v1.26.0
 - **Bỏ tính năng tự bỏ qua quảng cáo và ẩn banner:** gỡ toàn bộ code, thẻ cài đặt, CSS và bản dịch liên quan (kể cả sắp xếp lại lưới feed và màn hình đen che quảng cáo); **Chặn bằng proxy** là cách chặn quảng cáo duy nhất. Lựa chọn cũ `enableAdSkip` / `enableHideAds` trong `chrome.storage` không còn được đọc.
 - **Xử lý màn hình cảnh báo trình chặn quảng cáo:** khi bật proxy, `ad-proxy.js` để nguyên các bài tự kiểm tra `JSON.parse` của YouTube (phản hồi giả có quảng cáo) nên không còn bị nhận diện, không còn tự chuyển bài trong playlist; vô hiệu callback `onAbnormalityDetected`, sửa request `/player`, và nếu vẫn gặp cảnh báo thì tự tải lại video với biến thể request tiếp theo rồi ẩn giao diện cảnh báo còn sót; danh sách chặn mạng có thêm `log_event`, `qoe`, `ptracking` và `activeview`.
-- **Chặn quảng cáo bằng proxy (mặc định tắt):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube, kèm luật `declarativeNetRequest` chặn request quảng cáo chỉ trên `www.youtube.com`.
+- **Chặn quảng cáo bằng proxy (mặc định bật):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube, kèm luật `declarativeNetRequest` chặn request quảng cáo chỉ trên `www.youtube.com`.
 
 ### v1.25.0
 - **Sửa xung đột Âm lượng ↔ Bass bằng trần mềm (soft-clipper).** Trước đây mạch âm thanh kết thúc bằng một `DynamicsCompressor` (ratio 20, threshold -1.5 dB) chỉ **kích hoạt theo slider Âm lượng**: kéo bass lên 80–100% **trước** rồi mới nâng âm lượng qua 100% là nhốt toàn bộ phần trầm đã nâng vào một compressor hard-knee, nên tiếng bị "lán át", bass tự bóp mạnh rồi nhả (pumping) và hai slider có cảm giác đánh nhau.

@@ -106,7 +106,7 @@ setupHeaderRules();
 // MAIN-world scripts can't read chrome.storage, so the ad proxy is only registered while it's on.
 async function syncAdProxy() {
   try {
-    const { enableAdProxy } = await chrome.storage.local.get({ enableAdProxy: false });
+    const { enableAdProxy } = await chrome.storage.local.get({ enableAdProxy: true });
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: AD_BLOCK_FILTERS.map((_, i) => AD_BLOCK_RULE_BASE + i),
       addRules: !enableAdProxy ? [] : AD_BLOCK_FILTERS.map((urlFilter, i) => ({
