@@ -2104,7 +2104,19 @@ body.yt-aid-hide-ads .ytp-ad-image-overlay,
 body.yt-aid-hide-ads ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
 body.yt-aid-hide-ads ytd-rich-section-renderer:has(ytd-statement-banner-renderer),
 body.yt-aid-hide-ads ytd-rich-section-renderer:has(ytd-ad-slot-renderer) {
-  display: none !important;
+  /* Không dùng display:none: ô quảng cáo vẫn được render (1px, trong suốt, ngoài luồng bố cục)
+     để hạn chế bị trình phát nhận là đã chặn quảng cáo. Feed reflow nhận biết qua position:absolute. */
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 

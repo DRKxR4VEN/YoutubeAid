@@ -120,7 +120,8 @@ Bốn thanh trượt nằm chung trong một panel có nhãn **ÂM THANH** (lư�
 ### 12. Tự Động Bỏ Qua Quảng Cáo & Ẩn Banner
 - **Auto skip:** Tự động tắt tiếng, tăng tốc độ phát lên tối đa và nhấn nút Bỏ qua ngay khi xuất hiện.
 - **Hiệu ứng che quảng cáo:** Màn hình đen với vòng xoay đệm (spinner) ở tâm như lúc đang tải mạng, không gây chói mắt.
-- **Ẩn triệt để banner quảng cáo:** Xóa hoàn toàn banner "Được tài trợ" ở cột đề xuất bên phải (`#secondary`), trang chủ và masthead.
+- **Ẩn banner quảng cáo:** Banner "Được tài trợ" ở cột đề xuất bên phải (`#secondary`), trang chủ và masthead không còn hiển thị nhưng vẫn được render (1px, trong suốt) để hạn chế bị YouTube nhận là đã chặn quảng cáo.
+- **Chặn bằng proxy (mặc định tắt):** Lọc dữ liệu quảng cáo khỏi phản hồi của YouTube trước khi trình phát đọc, không cần server riêng. Khi bật, **Bỏ quảng cáo** và **Ẩn quảng cáo** tự tắt nhưng vẫn giữ lựa chọn cũ để khôi phục khi tắt proxy. Cần tải lại trang YouTube sau khi đổi.
 
 ### 13. Tự Động Lướt Shorts
 - Tự động chuyển tiếp sang video Shorts tiếp theo khi xem xong video hiện tại, rảnh tay thưởng thức video ngắn.
@@ -135,6 +136,10 @@ Bốn thanh trượt nằm chung trong một panel có nhãn **ÂM THANH** (lư�
 ---
 
 ## Thay Đổi Gần Đây
+
+### v1.19.0
+- **Chặn quảng cáo bằng proxy (mặc định tắt):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` và `Response.json` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube. Khi bật, tự bỏ qua và ẩn banner tự tắt mà không đổi lựa chọn đã lưu.
+- **Làm lại ẩn banner quảng cáo:** bỏ vòng quét JS 150ms và `display:none`; chỉ dùng CSS giữ ô quảng cáo render ở 1px trong suốt, nhằm giảm nguy cơ hiện màn hình cảnh báo trình chặn quảng cáo.
 
 ### v1.18.0
 - **Cỡ giao diện tiện ích (5 nấc 90–130%):** dashboard có mục **Giao diện** với hàng nút chọn cỡ; `uiScale` lưu vào `chrome.storage` và bật `--yta-ui-scale` trên `<html>`, `zoom` toàn bộ 16 surface tiêm vào trang (thanh công cụ Watch, hàng nút card sidebar, nút Trang chủ, hành động kênh, popover, menu chất lượng, toast, nút random, mục Bookmark ở guide/sidebar, trang Bookmark, drawer hàng đợi, picker yêu thích và ba hộp thoại). Bốn hàm định vị theo viewport (`toggleDropdown`, `positionHomeFlyout`, picker yêu thích, `positionBookmarkPage`) nay quy đổi px thị giác bằng `unscalePx()`, các giới hạn `vw/vh` được chia lại cho hệ số zoom, và panel âm thanh có `flex-basis/min-width` + container query để giữ đúng hình dạng ở mọi nấc. Kiểm chứng trên trang thật ở cả 5 nấc: menu, toast, popover và trang Bookmark nằm gọn trong viewport, không cuộn ngang, panel vẫn 2 cột.
@@ -203,8 +208,10 @@ Bốn thanh trượt nằm chung trong một panel có nhãn **ÂM THANH** (lư�
 
 ```
 Youtube_Aid/
-├── manifest.json      # Cấu hình Manifest V3: storage, clipboard, downloads, declarativeNetRequest
-├── background.js      # Service worker: xử lý tải media, API chuyển đổi, rule modify header mạng
+├── manifest.json      # Cấu hình Manifest V3: storage, clipboard, downloads, declarativeNetRequest, scripting
+├── background.js      # Service worker: xử lý tải media, API chuyển đổi, rule modify header mạng, đăng ký ad proxy
+├── ad-proxy.js        # Script MAIN world: lọc dữ liệu quảng cáo khỏi phản hồi của YouTube (khi bật)
+├── tests/             # Kiểm thử logic lọc: node tests/ad-proxy.test.js
 ├── i18n.js            # Từ điển Việt–Anh và API dịch dùng chung
 ├── shortcut-keys.js   # Logic cấu hình và xử lý phím tắt
 ├── content.js         # Content script: điều khiển DOM YouTube, toolbar, download queue, ad skip, auto loop...

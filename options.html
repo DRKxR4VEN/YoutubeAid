@@ -306,6 +306,21 @@
       transform: translateX(14px);
     }
 
+    /* Locked by proxy ad blocking: shown as off while the saved choice stays checked. */
+    .toggle-card:has(input:disabled) {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    input:disabled + .slider {
+      background-color: rgba(255, 255, 255, 0.2);
+      cursor: not-allowed;
+    }
+
+    input:disabled + .slider:before {
+      transform: none;
+    }
+
     /* Shortcut Table */
     .table-container {
       background: var(--yt-surface);
@@ -693,6 +708,23 @@
     </div>
 
     <div class="card-list">
+      <!-- Proxy ad blocking: replaces the two ad cards below while on -->
+      <label class="toggle-card">
+        <div class="toggle-main">
+          <div class="toggle-icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3z"/></svg>
+          </div>
+          <div class="toggle-info">
+            <div class="toggle-title" data-i18n="Chặn bằng proxy">Chặn bằng proxy</div>
+            <div class="toggle-desc" data-i18n="Tự tắt bỏ/ẩn ad. Cần tải lại trang.">Tự tắt bỏ/ẩn ad. Cần tải lại trang.</div>
+          </div>
+        </div>
+        <div class="switch">
+          <input type="checkbox" id="enableAdProxy">
+          <span class="slider"></span>
+        </div>
+      </label>
+
       <!-- 1. Auto Skip Ads -->
       <label class="toggle-card">
         <div class="toggle-main">

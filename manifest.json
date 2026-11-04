@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Youtube Aid",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "description": "Trợ lý YouTube gọn nhẹ: bỏ quảng cáo, lặp video, tải MP3/MP4, copy tiêu đề và link sạch, cắt ảnh bìa, bookmark, phím tắt.",
   "permissions": [
     "storage",
     "clipboardWrite",
     "clipboardRead",
     "downloads",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "scripting"
   ],
   "host_permissions": [
     "https://www.youtube.com/*",

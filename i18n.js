@@ -48,6 +48,8 @@
     ['Đã đặt "{0}" thành {1} lần bấm.{2}', '"{0}" is now {1} taps.{2}'],
 
     /* ---------- Options page: feature cards ---------- */
+    ['Chặn bằng proxy', 'Proxy ad blocking'],
+    ['Tự tắt bỏ/ẩn ad. Cần tải lại trang.', 'Replaces skip/hide. Reload to apply.'],
     ['Bỏ quảng cáo', 'Skip ads'],
     ['Tua nhanh, tự bấm Bỏ qua.', 'Fast-forwards and clicks Skip.'],
     ['Tự động bỏ qua quảng cáo', 'Skip ads automatically'],

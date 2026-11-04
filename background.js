@@ -6,6 +6,7 @@
 const RULE_ID_LOADER = 1001;
 const RULE_ID_AFFADAFFA = 1002;
 const RULE_ID_SAVENOW = 1003;
+const AD_PROXY_SCRIPT_ID = 'yt-aid-ad-proxy';
 
 // Server danh sách: ưu tiên p.savenow.to (nhanh hơn), fallback sang loader.to
 const DOWNLOAD_SERVERS = [
@@ -87,6 +88,33 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 setupHeaderRules();
+
+// MAIN-world scripts can't read chrome.storage, so the ad proxy is only registered while it's on.
+async function syncAdProxyScript() {
+  try {
+    const { enableAdProxy } = await chrome.storage.local.get({ enableAdProxy: false });
+    const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [AD_PROXY_SCRIPT_ID] });
+    if (enableAdProxy && !registered.length) {
+      await chrome.scripting.registerContentScripts([{
+        id: AD_PROXY_SCRIPT_ID,
+        js: ['ad-proxy.js'],
+        matches: ['https://www.youtube.com/*'],
+        runAt: 'document_start',
+        world: 'MAIN'
+      }]);
+    } else if (!enableAdProxy && registered.length) {
+      await chrome.scripting.unregisterContentScripts({ ids: [AD_PROXY_SCRIPT_ID] });
+    }
+  } catch (err) {
+    console.warn('[YtAid Background] Ad proxy registration error:', err);
+  }
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.enableAdProxy) syncAdProxyScript();
+});
+
+syncAdProxyScript();
 
 // Message listener for content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
