@@ -13,7 +13,13 @@ if (-not $branch -or $branch -eq 'main') {
   exit 2
 }
 
-$rules = 'Edit files only. Do not commit, push, or switch branches. Do not add AI attribution anywhere.'
+$rules = @(
+  'After your changes, run every test in tests/ with node. If anything fails, fix the cause and rerun, and repeat until nothing fails.',
+  'Do not weaken, skip, or delete a test to make it pass. If you cannot fix a failure, stop and report exactly what still fails.',
+  'Do not commit, push, or switch branches. Do not add AI attribution anywhere.',
+  'Keep each file''s line endings: an edited line in a CR LF file ends in exactly one CR LF.',
+  'Any browser test must use --mute-audio and a new temporary profile, never the user''s profile or accounts.'
+) -join ' '
 # Windows PowerShell 5.1 does not escape quotes in native arguments.
 $arg = "$rules`n`n$Prompt" -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1'
 

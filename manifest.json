@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Youtube Aid Elite Version",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Bản Elite dành riêng cho người mua độc lập — tính năng vượt trội, mạnh mẽ và tiện lợi hơn Youtube Aid Premium.",
   "permissions": [
     "storage",
