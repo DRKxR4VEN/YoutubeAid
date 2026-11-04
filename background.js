@@ -8,7 +8,7 @@ const RULE_ID_AFFADAFFA = 1002;
 const RULE_ID_SAVENOW = 1003;
 const AD_PROXY_SCRIPT_ID = 'yt-aid-ad-proxy';
 const COMMITS_API_URL = 'https://api.github.com/repos/DRKxR4VEN/YoutubeAid/commits/main';
-const COMMIT_PAGE_URL = 'https://github.com/DRKxR4VEN/YoutubeAid/commit/';
+const REPO_URL = 'https://github.com/DRKxR4VEN/YoutubeAid';
 const COMMIT_CHECK_MS = 60 * 60 * 1000;
 const AD_BLOCK_RULE_BASE = 1100;
 // Leave static.doubleclick.net/instream/ad_status.js alone: it sets google_ad_status, a bait for ad blockers.
@@ -218,7 +218,6 @@ async function handleLatestCommit() {
       if (/^[0-9a-f]{40}$/.test(data?.sha)) {
         latest = {
           sha: data.sha,
-          message: String(data.commit?.message || '').split('\n')[0].slice(0, 120),
           checkedAt: Date.now()
         };
         await chrome.storage.local.set({ latestCommit: latest });
@@ -236,8 +235,7 @@ async function handleLatestCommit() {
   return {
     isNew: latest.sha !== stored.seenCommitSha,
     sha: latest.sha,
-    message: latest.message,
-    url: COMMIT_PAGE_URL + latest.sha
+    url: REPO_URL
   };
 }
 
