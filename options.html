@@ -308,21 +308,6 @@
       transform: translateX(14px);
     }
 
-    /* Locked by proxy ad blocking: shown as off while the saved choice stays checked. */
-    .toggle-card:has(input:disabled) {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    input:disabled + .slider {
-      background-color: rgba(255, 255, 255, 0.2);
-      cursor: not-allowed;
-    }
-
-    input:disabled + .slider:before {
-      transform: none;
-    }
-
     /* Shortcut Table */
     .table-container {
       background: var(--yt-surface);
@@ -720,7 +705,7 @@
     </div>
 
     <div class="card-list">
-      <!-- Proxy ad blocking: replaces the two ad cards below while on -->
+      <!-- Proxy ad blocking -->
       <label class="toggle-card">
         <div class="toggle-main">
           <div class="toggle-icon-wrap">
@@ -728,45 +713,11 @@
           </div>
           <div class="toggle-info">
             <div class="toggle-title" data-i18n="Chặn bằng proxy">Chặn bằng proxy</div>
-            <div class="toggle-desc" data-i18n="Tự tắt bỏ/ẩn ad. Cần tải lại trang.">Tự tắt bỏ/ẩn ad. Cần tải lại trang.</div>
+            <div class="toggle-desc" data-i18n="Chặn ad video, banner. Cần tải lại trang.">Chặn ad video, banner. Cần tải lại trang.</div>
           </div>
         </div>
         <div class="switch">
           <input type="checkbox" id="enableAdProxy">
-          <span class="slider"></span>
-        </div>
-      </label>
-
-      <!-- 1. Auto Skip Ads -->
-      <label class="toggle-card">
-        <div class="toggle-main">
-          <div class="toggle-icon-wrap">
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-          </div>
-          <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Bỏ quảng cáo">Bỏ quảng cáo</div>
-            <div class="toggle-desc" data-i18n="Tua nhanh, tự bấm Bỏ qua.">Tua nhanh, tự bấm Bỏ qua.</div>
-          </div>
-        </div>
-        <div class="switch">
-          <input type="checkbox" id="enableAdSkip">
-          <span class="slider"></span>
-        </div>
-      </label>
-
-      <!-- 2. Hide Ad Surfaces -->
-      <label class="toggle-card">
-        <div class="toggle-main">
-          <div class="toggle-icon-wrap">
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.8 11.8 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-          </div>
-          <div class="toggle-info">
-            <div class="toggle-title" data-i18n="Ẩn quảng cáo">Ẩn quảng cáo</div>
-            <div class="toggle-desc" data-i18n="Ẩn banner và ad quanh video.">Ẩn banner và ad quanh video.</div>
-          </div>
-        </div>
-        <div class="switch">
-          <input type="checkbox" id="enableHideAds">
           <span class="slider"></span>
         </div>
       </label>

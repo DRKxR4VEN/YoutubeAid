@@ -23,7 +23,6 @@ Tiện ích mở rộng Manifest V3 tinh gọn dành riêng cho YouTube, hòa nh
 - **Phím tắt điều hướng:** Shorts, Trang chủ, Lịch sử, Danh sách phát, YouTube Music — tùy chỉnh phím a–z và 2/3 lần bấm; hoạt động cả trên YouTube Music.
 - **Bookmark mốc thời gian:** lưu/đổi tên/xóa/yêu thích bookmark, log theo video, dải bookmark trên Trang chủ, trang lưu trữ ở thanh bên và hoàn tác 5 giây khi **lưu lẫn khi xóa**.
 - **Video ngẫu nhiên:** chọn từ feed hoặc tìm kiếm công khai, lọc Video thường / Shorts / Video nhạc.
-- **Bỏ qua & ẩn quảng cáo:** tự bỏ qua quảng cáo video (màn hình đen kèm spinner xoay đệm như mất mạng), ẩn triệt để banner quảng cáo cột bên phải và masthead.
 - **Tự động chọn chất lượng video:** mặc định **1080p**, chọn từ **144p đến 8K**; video không có đúng mức đã chọn sẽ tự phát ở mức cao nhất nó có. Điều khiển nhanh nằm trong menu **Công cụ** và trong mục **Giao diện** của dashboard.
 - **Nhảy tới đoạn nổi bật:** nút **Đoạn nổi bật** trên toolbar đưa thẳng về đoạn "Most replayed" (đoạn được xem lại nhiều nhất mà YouTube vẽ trên thanh tua). Dữ liệu đọc từ **chính bộ marker YouTube phát cho player** (`setMacroMarkers`) và mọi payload heat mà trang đã nạp, nhận theo **nhiều kiểu dữ liệu và cả nhãn tiếng Việt**. Video không có dữ liệu thì nút mờ đi và hover báo **Video không có đoạn nổi bật**; bấm vào khi dữ liệu vừa về là tiện ích tự đọc lại rồi nhảy ngay.
 - **Trình phát thu nhỏ (Miniplayer):** nút **Thu nhỏ** nằm **ngay dưới "Tự động lặp"** trong cột tiện ích phát, thu video đang xem xuống góc màn hình bằng đúng miniplayer gốc của YouTube và bấm lần nữa để thoát; nút sáng xanh theo trạng thái, kể cả khi thu/thoát bằng nút của YouTube.
@@ -164,11 +163,8 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 - Bộ lọc linh hoạt: Video thường, Shorts, Video âm nhạc.
 - Lựa chọn nguồn từ feed cá nhân hoặc tìm kiếm công khai.
 
-### 12. Tự Động Bỏ Qua Quảng Cáo & Ẩn Banner
-- **Auto skip:** Tự động tắt tiếng, tăng tốc độ phát lên tối đa và nhấn nút Bỏ qua ngay khi xuất hiện.
-- **Hiệu ứng che quảng cáo:** Màn hình đen với vòng xoay đệm (spinner) ở tâm như lúc đang tải mạng, không gây chói mắt.
-- **Ẩn banner quảng cáo:** Banner "Được tài trợ" ở cột đề xuất bên phải (`#secondary`), trang chủ và masthead không còn hiển thị nhưng vẫn được render (1px, trong suốt) để hạn chế bị YouTube nhận là đã chặn quảng cáo.
-- **Chặn bằng proxy (mặc định tắt):** Theo cách của Brave Shields: lọc dữ liệu quảng cáo khỏi phản hồi của YouTube trước khi trình phát đọc và chặn request quảng cáo ở tầng mạng, không cần server riêng. Khi bật, **Bỏ quảng cáo** và **Ẩn quảng cáo** tự tắt nhưng vẫn giữ lựa chọn cũ để khôi phục khi tắt proxy. Cần tải lại trang YouTube sau khi đổi.
+### 12. Chặn Quảng Cáo Bằng Proxy
+- **Chặn bằng proxy (mặc định tắt):** Theo cách của Brave Shields: lọc dữ liệu quảng cáo khỏi phản hồi của YouTube trước khi trình phát đọc và chặn request quảng cáo ở tầng mạng, không cần server riêng. Cần tải lại trang YouTube sau khi đổi.
 
 ### 13. Tự Lướt Shorts
 - Tự động chuyển tiếp sang video Shorts tiếp theo khi xem xong video hiện tại, rảnh tay thưởng thức video ngắn.
@@ -190,9 +186,9 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 ## Thay Đổi Gần Đây
 
 ### v1.26.0
+- **Bỏ tính năng tự bỏ qua quảng cáo và ẩn banner:** gỡ toàn bộ code, thẻ cài đặt, CSS và bản dịch liên quan (kể cả sắp xếp lại lưới feed và màn hình đen che quảng cáo); **Chặn bằng proxy** là cách chặn quảng cáo duy nhất. Lựa chọn cũ `enableAdSkip` / `enableHideAds` trong `chrome.storage` không còn được đọc.
 - **Xử lý màn hình cảnh báo trình chặn quảng cáo:** khi bật proxy, `ad-proxy.js` để nguyên các bài tự kiểm tra `JSON.parse` của YouTube (phản hồi giả có quảng cáo) nên không còn bị nhận diện, không còn tự chuyển bài trong playlist; vô hiệu callback `onAbnormalityDetected`, sửa request `/player`, và nếu vẫn gặp cảnh báo thì tự tải lại video với biến thể request tiếp theo rồi ẩn giao diện cảnh báo còn sót; danh sách chặn mạng có thêm `log_event`, `qoe`, `ptracking` và `activeview`.
-- **Chặn quảng cáo bằng proxy (mặc định tắt):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube, kèm luật `declarativeNetRequest` chặn request quảng cáo chỉ trên `www.youtube.com`. Khi bật, tự bỏ qua và ẩn banner tự tắt mà không đổi lựa chọn đã lưu.
-- **Làm lại ẩn banner quảng cáo:** bỏ vòng quét JS 150ms và `display:none`; chỉ dùng CSS giữ ô quảng cáo render ở 1px trong suốt, nhằm giảm nguy cơ hiện màn hình cảnh báo trình chặn quảng cáo.
+- **Chặn quảng cáo bằng proxy (mặc định tắt):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube, kèm luật `declarativeNetRequest` chặn request quảng cáo chỉ trên `www.youtube.com`.
 
 ### v1.25.0
 - **Sửa xung đột Âm lượng ↔ Bass bằng trần mềm (soft-clipper).** Trước đây mạch âm thanh kết thúc bằng một `DynamicsCompressor` (ratio 20, threshold -1.5 dB) chỉ **kích hoạt theo slider Âm lượng**: kéo bass lên 80–100% **trước** rồi mới nâng âm lượng qua 100% là nhốt toàn bộ phần trầm đã nâng vào một compressor hard-knee, nên tiếng bị "lán át", bass tự bóp mạnh rồi nhả (pumping) và hai slider có cảm giác đánh nhau.

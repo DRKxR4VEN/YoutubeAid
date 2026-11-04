@@ -51,14 +51,7 @@
 
     /* ---------- Options page: feature cards ---------- */
     ['Chặn bằng proxy', 'Proxy ad blocking', '代理拦截广告', 'Proxy-Werbeblocker'],
-    ['Tự tắt bỏ/ẩn ad. Cần tải lại trang.', 'Replaces skip/hide. Reload to apply.', '替代跳过/隐藏广告，需刷新页面。', 'Ersetzt Überspringen/Ausblenden. Seite neu laden.'],
-    ['Bỏ quảng cáo', 'Skip ads', '跳过广告', 'Werbung überspringen'],
-    ['Tua nhanh, tự bấm Bỏ qua.', 'Fast-forwards and clicks Skip.', '快进并自动点击跳过。', 'Spult vor und klickt auf Überspringen.'],
-    ['Tự động bỏ qua quảng cáo', 'Skip ads automatically', '自动跳过广告', 'Werbung automatisch überspringen'],
-    ['Tự bấm Bỏ qua và tua nhanh quảng cáo, kể cả ở tab khác.', 'Clicks Skip and fast-forwards ads, even in background tabs.', '自动点击跳过并快进广告，即使在后台标签页也一样。', 'Klickt Überspringen und spult Werbung vor, auch in Hintergrund-Tabs.'],
-    ['Ẩn quảng cáo', 'Hide ad surfaces', '隐藏广告', 'Werbeflächen ausblenden'],
-    ['Ẩn banner và ad quanh video.', 'Hides banners and side ads.', '隐藏横幅和视频旁广告。', 'Blendet Banner und seitliche Werbung aus.'],
-    ['Ẩn quảng cáo ở feed, banner đầu trang và cạnh video.', 'Hides ads in the feed, the masthead banner and beside the video.', '隐藏信息流、页头横幅和视频旁的广告。', 'Blendet Werbung im Feed, im Kopfbereich-Banner und neben dem Video aus.'],
+    ['Chặn ad video, banner. Cần tải lại trang.', 'Blocks video and banner ads. Reload page.', '拦截视频和横幅广告，需刷新页面。', 'Blockt Video- und Bannerwerbung. Neu laden.'],
     ['Lặp video', 'Auto loop', '循环视频', 'Auto-Wiederholung'],
     ['Phát lại khi kết thúc, bỏ quảng cáo.', 'Replays at the end, skips ads.', '结束时重播，跳过广告。', 'Wiederholt am Ende, überspringt Werbung.'],
     ['Tự động lặp lại video', 'Auto Loop', '自动循环视频', 'Auto-Loop'],

@@ -91,8 +91,6 @@
     enableAutoPasteReplace: true,
     enableThumbnailDownload: true,
     enableMediaDownload: true,
-    enableAdSkip: true,
-    enableHideAds: true,
     enableAdProxy: false,
     enableShortsAutoScroll: false,
     enableAnimations: true,
@@ -322,11 +320,6 @@
     if (IS_MUSIC_SITE) return;
 
     if (!settings.enableShortcuts) resetKeyBuffer();
-    if (changed('enableAdSkip') || changed('enableHideAds') || changed('enableAdProxy')) syncAdSkipSettings();
-    if (changed('enableHideAds') || changed('enableAdProxy')) {
-      feedReflowSig = '';
-      scheduleFeedReflow(0);
-    }
     if (changed('hideButtonNames')) syncButtonNamesUi();
     if (changed('audioPanelCollapsed')) syncAudioUi();
     if (changed('enableLoop')) ensureVideoLoop();
@@ -501,8 +494,6 @@
       initDropdownDismiss,
       initDOMObserver,
       initBookmarks,
-      initAdSkipper,
-      initFeedReflow,
       initShortsAutoScroll
     ].forEach((fn) => {
       try { fn(); } catch (e) { console.error('[YoutubeAid] init lỗi:', fn.name, e); }
@@ -704,10 +695,6 @@
   const AD_RELEASE_DELAY = 500;
 
   let lastAdSeenAt = 0;
-  // Declared here because the audio engine (section 3B) reads it: initExtension
-  // can run before the ad module below is evaluated, and a `let` further down
-  // would still be in its temporal dead zone at that point.
-  let adSkipState = null; // { muted, rate } của video trước khi vào quảng cáo
   let loopPlayerObserver = null;
   let loopVideoObserver = null;
   let observedLoopPlayer = null;
@@ -1052,7 +1039,7 @@
   }
 
   function audioAdActive() {
-    return !!adSkipState || isAdPlaying() || Date.now() - lastAdSeenAt < AD_RELEASE_DELAY;
+    return isAdPlaying() || Date.now() - lastAdSeenAt < AD_RELEASE_DELAY;
   }
 
   function audioEffectsActive() {
@@ -1242,7 +1229,7 @@
     if (!video) return;
     trackAudioVideo(video);
     // An ad owns the rate while it plays: slowing it down or speeding it up
-    // fights the player and the ad skipper.
+    // fights the player.
     if (audioAdActive()) return;
 
     try {
@@ -1266,8 +1253,8 @@
     if (!video) return;
     const rate = video.playbackRate;
     if (Math.abs(rate - audioRateApplied) < 0.001) return;
-    // Ad skip drives this same <video> to 8x. Clamping that burst would pin the
-    // slider to its x1.5 notch and leave the video sped up once the ad ends.
+    // Other ad skippers drive this same <video> to 8x or more. Clamping that burst would
+    // pin the slider to its x1.5 notch and leave the video sped up once the ad ends.
     if (audioAdActive() || rate > 2 || rate < 0.1) return;
 
     if (Date.now() - speedMenuTouchAt <= SPEED_MENU_WINDOW_MS) {
@@ -7563,420 +7550,6 @@
       injectGuideEntries(true);
       syncHomeBookmarkButton();
     }, 1500);
-  }
-
-  // ==========================================
-  // 10. AUTO SKIP ADS (tự bỏ qua quảng cáo video, chạy được cả khi ở tab khác)
-  // ==========================================
-  // Cách hoạt động: khi player có class "ad-showing", tắt tiếng, tăng tốc, bấm nút
-  // "Bỏ qua" nếu có và tua thẳng tới cuối quảng cáo. Không chặn request mạng.
-  // Trigger bằng MutationObserver + sự kiện của <video> (không bị trình duyệt tạm
-  // dừng khi tab ở nền, khác với timer) kèm một timer dự phòng.
-  const AD_SKIP_BUTTON_SELECTORS = [
-    '.ytp-skip-ad-button',
-    '.ytp-ad-skip-button',
-    '.ytp-ad-skip-button-modern',
-    '.ytp-ad-skip-button-container button',
-    '.ytp-skip-ad button',
-    'button.ytp-ad-skip-button-modern',
-    '[class*="ytp-ad-skip-button"]',
-    'button[id^="skip-button"]',
-    '.ytp-ad-skip-button-slot button',
-    'button[aria-label*="Skip"]',
-    'button[aria-label*="skip"]',
-    'button[aria-label*="Bỏ qua"]',
-    'button[aria-label*="bỏ qua"]'
-  ].join(', ');
-  const AD_OVERLAY_CLOSE_SELECTORS = '.ytp-ad-overlay-close-button, .ytp-ad-overlay-close-container, .ytp-ad-image-overlay button';
-  const AD_MAX_SEEK_DURATION = 600; // chỉ tua tới cuối nếu "video" ngắn hơn 10 phút (tránh tua nhầm video chính)
-  const AD_SKIP_POLL_MS = 1200; // backstop only — the observers handle the real timing
-  const AD_FAST_POLL_MS = 40; // khi đang có quảng cáo: kiểm tra mỗi 40ms để bấm nút ngay khi xuất hiện
-
-  let adSkipObservedPlayer = null;
-  let adSkipObservedVideo = null;
-  let adSkipObservedLayer = null;
-  let adSkipObservers = [];
-  let adSkipRaf = 0;
-
-  // Chặn bằng proxy thay thế cả hai tính năng nhưng không đổi lựa chọn đã lưu của người dùng.
-  function adSkipActive() {
-    return !!settings.enableAdSkip && !settings.enableAdProxy;
-  }
-
-  function hideAdsActive() {
-    return !!settings.enableHideAds && !settings.enableAdProxy;
-  }
-
-  function getAdVideo(player) {
-    return player.querySelector('video.html5-main-video') || player.querySelector('video');
-  }
-
-  // Nhận diện quảng cáo bằng nhiều dấu hiệu:
-  //  - 'strong': player có class ad-showing/ad-interrupting hoặc getAdState() > 0
-  //  - 'weak'  : chỉ thấy giao diện quảng cáo (badge, nút bỏ qua...) có layout
-  function detectAdKind(player) {
-    if (AD_PLAYER_CLASSES.some((cls) => player.classList.contains(cls))) return 'strong';
-    try {
-      if (typeof player.getAdState === 'function' && Number(player.getAdState()) > 0) return 'strong';
-    } catch (e) { }
-    for (const el of player.querySelectorAll(AD_UI_SELECTORS)) {
-      if (!el.hidden && el.getClientRects().length) return 'weak';
-    }
-    return null;
-  }
-
-  // Giấu hình quảng cáo bằng thuộc tính trên <html> (CSS ở styles.css), không phụ thuộc tên class của player.
-  function setAdHidden(on) {
-    const root = document.documentElement;
-    if (on) {
-      if (!root.hasAttribute('data-yt-aid-ad')) root.setAttribute('data-yt-aid-ad', '1');
-    } else if (root.hasAttribute('data-yt-aid-ad')) {
-      root.removeAttribute('data-yt-aid-ad');
-    }
-  }
-
-  let adWeakSince = 0;
-  let adHideSince = 0;
-  let adAtEndSince = 0;
-  let adStuckAttempts = 0;
-  const AD_HIDE_MAX_MS = 25000;   // tối đa 25s ẩn nếu quảng cáo kéo dài
-  const AD_STUCK_AFTER_MS = 150;  // quảng cáo đứng ở cuối quá 150ms thì xử lý ngay
-  const AD_STUCK_MAX_TRIES = 20;
-  const AD_WEAK_MAX_MS = 8000; // dấu hiệu "yếu" chỉ giấu tối đa 8 giây để không kẹt player đen
-
-  function restoreAfterAd(player) {
-    setAdHidden(false);
-    adWeakSince = 0;
-    adHideSince = 0;
-    adAtEndSince = 0;
-    adStuckAttempts = 0;
-    if (!adSkipState) return;
-    const state = adSkipState;
-    adSkipState = null;
-    const video = player ? getAdVideo(player) : null;
-    if (!video) return;
-    try {
-      video.muted = state.muted;
-      video.playbackRate = state.rate || 1;
-    } catch (e) { }
-  }
-
-  // Cho quảng cáo chạy tiếp (nếu đang dừng) để player nhận sự kiện "kết thúc" và chuyển sang video chính.
-  function nudgeAdPlayback(player, video) {
-    try {
-      const p = video.play();
-      if (p && typeof p.catch === 'function') p.catch(() => { });
-    } catch (e) { }
-    try {
-      if (typeof player.playVideo === 'function') player.playVideo();
-    } catch (e) { }
-    const bigPlay = player.querySelector('.ytp-large-play-button');
-    if (bigPlay && video.paused) {
-      try { bigPlay.click(); } catch (e) { }
-    }
-  }
-
-  // Click "thật" hơn: YouTube mới nghe pointer/mouse event, .click() đơn thuần đôi khi bị bỏ qua.
-  function fireRealClick(el) {
-    if (!el) return;
-    try {
-      if (typeof el.click === 'function') el.click();
-    } catch (e) { }
-    try {
-      const r = el.getBoundingClientRect();
-      const clientX = r.left + (r.width > 0 ? r.width / 2 : 5);
-      const clientY = r.top + (r.height > 0 ? r.height / 2 : 5);
-      const opts = {
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        view: window,
-        clientX,
-        clientY,
-        button: 0,
-        buttons: 1
-      };
-      ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((type) => {
-        const Ctor = type.startsWith('pointer') ? PointerEvent : MouseEvent;
-        el.dispatchEvent(new Ctor(type, opts));
-      });
-    } catch (e) { }
-    // Nếu phần tử cha có thể click
-    try {
-      const parentBtn = el.closest('button, [role="button"]');
-      if (parentBtn && parentBtn !== el) {
-        parentBtn.click();
-      }
-    } catch (e) { }
-  }
-
-  function runAdSkip() {
-    adSkipRaf = 0;
-    if (IS_MUSIC_SITE) return;
-    const player = getPlayerElement();
-    if (!player) return;
-
-    if (!adSkipActive()) {
-      restoreAfterAd(player);
-      return;
-    }
-
-    // Banner quảng cáo đè lên video: đóng lại.
-    player.querySelectorAll(AD_OVERLAY_CLOSE_SELECTORS).forEach((btn) => {
-      try { btn.click(); } catch (e) { }
-    });
-
-    const kind = detectAdKind(player);
-    if (!kind) {
-      restoreAfterAd(player);
-      return;
-    }
-
-    if (kind === 'weak') {
-      if (!adWeakSince) adWeakSince = Date.now();
-      if (Date.now() - adWeakSince > AD_WEAK_MAX_MS) {
-        restoreAfterAd(player);
-        return;
-      }
-    } else {
-      adWeakSince = 0;
-    }
-
-    // Giấu hình + tắt tiếng ngay, rồi mới xử lý bỏ qua.
-    if (!adHideSince) adHideSince = Date.now();
-    setAdHidden(Date.now() - adHideSince < AD_HIDE_MAX_MS);
-    const video = getAdVideo(player);
-    if (!video) return;
-
-    if (!adSkipState) adSkipState = { muted: video.muted, rate: video.playbackRate };
-    try {
-      video.muted = true;
-      video.playbackRate = 8;
-    } catch (e) { }
-
-    const skipBtn = player.querySelector(AD_SKIP_BUTTON_SELECTORS);
-    if (skipBtn) {
-      fireRealClick(skipBtn);
-    } else {
-      // Tìm sâu hơn trong player hoặc document nếu nút nằm ngoài .video-ads
-      const docSkipBtn = document.querySelector(AD_SKIP_BUTTON_SELECTORS);
-      if (docSkipBtn) fireRealClick(docSkipBtn);
-    }
-
-    // Quảng cáo đang tải/đệm: ép phát để nó có dữ liệu sớm nhất có thể.
-    if (kind === 'strong' && video.paused) nudgeAdPlayback(player, video);
-
-    // Tua tới cuối quảng cáo (cả loại không có nút bỏ qua). Chỉ tua khi chắc chắn là quảng cáo.
-    const duration = video.duration;
-    if (kind === 'strong' && isFinite(duration) && duration > 1 && duration <= AD_MAX_SEEK_DURATION) {
-      const atEnd = video.ended || video.currentTime >= duration - 0.5;
-      if (!atEnd) {
-        adAtEndSince = 0;
-        if (video.paused) nudgeAdPlayback(player, video);
-        try { video.currentTime = duration - 0.2; } catch (e) { }
-      } else {
-        // Đã ở cuối nhưng quảng cáo vẫn còn hiện (kẹt): lùi nhẹ rồi cho chạy lại để kích hoạt kết thúc.
-        if (!adAtEndSince) adAtEndSince = Date.now();
-        if (Date.now() - adAtEndSince > AD_STUCK_AFTER_MS && adStuckAttempts < AD_STUCK_MAX_TRIES) {
-          adStuckAttempts++;
-          try { video.currentTime = Math.max(0, duration - 0.5); } catch (e) { }
-          nudgeAdPlayback(player, video);
-        }
-      }
-    }
-    // Còn quảng cáo: chạy lại nhanh, không chờ timer 250ms.
-    scheduleAdSkip(AD_FAST_POLL_MS);
-  }
-
-  function scheduleAdSkip(delay) {
-    // Nothing to detect while the feature is off; observers may still fire.
-    if (!adSkipActive()) return;
-    if (adSkipRaf) return;
-    if (typeof delay === 'number' && delay > 0) {
-      adSkipRaf = setTimeout(runAdSkip, delay);
-      return;
-    }
-    // requestAnimationFrame không chạy ở tab nền, nên dùng microtask/timeout ngắn.
-    adSkipRaf = setTimeout(runAdSkip, 0);
-  }
-
-  function attachAdSkipObservers() {
-    const player = getPlayerElement();
-    if (!player) return;
-
-    if (player !== adSkipObservedPlayer || player.querySelector('.video-ads') !== adSkipObservedLayer) {
-      adSkipObservers.forEach((o) => o.disconnect());
-      adSkipObservers = [];
-      adSkipObservedPlayer = player;
-
-      // Class của player (ad-showing / ad-interrupting).
-      const classObserver = new MutationObserver(() => scheduleAdSkip());
-      classObserver.observe(player, { attributes: true, attributeFilter: ['class'] });
-      adSkipObservers.push(classObserver);
-
-      // Nút "Bỏ qua" và banner xuất hiện trong .video-ads.
-      const adsLayer = player.querySelector('.video-ads');
-      adSkipObservedLayer = adsLayer;
-      if (adsLayer) {
-        const layerObserver = new MutationObserver(() => scheduleAdSkip());
-        layerObserver.observe(adsLayer, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['class', 'style', 'hidden']
-        });
-        adSkipObservers.push(layerObserver);
-      }
-    }
-
-    const video = getAdVideo(player);
-    if (video && video !== adSkipObservedVideo) {
-      adSkipObservedVideo = video;
-      ['loadstart', 'emptied', 'loadedmetadata', 'durationchange', 'canplay', 'play', 'playing', 'pause', 'seeked', 'ended', 'waiting', 'stalled'].forEach((evt) => {
-        video.addEventListener(evt, () => scheduleAdSkip(), { passive: true });
-      });
-    }
-  }
-
-  function syncAdSkipSettings() {
-    document.body.classList.toggle('yt-aid-hide-ads', hideAdsActive());
-    if (IS_MUSIC_SITE) return;
-    if (!adSkipActive()) {
-      const player = getPlayerElement();
-      if (player) restoreAfterAd(player);
-      else setAdHidden(false);
-      return;
-    }
-    attachAdSkipObservers();
-    scheduleAdSkip();
-  }
-
-  function initAdSkipper() {
-    if (IS_MUSIC_SITE) return;
-    attachAdSkipObservers();
-    window.addEventListener('yt-navigate-finish', () => {
-      attachAdSkipObservers();
-      scheduleAdSkip();
-    });
-    // Observe-only paths fire on their own; this poll is the backstop for a
-    // player YouTube swapped out from under us. It walks the whole document, so
-    // it stays slow and quiet while the tab is in the background.
-    setInterval(() => {
-      if (document.visibilityState === 'hidden') return;
-      if (!adSkipActive()) return;
-      attachAdSkipObservers();
-      runAdSkip();
-    }, AD_SKIP_POLL_MS);
-  }
-
-  // ==========================================
-  // FEED GRID: lấp chỗ trống do ẩn quảng cáo
-  // ==========================================
-  // Thẻ video và các dải rộng cả hàng (Shorts...) là con trực tiếp của một khung flex-wrap.
-  // Ẩn bớt thẻ làm số thẻ giữa hai dải bị lẻ, hàng cuối trước dải còn trống bên phải.
-  // Ta chỉ đổi thứ tự hiển thị bằng CSS "order" (không di chuyển phần tử trong DOM): dải rộng
-  // được dời xuống sau khi hàng đang dở được lấp đủ, nên mọi video vẫn giữ nguyên.
-  const FEED_ORDER_BASE = -1000000; // thẻ mới chưa xếp (order 0) tự nằm cuối, đúng chỗ của chúng
-  let feedReflowTimer = 0;
-  let feedReflowSig = '';
-  let feedReflowContainer = null;
-  let feedReflowObserver = null;
-
-  function feedGridContents() {
-    return document.querySelector('ytd-browse:not([hidden]) ytd-rich-grid-renderer > #contents');
-  }
-
-  function isFeedPage() {
-    const path = window.location.pathname;
-    return path === '/' || path.startsWith('/feed/');
-  }
-
-  function clearFeedReflow(container) {
-    if (!container) return;
-    container.querySelectorAll(':scope > [data-yt-aid-order]').forEach((el) => {
-      el.style.removeProperty('order');
-      el.removeAttribute('data-yt-aid-order');
-    });
-  }
-
-  function reflowFeedGrid() {
-    feedReflowTimer = 0;
-    if (IS_MUSIC_SITE || !isFeedPage() || document.visibilityState === 'hidden') return;
-    const container = feedGridContents();
-    if (!container) return;
-
-    if (container !== feedReflowContainer) {
-      if (feedReflowObserver) feedReflowObserver.disconnect();
-      feedReflowContainer = container;
-      feedReflowSig = '';
-      feedReflowObserver = new MutationObserver(() => scheduleFeedReflow(60));
-      feedReflowObserver.observe(container, { childList: true });
-    }
-
-    if (!hideAdsActive()) {
-      clearFeedReflow(container);
-      feedReflowSig = '';
-      return;
-    }
-
-    const children = [...container.children];
-    const firstItem = children.find((c) => c.tagName === 'YTD-RICH-ITEM-RENDERER' && c.getAttribute('items-per-row'));
-    const perRow = Math.max(1, parseInt(firstItem && firstItem.getAttribute('items-per-row'), 10) || 1);
-    const visible = children.map((c) => {
-      const style = getComputedStyle(c);
-      return style.display !== 'none' && style.position !== 'absolute'; // absolute = thẻ quảng cáo đã ẩn
-    });
-    const sig = `${perRow}|${visible.map((v) => (v ? 1 : 0)).join('')}`;
-    if (sig === feedReflowSig) return;
-    feedReflowSig = sig;
-
-    const sequence = [];
-    const pending = []; // dải rộng đang chờ hàng dở được lấp đủ
-    let rowCount = 0;
-    children.forEach((child, i) => {
-      if (!visible[i]) return;
-      if (child.tagName === 'YTD-RICH-ITEM-RENDERER') {
-        sequence.push(child);
-        rowCount = (rowCount + 1) % perRow;
-        if (rowCount === 0 && pending.length) sequence.push(...pending.splice(0));
-      } else if (rowCount === 0) {
-        sequence.push(child);
-      } else {
-        pending.push(child);
-      }
-    });
-    sequence.push(...pending);
-
-    const orderOf = new Map(sequence.map((el, i) => [el, String(FEED_ORDER_BASE + i)]));
-    children.forEach((child) => {
-      const order = orderOf.get(child);
-      if (order !== undefined) {
-        if (child.style.order !== order) child.style.order = order;
-        child.setAttribute('data-yt-aid-order', '');
-      } else if (child.hasAttribute('data-yt-aid-order')) {
-        child.style.removeProperty('order');
-        child.removeAttribute('data-yt-aid-order');
-      }
-    });
-  }
-
-  function scheduleFeedReflow(delay = 80) {
-    if (feedReflowTimer) return;
-    feedReflowTimer = setTimeout(reflowFeedGrid, delay);
-  }
-
-  function initFeedReflow() {
-    if (IS_MUSIC_SITE) return;
-    window.addEventListener('resize', () => scheduleFeedReflow(150));
-    window.addEventListener('yt-navigate-finish', () => scheduleFeedReflow(200));
-    document.addEventListener('yt-page-data-updated', () => scheduleFeedReflow(200));
-    document.addEventListener('visibilitychange', () => scheduleFeedReflow(0));
-    // Thẻ quảng cáo chỉ bị ẩn sau khi nội dung của chúng render xong, nên quét nhẹ định kỳ.
-    setInterval(() => {
-      if (document.visibilityState === 'hidden' || !isFeedPage()) return;
-      scheduleFeedReflow(0);
-    }, 1200);
-    scheduleFeedReflow(300);
   }
 
   // ==========================================
