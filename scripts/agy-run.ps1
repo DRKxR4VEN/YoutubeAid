@@ -22,7 +22,7 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 [Console]::OutputEncoding = $utf8
 [IO.File]::WriteAllText($log, "branch: $branch`nprompt: $Prompt`n---`n", $utf8)
 
-& agy --mode accept-edits -p $arg 2>&1 | ForEach-Object {
+& agy -p $arg 2>&1 | ForEach-Object {
   [IO.File]::AppendAllText($log, "$_`n", $utf8)
   "$_"
 }
