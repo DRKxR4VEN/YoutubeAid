@@ -2153,8 +2153,7 @@
     if (miniplayerBusy) return;
     miniplayerBusy = true;
     // While an ad owns the surface the player cannot hand itself to the corner
-    // player; calling setMinimized then hides the controls without any
-    // miniplayer appearing.
+    // player, so don't try.
     if (isAdPlaying() && !isMiniplayerOpen()) {
       miniplayerBusy = false;
       showToast(T('Đang có quảng cáo, thử lại sau'), 'warning');

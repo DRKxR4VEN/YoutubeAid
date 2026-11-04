@@ -106,9 +106,9 @@ Nút **Đoạn nổi bật** nằm trên toolbar trang xem, **ngay trước nút
 
 ### 5e. Nút "Trình phát thu nhỏ" (Miniplayer)
 Nút **Thu nhỏ** nằm trong **cột tiện ích phát** của toolbar, **ngay dưới "Tự động lặp"** và **trên "Video ngẫu nhiên"**:
-- **Thu đúng video đang xem xuống góc màn hình** bằng miniplayer gốc của YouTube — gọi `movie_player.setMinimized(true)`, không tự dựng một player riêng nên chất lượng, phụ đề và phím tắt của YouTube vẫn hoạt động bình thường.
-- **Bấm lần nữa để thoát** (`setMinimized(false)`). Nút **sáng xanh** và tooltip đổi thành **Thoát trình phát thu nhỏ** khi miniplayer đang mở.
-- **Bấm là kiểm chứng thật:** bridge đợi 1,2s rồi kiểm tra `.ytp-miniplayer-ui` thực sự hiển thị; nếu player báo đã thu mà UI miniplayer không xuất hiện, bridge **tự trả player về chỗ cũ** và nút báo **Không mở được trình phát thu nhỏ** — không bao giờ để lại cảnh mất toàn bộ nút điều khiển. **Đang chạy quảng cáo thì không thu** (báo *Đang có quảng cáo, thử lại sau*) để không kéo nhầm quảng cáo xuống góc màn hình.
+- **Thu đúng video đang xem xuống góc màn hình** bằng miniplayer gốc của YouTube — kích hoạt phím tắt `i` của YouTube trên `#movie_player`, nên trang tự về nơi đã đến (mặc định là Trang chủ) và video chạy tiếp ở góc; không tự dựng player riêng nên chất lượng, phụ đề và phím tắt của YouTube vẫn hoạt động bình thường.
+- **Phóng to lại** bằng nút mở rộng của miniplayer. Nút **sáng xanh** và tooltip đổi thành **Thoát trình phát thu nhỏ** khi miniplayer đang mở.
+- **Bấm là kiểm chứng thật:** bridge đợi 1,2s rồi kiểm tra `ytd-app[miniplayer-is-active]`; nếu miniplayer không mở được, nút báo **Không mở được trình phát thu nhỏ**.
 - **Theo sát trạng thái thật:** một `MutationObserver` trên class của `#movie_player` (`ytp-player-minimized`) giữ nút đúng ngay cả khi thu/thoát bằng nút của YouTube hoặc bằng phím `i`; đổi video là gắn lại observer.
 - **Chế độ ẩn tên nút:** nút còn 30×30px và **nằm chung hàng ngang với "Tự động lặp"** (lưới 2 cột × 2 hàng của cột tiện ích phát), "Video ngẫu nhiên" nằm hàng dưới căn giữa cột; hover có tooltip đầy đủ. YouTube Music không có toolbar trang xem nên nút không xuất hiện ở đó.
 
@@ -186,6 +186,8 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 ## Thay Đổi Gần Đây
 
 ### v1.26.0
+- **Sửa nút Thu nhỏ:** trước đây `setMinimized(true)` chỉ đổi player sang giao diện mini ngay tại chỗ, video vẫn to và trang vẫn ở `/watch`. Nay nút dùng phím `i` của YouTube nên player thật sự về góc màn hình và trang về Trang chủ.
+- **Thanh công cụ gọn hơn:** khi bảng âm thanh đang thu gọn, mọi nút nằm chung một dòng tự xuống hàng thay vì ba hàng xếp dọc; **Ẩn tên nút** và **Công cụ** vẫn ghim bên phải.
 - **Bỏ tính năng tự bỏ qua quảng cáo và ẩn banner:** gỡ toàn bộ code, thẻ cài đặt, CSS và bản dịch liên quan (kể cả sắp xếp lại lưới feed và màn hình đen che quảng cáo); **Chặn bằng proxy** là cách chặn quảng cáo duy nhất. Lựa chọn cũ `enableAdSkip` / `enableHideAds` trong `chrome.storage` không còn được đọc.
 - **Xử lý màn hình cảnh báo trình chặn quảng cáo:** khi bật proxy, `ad-proxy.js` để nguyên các bài tự kiểm tra `JSON.parse` của YouTube (phản hồi giả có quảng cáo) nên không còn bị nhận diện, không còn tự chuyển bài trong playlist; vô hiệu callback `onAbnormalityDetected`, sửa request `/player`, và nếu vẫn gặp cảnh báo thì tự tải lại video với biến thể request tiếp theo rồi ẩn giao diện cảnh báo còn sót; danh sách chặn mạng có thêm `log_event`, `qoe`, `ptracking` và `activeview`.
 - **Chặn quảng cáo bằng proxy (mặc định bật):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube, kèm luật `declarativeNetRequest` chặn request quảng cáo chỉ trên `www.youtube.com`.

@@ -906,6 +906,30 @@ html.yta-light .yt-aid-audio-collapse:hover {
   display: inline-flex;
 }
 
+/* With the sound board folded nothing needs the tall columns: every pill flows
+   into one wrapping line, with the preferences pinned to the right edge. */
+.yt-aid-watch-toolbar.yta-audio-collapsed {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.yt-aid-watch-toolbar.yta-audio-collapsed .yt-aid-toolbar-main,
+.yt-aid-watch-toolbar.yta-audio-collapsed .yt-aid-toolbar-row {
+  display: contents;
+}
+
+.yt-aid-watch-toolbar.yta-audio-collapsed .yt-aid-toolbar-stack,
+.yt-aid-watch-toolbar.yta-audio-collapsed #yt-aid-toolbar-stack-media {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.yt-aid-watch-toolbar.yta-audio-collapsed .yt-aid-trim-panel {
+  flex: 1 0 100%;
+}
+
 .yt-aid-audio-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

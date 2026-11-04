@@ -450,11 +450,7 @@
     return [];
   }
 
-  const readMiniplayer = () => {
-    const player = document.getElementById('movie_player');
-    if (!player || typeof player.setMinimized !== 'function') return null;
-    return { player, open: player.classList.contains('ytp-player-minimized') };
-  };
+  const isMiniplayerActive = () => !!document.querySelector('ytd-app[miniplayer-is-active]');
 
   document.addEventListener(REQUEST, (event) => {
     const detail = event.detail;
@@ -470,36 +466,17 @@
     }
 
     if (detail.action === 'miniplayer') {
-      const state = readMiniplayer();
-      if (!state) return answer({ ok: false, error: 'player-not-ready' });
-      const wanted = typeof detail.value === 'boolean' ? detail.value : !state.open;
-      try {
-        state.player.setMinimized(wanted);
-      } catch (e) {
-        return answer({ ok: false, error: 'apply-failed', minimized: state.open });
+      const player = document.getElementById('movie_player');
+      if (!player) return answer({ ok: false, error: 'player-not-ready' });
+      const wanted = !isMiniplayerActive();
+      // player.setMinimized only restyles the player in place. YouTube's "i" shortcut is
+      // what docks it in the corner and takes the page back to where the user came from.
+      for (const type of ['keydown', 'keyup']) {
+        player.dispatchEvent(new KeyboardEvent(type, { key: 'i', code: 'KeyI', keyCode: 73, which: 73, bubbles: true, composed: true, cancelable: true }));
       }
-      if (!wanted) {
-        answer({ ok: true, minimized: false });
-        return;
-      }
-      // Opening: give the corner UI a beat to mount, then verify it really
-      // did. When the player minimises but the miniplayer never renders
-      // (e.g. clicked during a preroll ad) the controls would just vanish —
-      // hand the player back so the toolbar stays usable.
       setTimeout(() => {
-        const minimized = state.player.classList.contains('ytp-player-minimized');
-        const ui = document.querySelector('.ytp-miniplayer-ui');
-        const uiVisible = !!(ui && getComputedStyle(ui).display !== 'none');
-        if (minimized && !uiVisible) {
-          try {
-            state.player.setMinimized(false);
-          } catch (e) {
-            // YouTube will settle the state itself.
-          }
-          answer({ ok: false, error: 'dock-missing', minimized: false });
-          return;
-        }
-        answer({ ok: true, minimized });
+        const minimized = isMiniplayerActive();
+        answer({ ok: minimized === wanted, minimized, error: minimized === wanted ? undefined : 'not-applied' });
       }, 1200);
       return;
     }
