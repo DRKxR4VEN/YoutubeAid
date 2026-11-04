@@ -42,6 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
     enableCloseGuard: false,
     uiScale: 100,
     hideButtonNames: false,
+    enableAutoQuality: true,
+    autoQualityLevel: 'hd1080',
+    extensionTheme: 'auto',
     shortcutKeys: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_KEYS } : { ...FALLBACK_SHORTCUT_KEYS },
     shortcutTaps: SHORTCUTS ? { ...SHORTCUTS.DEFAULT_TAPS } : { ...FALLBACK_SHORTCUT_TAPS }
   };
@@ -375,6 +378,89 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Video quality: one chip per level, 'auto' hands the decision back to
+  // YouTube. A level is a cap — the player can still serve lower on a slow link.
+  const QUALITY_LEVELS = ['highres', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'];
+  const autoQualityStepsEl = document.getElementById('autoQualitySteps');
+  let autoQualityOn = true;
+  let autoQualityLevel = 'hd1080';
+
+  function sanitizeQualityLevel(value) {
+    return QUALITY_LEVELS.includes(value) ? value : 'hd1080';
+  }
+
+  function qualityChipLabel(level) {
+    if (level === 'auto') return T('Tắt');
+    const chip = autoQualityStepsEl
+      ? autoQualityStepsEl.querySelector(`.keybind-tap[data-quality="${level}"]`)
+      : null;
+    return chip ? chip.textContent.trim() : level;
+  }
+
+  function refreshAutoQualityState() {
+    if (!autoQualityStepsEl) return;
+    autoQualityStepsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
+      const level = btn.dataset.quality;
+      const isActive = level === 'auto' ? !autoQualityOn : autoQualityOn && level === autoQualityLevel;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+  }
+
+  function handleQualityPick(level) {
+    const enabled = level !== 'auto';
+    const nextLevel = enabled ? sanitizeQualityLevel(level) : autoQualityLevel;
+    if (enabled && nextLevel === autoQualityLevel && autoQualityOn) return;
+    if (!enabled && !autoQualityOn) return;
+    autoQualityOn = enabled;
+    autoQualityLevel = nextLevel;
+    refreshAutoQualityState();
+    chrome.storage.local.set({ enableAutoQuality: enabled, autoQualityLevel: nextLevel }, () => {
+      void chrome.runtime?.lastError;
+      showStatus(enabled
+        ? T('Đã đặt chất lượng: {0}', [qualityChipLabel(nextLevel)])
+        : T('Đã tắt tự chọn chất lượng'));
+    });
+  }
+
+  // Extension-only theme: 'auto' mirrors whatever YouTube is using, 'light'
+  // and 'dark' force it. The content script owns the mirroring; this page only
+  // stores the choice.
+  const THEME_MODES = ['light', 'dark', 'auto'];
+  const extensionThemeStepsEl = document.getElementById('extensionThemeSteps');
+  let currentThemeMode = 'auto';
+
+  function sanitizeThemeMode(value) {
+    return THEME_MODES.includes(value) ? value : 'auto';
+  }
+
+  function themeChipLabel(mode) {
+    const chip = extensionThemeStepsEl
+      ? extensionThemeStepsEl.querySelector(`.keybind-tap[data-theme="${mode}"]`)
+      : null;
+    return chip ? chip.textContent.trim() : mode;
+  }
+
+  function refreshThemeState() {
+    if (!extensionThemeStepsEl) return;
+    extensionThemeStepsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
+      const isActive = btn.dataset.theme === currentThemeMode;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+  }
+
+  function handleThemePick(mode) {
+    const next = sanitizeThemeMode(mode);
+    if (next === currentThemeMode) return;
+    currentThemeMode = next;
+    refreshThemeState();
+    chrome.storage.local.set({ extensionTheme: next }, () => {
+      void chrome.runtime?.lastError;
+      showStatus(T('Đã đặt chủ đề tiện ích: {0}', [themeChipLabel(next)]));
+    });
+  }
+
   function loadSettings() {
     chrome.storage.local.get(DEFAULTS, (items) => {
       if (I18N) I18N.setLanguage(items.language);
@@ -389,6 +475,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       currentUiScale = sanitizeUiScale(items.uiScale);
       refreshUiScaleState();
+
+      autoQualityOn = !!items.enableAutoQuality;
+      autoQualityLevel = sanitizeQualityLevel(items.autoQualityLevel);
+      refreshAutoQualityState();
+
+      currentThemeMode = sanitizeThemeMode(items.extensionTheme);
+      refreshThemeState();
 
       currentShortcutTaps = SHORTCUTS
         ? SHORTCUTS.sanitizeTaps(items.shortcutTaps)
@@ -437,6 +530,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (autoQualityStepsEl) {
+    autoQualityStepsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
+      btn.addEventListener('click', () => handleQualityPick(btn.dataset.quality));
+    });
+  }
+
+  if (extensionThemeStepsEl) {
+    extensionThemeStepsEl.querySelectorAll('.keybind-tap').forEach((btn) => {
+      btn.addEventListener('click', () => handleThemePick(btn.dataset.theme));
+    });
+  }
+
   langButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!I18N || btn.dataset.lang === I18N.getLanguage()) return;
@@ -466,6 +571,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (changes.uiScale) {
         currentUiScale = sanitizeUiScale(changes.uiScale.newValue);
         refreshUiScaleState();
+      }
+      if (changes.enableAutoQuality) autoQualityOn = !!changes.enableAutoQuality.newValue;
+      if (changes.autoQualityLevel) autoQualityLevel = sanitizeQualityLevel(changes.autoQualityLevel.newValue);
+      if (changes.enableAutoQuality || changes.autoQualityLevel) refreshAutoQualityState();
+      if (changes.extensionTheme) {
+        currentThemeMode = sanitizeThemeMode(changes.extensionTheme.newValue);
+        refreshThemeState();
       }
     });
   } catch (e) { }

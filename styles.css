@@ -46,7 +46,7 @@
 }
 
 /* Light mode overrides if YouTube is in light mode */
-html:not([dark]) {
+html.yta-light {
   --yta-bg-surface: #ffffff;
   --yta-bg-surface-elevated: #f2f2f2;
   --yta-bg-card: #e5e5e5;
@@ -115,24 +115,24 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   z-index: 9999999;
   display: flex;
   flex-direction: column-reverse;
-  gap: 6px;
+  gap: 7px;
   pointer-events: none;
 }
 
 .yt-aid-toast {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   background: rgba(18, 18, 18, 0.95);
   color: #f1f1f1;
-  padding: 5px 10px;
-  border-radius: 8px;
+  padding: 6px 11px;
+  border-radius: 9px;
   border: 1px solid var(--yta-border);
   box-shadow: var(--yta-shadow-md);
   font-family: var(--yta-font-family);
-  font-size: 12px;
+  font-size: 13.2px;
   font-weight: 500;
-  max-width: 260px;
+  max-width: 286px;
   transform: translateY(16px) scale(0.96);
   opacity: 0;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
@@ -156,8 +156,8 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 }
 
 .yt-aid-toast-icon svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   display: block;
 }
 
@@ -183,13 +183,13 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 
 .yt-aid-toast-action {
   margin-left: 2px;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -245,7 +245,7 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 }
 
 .yt-aid-toolbar-main,
-.yt-aid-toolbar-preferences {
+.yt-aid-toolbar-stack {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -253,9 +253,25 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   min-width: 0;
 }
 
+/* Utility columns. Stretching makes both buttons of a column share the width
+   of the wider label, so the pair reads as one block instead of two ragged
+   pills — and in icon mode both collapse to the same 30px square. */
+.yt-aid-toolbar-stack {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+
 .yt-aid-toolbar-preferences {
   margin-left: auto;
-  justify-content: flex-end;
+}
+
+/* Inside a column the random control is stretched like its neighbours, so its
+   main action absorbs the leftover width and the filter stays flush with the
+   column edge instead of leaving a hole on the right. */
+.yt-aid-toolbar-stack .yt-aid-split-group .yt-aid-random-go {
+  flex: 1 1 auto;
 }
 
 /* YouTube Native Pill Buttons */
@@ -382,6 +398,19 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   color: var(--yta-brand-blue);
 }
 
+/* Highlight jump. The "no highlight" state is dimmed rather than truly
+   `disabled`, because an inert button would not answer the hover that carries
+   the explanation the user asked for. */
+.yt-aid-highlight-btn.yt-aid-btn-off {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.yt-aid-highlight-btn:not(.yt-aid-btn-off):hover {
+  border-color: rgba(62, 166, 255, 0.3);
+  color: var(--yta-brand-blue);
+}
+
 /* Auto Loop button: soft red = OFF, green = ON */
 .yt-aid-loop-indicator {
   background: rgba(239, 68, 68, 0.16);
@@ -401,6 +430,22 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 
 .yt-aid-loop-indicator.active:hover {
   background: rgba(43, 166, 64, 0.28);
+}
+
+/* Miniplayer button: brand blue while the corner player is open */
+.yt-aid-miniplayer-indicator:hover {
+  border-color: rgba(62, 166, 255, 0.3);
+  color: var(--yta-brand-blue);
+}
+
+.yt-aid-miniplayer-indicator.active {
+  background: rgba(62, 166, 255, 0.18);
+  color: var(--yta-brand-blue);
+  border-color: rgba(62, 166, 255, 0.4);
+}
+
+.yt-aid-miniplayer-indicator.active:hover {
+  background: rgba(62, 166, 255, 0.28);
 }
 
 /* ========================================================
@@ -436,6 +481,9 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--yta-border) transparent;
   background: var(--yta-bg-menu);
   border: 1px solid var(--yta-border);
   border-radius: 12px;
@@ -449,6 +497,21 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
 .yt-aid-tools-menu-show {
   opacity: 1;
   transform: translateY(0) scale(1);
+}
+
+/* WebKit needs the same visible groove, otherwise the last rows of a long menu
+   look like they are missing rather than scrolled out of reach. */
+.yt-aid-tools-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.yt-aid-tools-menu::-webkit-scrollbar-thumb {
+  background: var(--yta-border);
+  border-radius: var(--yta-radius-pill);
+}
+
+.yt-aid-tools-menu::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .yt-aid-tools-title {
@@ -491,6 +554,150 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   font-size: 11px;
   line-height: 1.35;
   color: var(--yta-text-muted);
+}
+
+/* Inline actions for a tools row (the bookmark row uses a count chip + save). */
+.yt-aid-tools-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.yt-aid-tools-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid var(--yta-border-subtle);
+  border-radius: var(--yta-radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--yta-text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.yt-aid-tools-chip:hover,
+.yt-aid-tools-chip:focus-visible {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-tools-chip.is-primary {
+  background: rgba(62, 166, 255, 0.20);
+  border-color: rgba(62, 166, 255, 0.45);
+  color: var(--yta-brand-blue);
+}
+
+.yt-aid-tools-chip.is-empty {
+  opacity: 0.55;
+}
+
+html.yta-light .yt-aid-tools-chip {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+html.yta-light .yt-aid-tools-chip:hover {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+html.yta-light .yt-aid-tools-chip.is-primary {
+  background: rgba(62, 166, 255, 0.14);
+}
+
+/* Quality picker: the level chips wrap freely so the menu keeps its width,
+   and the active chip uses the same blue accent as the audio presets. */
+.yt-aid-quality-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--yta-border-subtle);
+}
+
+.yt-aid-quality-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.yt-aid-quality-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-quality-now {
+  font-size: 10.5px;
+  color: var(--yta-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-aid-quality-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.yt-aid-quality-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  min-width: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--yta-border-subtle);
+  border-radius: var(--yta-radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--yta-text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.yt-aid-quality-chip:hover,
+.yt-aid-quality-chip:focus-visible {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-quality-chip.is-active {
+  background: rgba(62, 166, 255, 0.20);
+  border-color: rgba(62, 166, 255, 0.45);
+  color: var(--yta-brand-blue);
+}
+
+.yt-aid-quality-hint {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--yta-text-muted);
+}
+
+html.yta-light .yt-aid-quality-chip {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+html.yta-light .yt-aid-quality-chip:hover {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+html.yta-light .yt-aid-quality-chip.is-active {
+  background: rgba(62, 166, 255, 0.14);
 }
 
 #yt-aid-random-home {
@@ -556,20 +763,25 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
    2b. WATCH TOOLBAR — UNIFIED AUDIO PANEL
    ========================================================
    One card holding the four sliders (volume, bass, speed, reverb), stacked
-   so each track stays long and easy to drag precisely. The panel owns a
-   fixed width so toggling the button names can never stretch or squeeze it
-   — the prefs cluster on the same row absorbs the leftover space instead.
+   so each track stays long and easy to drag precisely. The panel stretches
+   across whatever the two utility columns leave on their row, so they are
+   never stranded at the far right with a hole in between.
    Colours stay neutral (theme text, white/gray fill) so the card blends
    into YouTube instead of shouting over it. */
 .yt-aid-audio-panel {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* Fixed footprint: identical in label and icon mode at every width.
-     Capped at 440px but always leaves ~560px of the row for the prefs
-     cluster, so the two-row layout survives typical window sizes. */
-  flex: 0 0 auto;
-  width: min(440px, max(240px, calc(100% - 560px)));
+  /* The panel takes every pixel of the row the utility columns leave it, so
+     they can never sit stranded at the far right with a hole in the
+     middle. That also keeps the preferences column glued to the right edge in
+     both label and icon mode: the panel simply grows into the space its
+     neighbours free up. 340px is the floor below which the tracks stop being
+     draggable — if a column cannot fit beside that, it drops to its own line. */
+  --yta-thumb-w: 12px;
+  flex: 1 1 340px;
+  min-width: 340px;
+  max-width: 1100px;
   padding: 7px 10px 8px;
   box-sizing: border-box;
   background: rgba(255, 255, 255, 0.06);
@@ -643,6 +855,57 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   height: 13px;
 }
 
+/* Fold-away control: same round token as the reset button, sitting next to it. */
+.yt-aid-audio-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--yta-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.yt-aid-audio-collapse:hover,
+.yt-aid-audio-collapse:focus-visible {
+  background: rgba(255, 255, 255, 0.20);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-audio-collapse svg {
+  width: 13px;
+  height: 13px;
+}
+
+html.yta-light .yt-aid-audio-collapse {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+html.yta-light .yt-aid-audio-collapse:hover {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+/* Collapsed state: the panel is replaced by a single "Âm thanh" pill in the
+   same slot, so the preferences cluster keeps its right-aligned position. */
+.yt-aid-audio-collapsed {
+  display: none;
+  flex-shrink: 0;
+}
+
+.yt-aid-watch-toolbar.yta-audio-collapsed .yt-aid-audio-panel {
+  display: none;
+}
+
+.yt-aid-watch-toolbar.yta-audio-collapsed .yt-aid-audio-collapsed {
+  display: inline-flex;
+}
+
 .yt-aid-audio-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -650,15 +913,15 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   min-width: 0;
 }
 
-/* One row per slider: name, track, value readout. No decorative icons —
-   the labels alone identify each control. The four rows stack in a single
-   column so every track stays long (~300px) and the 0.05x / 5% notches stay
-   easy to hit precisely. */
+/* One row per slider: name, then the track with its value bubble riding on the
+   thumb. No decorative icons — the labels alone identify each control. The four
+   rows stack in a single column so every track stays long (~300px) and the
+   0.05x / 5% notches stay easy to hit precisely. */
 .yt-aid-fx-field {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 56px;
+  grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -671,14 +934,37 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   text-overflow: ellipsis;
 }
 
+/* Headroom for the bubble: it floats above the thumb instead of sitting in a
+   fixed column at the end of the row, so the number is always where the user
+   just dragged to. */
+.yt-aid-fx-track {
+  position: relative;
+  display: block;
+  padding-top: 16px;
+  min-width: 0;
+}
+
 .yt-aid-fx-value {
-  font-size: 11.5px;
+  position: absolute;
+  top: 0;
+  /* --pf is the 0-1 thumb fraction set by JS. The bubble is clamped so it can
+     never hang off either end of the track. */
+  left: clamp(19px, calc(var(--pf, 0) * (100% - var(--yta-thumb-w, 12px)) + var(--yta-thumb-w, 12px) / 2), calc(100% - 19px));
+  transform: translateX(-50%);
+  padding: 0 5px;
+  border-radius: var(--yta-radius-pill);
+  background: rgba(255, 255, 255, 0.10);
+  font-size: 10.5px;
   font-weight: 600;
+  line-height: 14px;
+  height: 14px;
   color: var(--yta-text-primary);
-  text-align: right;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+html.yta-light .yt-aid-fx-value {
+  background: rgba(0, 0, 0, 0.08);
 }
 
 /* Preset chips: one tap applies the genre's typical levels; the active chip
@@ -721,15 +1007,15 @@ body.yt-aid-hide-copy-buttons .yt-aid-copy-link {
   color: var(--yta-brand-blue);
 }
 
-html:not([dark]) .yt-aid-preset-chip {
+html.yta-light .yt-aid-preset-chip {
   background: rgba(0, 0, 0, 0.04);
 }
 
-html:not([dark]) .yt-aid-preset-chip:hover {
+html.yta-light .yt-aid-preset-chip:hover {
   background: rgba(0, 0, 0, 0.09);
 }
 
-html:not([dark]) .yt-aid-preset-chip.is-active {
+html.yta-light .yt-aid-preset-chip.is-active {
   background: rgba(62, 166, 255, 0.14);
 }
 
@@ -763,31 +1049,34 @@ html:not([dark]) .yt-aid-preset-chip.is-active {
 }
 
 /* The Shorts audio panel renders inside a dropdown, so the watch-page width
-   formula (which reserves room for the prefs cluster) does not apply there. */
+   formula (which reserves room for the utility columns) does not apply there. */
 .yt-aid-shorts-audio-menu {
-  width: 316px;
+  width: 340px;
   box-sizing: border-box;
 }
 
 .yt-aid-shorts-audio-menu .yt-aid-audio-panel {
   flex: none;
   width: 100%;
+  min-width: 0;
+  max-width: none;
 }
 
-/* Range: a slim rounded track whose filled portion uses the theme-neutral
-   fill, with a plain thumb. --p is set by JS. */
+/* Range: a rounded track whose filled portion uses the theme-neutral fill, with
+   a capsule thumb — taller than the track so it reads as a handle. --p/--pf are
+   set by JS. The palette is untouched; only the silhouette changed. */
 .yt-aid-audio-panel input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 18px;
+  height: 20px;
   margin: 0;
   background: transparent;
   cursor: pointer;
 }
 
 .yt-aid-audio-panel input[type="range"]::-webkit-slider-runnable-track {
-  height: 5px;
+  height: 7px;
   border-radius: 999px;
   background: linear-gradient(to right,
     var(--yta-range-fill) 0 var(--p),
@@ -797,22 +1086,22 @@ html:not([dark]) .yt-aid-preset-chip.is-active {
 .yt-aid-audio-panel input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 13px;
-  height: 13px;
-  margin-top: -4px;
+  width: var(--yta-thumb-w, 12px);
+  height: 20px;
+  margin-top: -6.5px;
   border: none;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--yta-range-thumb);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-  transition: transform 0.12s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  transition: box-shadow 0.12s ease;
 }
 
 .yt-aid-audio-panel input[type="range"]:hover::-webkit-slider-thumb {
-  transform: scale(1.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55), 0 0 0 4px rgba(62, 166, 255, 0.16);
 }
 
 .yt-aid-audio-panel input[type="range"]:active::-webkit-slider-thumb {
-  transform: scale(1.28);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55), 0 0 0 6px rgba(62, 166, 255, 0.24);
 }
 
 .yt-aid-audio-panel input[type="range"]:focus-visible::-webkit-slider-thumb {
@@ -820,39 +1109,39 @@ html:not([dark]) .yt-aid-preset-chip.is-active {
 }
 
 .yt-aid-audio-panel input[type="range"]::-moz-range-track {
-  height: 5px;
+  height: 7px;
   border-radius: 999px;
   background: var(--yta-range-track);
 }
 
 .yt-aid-audio-panel input[type="range"]::-moz-range-progress {
-  height: 5px;
+  height: 7px;
   border-radius: 999px;
   background: var(--yta-range-fill);
 }
 
 .yt-aid-audio-panel input[type="range"]::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
+  width: var(--yta-thumb-w, 12px);
+  height: 20px;
   border: none;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--yta-range-thumb);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
 }
 
-html:not([dark]) .yt-aid-audio-panel {
+html.yta-light .yt-aid-audio-panel {
   background: rgba(0, 0, 0, 0.04);
 }
 
-html:not([dark]) .yt-aid-audio-panel.is-active {
+html.yta-light .yt-aid-audio-panel.is-active {
   background: rgba(62, 166, 255, 0.10);
 }
 
-html:not([dark]) .yt-aid-audio-reset {
+html.yta-light .yt-aid-audio-reset {
   background: rgba(0, 0, 0, 0.07);
 }
 
-html:not([dark]) .yt-aid-audio-reset:hover {
+html.yta-light .yt-aid-audio-reset:hover {
   background: rgba(0, 0, 0, 0.14);
 }
 
@@ -1196,15 +1485,15 @@ yt-lockup-view-model:hover .yt-aid-sidebar-bar {
   color: #ffffff;
 }
 
-html:not([dark]) .yt-aid-side-trigger {
+html.yta-light .yt-aid-side-trigger {
   background: rgba(0, 0, 0, 0.06);
   border-color: rgba(0, 0, 0, 0.12);
   color: rgba(0, 0, 0, 0.6);
 }
 
-html:not([dark]) .yt-aid-side-trigger:hover,
-html:not([dark]) .yt-aid-side-trigger:focus-visible,
-html:not([dark]) .yt-aid-sidebar-bar:hover .yt-aid-side-trigger {
+html.yta-light .yt-aid-side-trigger:hover,
+html.yta-light .yt-aid-side-trigger:focus-visible,
+html.yta-light .yt-aid-sidebar-bar:hover .yt-aid-side-trigger {
   background: rgba(0, 0, 0, 0.12);
   border-color: rgba(0, 0, 0, 0.22);
   color: #0f0f0f;
@@ -1302,18 +1591,18 @@ ytd-grid-video-renderer:hover .yt-aid-home-trigger,
   color: #ffffff;
 }
 
-html:not([dark]) .yt-aid-home-trigger {
+html.yta-light .yt-aid-home-trigger {
   background: rgba(0, 0, 0, 0.06);
   border-color: rgba(0, 0, 0, 0.12);
   color: rgba(0, 0, 0, 0.6);
 }
 
-html:not([dark]) ytd-rich-item-renderer:hover .yt-aid-home-trigger,
-html:not([dark]) ytd-video-renderer:hover .yt-aid-home-trigger,
-html:not([dark]) ytd-grid-video-renderer:hover .yt-aid-home-trigger,
-html:not([dark]) .yt-aid-home-trigger:hover,
-html:not([dark]) .yt-aid-home-trigger:focus-visible,
-html:not([dark]) .yt-aid-home-trigger[aria-expanded="true"] {
+html.yta-light ytd-rich-item-renderer:hover .yt-aid-home-trigger,
+html.yta-light ytd-video-renderer:hover .yt-aid-home-trigger,
+html.yta-light ytd-grid-video-renderer:hover .yt-aid-home-trigger,
+html.yta-light .yt-aid-home-trigger:hover,
+html.yta-light .yt-aid-home-trigger:focus-visible,
+html.yta-light .yt-aid-home-trigger[aria-expanded="true"] {
   background: rgba(0, 0, 0, 0.12);
   border-color: rgba(0, 0, 0, 0.22);
   color: #0f0f0f;
@@ -1435,13 +1724,13 @@ html:not([dark]) .yt-aid-home-trigger[aria-expanded="true"] {
   background: rgba(255, 255, 255, 0.3);
 }
 
-html:not([dark]) .yt-aid-channel-btn {
+html.yta-light .yt-aid-channel-btn {
   background: rgba(255, 255, 255, 0.9);
   border-color: rgba(0, 0, 0, 0.12);
   color: #0f0f0f;
 }
 
-html:not([dark]) .yt-aid-channel-btn:hover {
+html.yta-light .yt-aid-channel-btn:hover {
   background: rgba(255, 255, 255, 1);
   border-color: rgba(0, 0, 0, 0.24);
 }
@@ -2249,15 +2538,6 @@ html[data-yt-aid-ad] .html5-video-player::after {
   margin-left: -2px;
 }
 
-.yt-aid-watch-toolbar .yt-aid-bookmark-log-btn > span {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.yt-aid-watch-toolbar .yt-aid-bookmark-log-btn > span:empty {
-  display: none;
-}
-
 .yt-aid-hide-names .yt-aid-pill-btn:not(.yt-aid-name-toggle) {
   width: 30px;
   height: 30px;
@@ -2279,7 +2559,27 @@ html[data-yt-aid-ad] .html5-video-player::after {
 }
 
 /* Icon mode keeps the same two-row grid as label mode (utilities stay pinned
-   right) so the name-toggle never changes position when toggling. */
+   right) so the name-toggle never changes position when toggling. Inside the
+   two utility columns the buttons are no longer equal width — the name toggle
+   keeps its label while its neighbours collapse to 30px — so the column centers
+   them instead of stretching, which would leave a lone icon stranded at one edge. */
+.yt-aid-hide-names .yt-aid-toolbar-stack {
+  align-items: center;
+}
+
+/* Icon mode: loop and miniplayer share one row of the media column and the
+   random group settles on its own row underneath. */
+.yt-aid-hide-names #yt-aid-toolbar-stack-media {
+  display: grid;
+  grid-template-columns: 30px 30px;
+  grid-template-rows: 30px auto;
+  gap: 6px;
+}
+
+.yt-aid-hide-names #yt-aid-toolbar-stack-media .yt-aid-split-group {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
 
 .yt-aid-hide-names .yt-aid-name-toggle {
   border-color: rgba(62, 166, 255, 0.45);
@@ -2298,13 +2598,244 @@ html[data-yt-aid-ad] .html5-video-player::after {
   padding: 0 7px;
 }
 
-.yt-aid-hide-names .yt-aid-bookmark-log-btn > span {
+/* The audio panel keeps stretching in icon mode too: it absorbs whatever the
+   preferences cluster leaves, so hiding names only collapses the labels. */
+
+/* ========================================================
+   CLIP TRIM PANEL ("Cắt đoạn")
+   ======================================================== */
+/* The panel is its own row inside the toolbar card, so opening it never moves
+   the buttons above it. It stays compact: two marks, the length, then the
+   record buttons. */
+.yt-aid-trim-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px 10px 8px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--yta-border-subtle);
+  border-radius: 12px;
+}
+
+.yt-aid-trim-panel[hidden] {
   display: none;
 }
 
-/* The audio panel is intentionally NOT re-sized in icon mode: its width is
-   fixed per the formula above, so hiding names never shrinks, stretches or
-   shifts it — only the button labels around it collapse. */
+.yt-aid-trim-marks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.yt-aid-trim-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--yta-border-subtle);
+  border-radius: var(--yta-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yta-text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  white-space: nowrap;
+}
+
+.yt-aid-trim-mark:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.yt-aid-trim-mark:active {
+  transform: scale(0.97);
+}
+
+.yt-aid-trim-role {
+  color: var(--yta-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.yt-aid-trim-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.yt-aid-trim-mark:not(.yt-aid-btn-off) .yt-aid-trim-time {
+  color: var(--yta-brand-blue);
+}
+
+/* Length chip sits between the two marks and holds its own line so the marks
+   cannot drift apart when the label text is long. */
+.yt-aid-trim-len {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--yta-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-aid-trim-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.yt-aid-trim-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: var(--yta-radius-pill);
+  background: rgba(62, 166, 255, 0.16);
+  color: var(--yta-brand-blue);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  white-space: nowrap;
+}
+
+.yt-aid-trim-go svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.yt-aid-trim-go:hover {
+  background: rgba(62, 166, 255, 0.30);
+}
+
+.yt-aid-trim-go:active {
+  transform: scale(0.97);
+}
+
+/* Disabled state stays hoverable (the tooltip explains why), matching the
+   other toolbar buttons. */
+.yt-aid-trim-go.yt-aid-btn-off,
+.yt-aid-trim-go.yt-aid-btn-off:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--yta-text-muted);
+}
+
+.yt-aid-trim-mark.yt-aid-btn-off,
+.yt-aid-trim-mark.yt-aid-btn-off:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--yta-text-muted);
+  cursor: default;
+  transform: none;
+}
+
+.yt-aid-trim-cancel {
+  margin-left: auto;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--yta-border-subtle);
+  border-radius: var(--yta-radius-pill);
+  background: transparent;
+  color: var(--yta-text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.yt-aid-trim-cancel:hover {
+  background: var(--yta-bg-hover);
+  color: var(--yta-text-primary);
+}
+
+.yt-aid-trim-cancel[hidden] {
+  display: none;
+}
+
+.yt-aid-trim-progress {
+  height: 4px;
+  border-radius: var(--yta-radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.yt-aid-trim-progress[hidden] {
+  display: none;
+}
+
+.yt-aid-trim-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--yta-brand-blue);
+  transition: width 0.12s linear;
+}
+
+.yt-aid-trim-note {
+  font-size: 11px;
+  color: var(--yta-text-secondary);
+}
+
+/* Open panel (or a running recording) marks its toolbar button, like the other
+   toggles in the bar. */
+.yt-aid-trim-btn.active,
+.yt-aid-trim-btn.active:hover {
+  background: rgba(62, 166, 255, 0.22);
+  color: var(--yta-brand-blue);
+}
+
+html.yta-light .yt-aid-trim-btn.active,
+html.yta-light .yt-aid-trim-btn.active:hover {
+  background: rgba(0, 109, 189, 0.16);
+  color: #006dbe;
+}
+
+html.yta-light .yt-aid-trim-panel {
+  background: rgba(0, 0, 0, 0.03);
+}
+html.yta-light .yt-aid-trim-mark,
+html.yta-light .yt-aid-trim-cancel {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--yta-text-primary);
+}
+
+html.yta-light .yt-aid-trim-mark:hover {
+  background: rgba(0, 0, 0, 0.10);
+}
+
+html.yta-light .yt-aid-trim-go {
+  background: rgba(0, 109, 189, 0.12);
+  color: #006dbe;
+}
+
+html.yta-light .yt-aid-trim-go:hover {
+  background: rgba(0, 109, 189, 0.22);
+}
+
+html.yta-light .yt-aid-trim-go.yt-aid-btn-off,
+html.yta-light .yt-aid-trim-go.yt-aid-btn-off:hover,
+html.yta-light .yt-aid-trim-mark.yt-aid-btn-off,
+html.yta-light .yt-aid-trim-mark.yt-aid-btn-off:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--yta-text-muted);
+}
+
+html.yta-light .yt-aid-trim-progress {
+  background: rgba(0, 0, 0, 0.10);
+}
 
 
 /* Thanh random nằm ngoài lưới video, chiếm cả hàng và căn giữa */
@@ -2902,5 +3433,20 @@ body.yt-aid-no-animations .yt-aid-newtab-btn:hover svg,
 body.yt-aid-no-animations .yt-aid-queue-btn:active,
 body.yt-aid-no-animations .yt-aid-toast-clickable-icon:hover {
   transform: none !important;
+}
+
+/* YouTube's own light-DOM animations. 1ms rather than none: YouTube listens for
+   transitionend/animationend to close menus and dialogs, so a real (but instant)
+   transition still has to fire those events. Shadow roots are handled by
+   perf-bridge.js, which a content-script stylesheet cannot reach. */
+body.yt-aid-no-animations *,
+body.yt-aid-no-animations *::before,
+body.yt-aid-no-animations *::after {
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
 }
 

@@ -519,6 +519,14 @@
       font-size: 11.5px;
     }
 
+    /* Quality picker keeps its label and hint on their own lines so the level
+       chips always start a fresh row instead of flowing after the text. */
+    .keybind-taps-stacked .keybind-taps-label,
+    .keybind-taps-stacked .keybind-taps-desc {
+      flex-basis: 100%;
+      margin: 0;
+    }
+
     @media (max-width: 560px) {
       .keybind-taps-desc {
         margin-left: 0;
@@ -936,6 +944,29 @@
         <button type="button" class="keybind-tap" data-scale="120">120%</button>
         <button type="button" class="keybind-tap" data-scale="130">130%</button>
         <span class="keybind-taps-desc" data-i18n="Áp dụng cho toàn bộ nút và chữ của tiện ích.">Áp dụng cho toàn bộ nút và chữ của tiện ích.</span>
+      </div>
+
+      <div class="keybind-taps" id="extensionThemeSteps" role="group" data-i18n-aria="Chủ đề tiện ích" aria-label="Chủ đề tiện ích">
+        <span class="keybind-taps-label" data-i18n="Chủ đề tiện ích">Chủ đề tiện ích</span>
+        <button type="button" class="keybind-tap" data-theme="light" data-i18n="Sáng">Sáng</button>
+        <button type="button" class="keybind-tap" data-theme="dark" data-i18n="Tối">Tối</button>
+        <button type="button" class="keybind-tap" data-theme="auto" data-i18n="Tự đồng bộ">Tự đồng bộ</button>
+        <span class="keybind-taps-desc" data-i18n="Chỉ đổi giao diện của tiện ích, không đổi giao diện YouTube">Chỉ đổi giao diện của tiện ích, không đổi giao diện YouTube</span>
+      </div>
+
+      <div class="keybind-taps keybind-taps-stacked" id="autoQualitySteps" role="group" data-i18n-aria="Chất lượng video tự động" aria-label="Chất lượng video tự động">
+        <span class="keybind-taps-label" data-i18n="Chất lượng video tự động">Chất lượng video tự động</span>
+        <button type="button" class="keybind-tap" data-quality="auto" data-i18n="Tắt">Tắt</button>
+        <button type="button" class="keybind-tap" data-quality="highres">8K</button>
+        <button type="button" class="keybind-tap" data-quality="hd2160">4K</button>
+        <button type="button" class="keybind-tap" data-quality="hd1440">2K</button>
+        <button type="button" class="keybind-tap" data-quality="hd1080">1080p</button>
+        <button type="button" class="keybind-tap" data-quality="hd720">720p</button>
+        <button type="button" class="keybind-tap" data-quality="large">480p</button>
+        <button type="button" class="keybind-tap" data-quality="medium">360p</button>
+        <button type="button" class="keybind-tap" data-quality="small">240p</button>
+        <button type="button" class="keybind-tap" data-quality="tiny">144p</button>
+        <span class="keybind-taps-desc" data-i18n="Video thiếu mức đã chọn sẽ phát ở mức cao nhất nó có.">Video thiếu mức đã chọn sẽ phát ở mức cao nhất nó có.</span>
       </div>
     </div>
   </section>
