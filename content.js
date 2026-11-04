@@ -93,6 +93,7 @@
     enableMediaDownload: true,
     enableAdSkip: true,
     enableHideAds: true,
+    enableAdProxy: false,
     enableShortsAutoScroll: false,
     enableAnimations: true,
     enableCloseGuard: false,
@@ -321,8 +322,8 @@
     if (IS_MUSIC_SITE) return;
 
     if (!settings.enableShortcuts) resetKeyBuffer();
-    if (changed('enableAdSkip') || changed('enableHideAds')) syncAdSkipSettings();
-    if (changed('enableHideAds')) {
+    if (changed('enableAdSkip') || changed('enableHideAds') || changed('enableAdProxy')) syncAdSkipSettings();
+    if (changed('enableHideAds') || changed('enableAdProxy')) {
       feedReflowSig = '';
       scheduleFeedReflow(0);
     }
@@ -7597,6 +7598,15 @@
   let adSkipObservers = [];
   let adSkipRaf = 0;
 
+  // Chặn bằng proxy thay thế cả hai tính năng nhưng không đổi lựa chọn đã lưu của người dùng.
+  function adSkipActive() {
+    return !!settings.enableAdSkip && !settings.enableAdProxy;
+  }
+
+  function hideAdsActive() {
+    return !!settings.enableHideAds && !settings.enableAdProxy;
+  }
+
   function getAdVideo(player) {
     return player.querySelector('video.html5-main-video') || player.querySelector('video');
   }
@@ -7706,7 +7716,7 @@
     const player = getPlayerElement();
     if (!player) return;
 
-    if (!settings.enableAdSkip) {
+    if (!adSkipActive()) {
       restoreAfterAd(player);
       return;
     }
@@ -7780,7 +7790,7 @@
 
   function scheduleAdSkip(delay) {
     // Nothing to detect while the feature is off; observers may still fire.
-    if (!settings.enableAdSkip) return;
+    if (!adSkipActive()) return;
     if (adSkipRaf) return;
     if (typeof delay === 'number' && delay > 0) {
       adSkipRaf = setTimeout(runAdSkip, delay);
@@ -7828,20 +7838,10 @@
     }
   }
 
-  function clearHiddenAdElements() {
-    document.querySelectorAll('[data-yt-aid-hidden-ad]').forEach((el) => {
-      el.style.removeProperty('display');
-      el.removeAttribute('data-yt-aid-hidden-ad');
-    });
-  }
-
   function syncAdSkipSettings() {
-    document.body.classList.toggle('yt-aid-hide-ads', !!settings.enableHideAds);
-    if (!settings.enableHideAds) {
-      clearHiddenAdElements();
-    }
+    document.body.classList.toggle('yt-aid-hide-ads', hideAdsActive());
     if (IS_MUSIC_SITE) return;
-    if (!settings.enableAdSkip) {
+    if (!adSkipActive()) {
       const player = getPlayerElement();
       if (player) restoreAfterAd(player);
       else setAdHidden(false);
@@ -7849,41 +7849,6 @@
     }
     attachAdSkipObservers();
     scheduleAdSkip();
-  }
-
-  function removeSecondaryAdBanners() {
-    if (!settings.enableHideAds) {
-      clearHiddenAdElements();
-      return;
-    }
-    try {
-      const adSlots = document.querySelectorAll(
-        'ytd-ad-slot-renderer, ' +
-        'ytd-companion-slot-renderer, ' +
-        'ytd-action-companion-ad-renderer, ' +
-        'ytd-in-feed-ad-layout-renderer, ' +
-        'ytd-promoted-sparkles-web-renderer, ' +
-        'ytd-compact-promoted-video-renderer, ' +
-        'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"], ' +
-        'ytd-engagement-panel-section-list-renderer:has(ytd-ads-engagement-panel-content-renderer), ' +
-        '#masthead-ad'
-      );
-      adSlots.forEach((slot) => {
-        if (slot.style.getPropertyValue('display') !== 'none') {
-          slot.style.setProperty('display', 'none', 'important');
-          slot.setAttribute('data-yt-aid-hidden-ad', '1');
-        }
-        const parentCard = slot.closest('ytd-rich-item-renderer');
-        if (
-          parentCard &&
-          !parentCard.closest('#secondary, ytd-watch-next-secondary-results-renderer') &&
-          !parentCard.querySelector('ytd-rich-grid-media, yt-lockup-view-model, ytd-video-renderer, ytd-reel-item-renderer, ytd-shorts-lockup-view-model')
-        ) {
-          parentCard.style.setProperty('display', 'none', 'important');
-          parentCard.setAttribute('data-yt-aid-hidden-ad', '1');
-        }
-      });
-    } catch (e) { }
   }
 
   function initAdSkipper() {
@@ -7898,8 +7863,7 @@
     // it stays slow and quiet while the tab is in the background.
     setInterval(() => {
       if (document.visibilityState === 'hidden') return;
-      removeSecondaryAdBanners();
-      if (!settings.enableAdSkip) return;
+      if (!adSkipActive()) return;
       attachAdSkipObservers();
       runAdSkip();
     }, AD_SKIP_POLL_MS);
@@ -7949,7 +7913,7 @@
       feedReflowObserver.observe(container, { childList: true });
     }
 
-    if (!settings.enableHideAds) {
+    if (!hideAdsActive()) {
       clearFeedReflow(container);
       feedReflowSig = '';
       return;
@@ -7958,7 +7922,10 @@
     const children = [...container.children];
     const firstItem = children.find((c) => c.tagName === 'YTD-RICH-ITEM-RENDERER' && c.getAttribute('items-per-row'));
     const perRow = Math.max(1, parseInt(firstItem && firstItem.getAttribute('items-per-row'), 10) || 1);
-    const visible = children.map((c) => getComputedStyle(c).display !== 'none');
+    const visible = children.map((c) => {
+      const style = getComputedStyle(c);
+      return style.display !== 'none' && style.position !== 'absolute'; // absolute = thẻ quảng cáo đã ẩn
+    });
     const sig = `${perRow}|${visible.map((v) => (v ? 1 : 0)).join('')}`;
     if (sig === feedReflowSig) return;
     feedReflowSig = sig;

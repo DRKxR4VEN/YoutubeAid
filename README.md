@@ -167,7 +167,8 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 ### 12. Tự Động Bỏ Qua Quảng Cáo & Ẩn Banner
 - **Auto skip:** Tự động tắt tiếng, tăng tốc độ phát lên tối đa và nhấn nút Bỏ qua ngay khi xuất hiện.
 - **Hiệu ứng che quảng cáo:** Màn hình đen với vòng xoay đệm (spinner) ở tâm như lúc đang tải mạng, không gây chói mắt.
-- **Ẩn triệt để banner quảng cáo:** Xóa hoàn toàn banner "Được tài trợ" ở cột đề xuất bên phải (`#secondary`), trang chủ và masthead.
+- **Ẩn banner quảng cáo:** Banner "Được tài trợ" ở cột đề xuất bên phải (`#secondary`), trang chủ và masthead không còn hiển thị nhưng vẫn được render (1px, trong suốt) để hạn chế bị YouTube nhận là đã chặn quảng cáo.
+- **Chặn bằng proxy (mặc định tắt):** Theo cách của Brave Shields: lọc dữ liệu quảng cáo khỏi phản hồi của YouTube trước khi trình phát đọc và chặn request quảng cáo ở tầng mạng, không cần server riêng. Khi bật, **Bỏ quảng cáo** và **Ẩn quảng cáo** tự tắt nhưng vẫn giữ lựa chọn cũ để khôi phục khi tắt proxy. Cần tải lại trang YouTube sau khi đổi.
 
 ### 13. Tự Lướt Shorts
 - Tự động chuyển tiếp sang video Shorts tiếp theo khi xem xong video hiện tại, rảnh tay thưởng thức video ngắn.
@@ -187,6 +188,11 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 ---
 
 ## Thay Đổi Gần Đây
+
+### v1.26.0
+- **Xử lý màn hình cảnh báo trình chặn quảng cáo:** khi bật proxy, `ad-proxy.js` để nguyên các bài tự kiểm tra `JSON.parse` của YouTube (phản hồi giả có quảng cáo) nên không còn bị nhận diện, không còn tự chuyển bài trong playlist; vô hiệu callback `onAbnormalityDetected`, sửa request `/player`, và nếu vẫn gặp cảnh báo thì tự tải lại video với biến thể request tiếp theo rồi ẩn giao diện cảnh báo còn sót; danh sách chặn mạng có thêm `log_event`, `qoe`, `ptracking` và `activeview`.
+- **Chặn quảng cáo bằng proxy (mặc định tắt):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube, kèm luật `declarativeNetRequest` chặn request quảng cáo chỉ trên `www.youtube.com`. Khi bật, tự bỏ qua và ẩn banner tự tắt mà không đổi lựa chọn đã lưu.
+- **Làm lại ẩn banner quảng cáo:** bỏ vòng quét JS 150ms và `display:none`; chỉ dùng CSS giữ ô quảng cáo render ở 1px trong suốt, nhằm giảm nguy cơ hiện màn hình cảnh báo trình chặn quảng cáo.
 
 ### v1.25.0
 - **Sửa xung đột Âm lượng ↔ Bass bằng trần mềm (soft-clipper).** Trước đây mạch âm thanh kết thúc bằng một `DynamicsCompressor` (ratio 20, threshold -1.5 dB) chỉ **kích hoạt theo slider Âm lượng**: kéo bass lên 80–100% **trước** rồi mới nâng âm lượng qua 100% là nhốt toàn bộ phần trầm đã nâng vào một compressor hard-knee, nên tiếng bị "lán át", bass tự bóp mạnh rồi nhả (pumping) và hai slider có cảm giác đánh nhau.
@@ -339,8 +345,10 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 
 ```
 Youtube_Aid/
-├── manifest.json      # Cấu hình Manifest V3: storage, clipboard, downloads, declarativeNetRequest
-├── background.js      # Service worker: xử lý tải media, API chuyển đổi, rule modify header mạng
+├── manifest.json      # Cấu hình Manifest V3: storage, clipboard, downloads, declarativeNetRequest, scripting
+├── background.js      # Service worker: xử lý tải media, API chuyển đổi, rule modify header mạng, đăng ký ad proxy
+├── ad-proxy.js        # Script MAIN world: lọc dữ liệu quảng cáo khỏi phản hồi của YouTube (khi bật)
+├── tests/             # Kiểm thử logic lọc: node tests/ad-proxy.test.js
 ├── i18n.js            # Từ điển 4 ngôn ngữ (Việt · Anh · Trung · Đức) và API dịch dùng chung
 ├── shortcut-keys.js   # Logic cấu hình và xử lý phím tắt
 ├── player-bridge.js   # Script `world: "MAIN"`: cầu nối gọi API chất lượng của #movie_player hộ content script

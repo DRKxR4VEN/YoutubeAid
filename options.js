@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableMediaDownload: true,
     enableAdSkip: true,
     enableHideAds: true,
+    enableAdProxy: false,
     enableShortsAutoScroll: false,
     enableAnimations: true,
     enableCloseGuard: false,
@@ -60,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableMediaDownload: document.getElementById('enableMediaDownload'),
     enableAdSkip: document.getElementById('enableAdSkip'),
     enableHideAds: document.getElementById('enableHideAds'),
+    enableAdProxy: document.getElementById('enableAdProxy'),
     enableShortsAutoScroll: document.getElementById('enableShortsAutoScroll'),
     enableAnimations: document.getElementById('enableAnimations'),
     enableCloseGuard: document.getElementById('enableCloseGuard')
@@ -347,6 +349,12 @@ document.addEventListener('DOMContentLoaded', () => {
     keybindSection.classList.toggle('is-disabled', !isEnabled);
   }
 
+  function syncAdProxyLock() {
+    const proxyOn = toggleInputs.enableAdProxy.checked;
+    toggleInputs.enableAdSkip.disabled = proxyOn;
+    toggleInputs.enableHideAds.disabled = proxyOn;
+  }
+
   // UI scale: five fixed steps, +10% each. Anything else falls back to 100%
   // so a hand-edited storage value can never leave the pages unscaled.
   const UI_SCALE_STEPS = [90, 100, 110, 120, 130];
@@ -472,6 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.classList.toggle('yt-aid-no-animations', !!toggleInputs.enableAnimations?.checked);
 
       syncKeybindVisibility();
+      syncAdProxyLock();
 
       currentUiScale = sanitizeUiScale(items.uiScale);
       refreshUiScaleState();
@@ -501,6 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     syncKeybindVisibility();
+    syncAdProxyLock();
 
     chrome.storage.local.set(current, () => {
       if (showSaved) showStatus('Đã tự động lưu cài đặt!');
@@ -564,6 +574,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const perfOn = !changes.enableAnimations.newValue;
         toggleInputs.enableAnimations.checked = perfOn;
         document.body.classList.toggle('yt-aid-no-animations', perfOn);
+      }
+      if (changes.enableAdProxy) {
+        toggleInputs.enableAdProxy.checked = !!changes.enableAdProxy.newValue;
+        syncAdProxyLock();
       }
       if (changes.enableCloseGuard && toggleInputs.enableCloseGuard) {
         toggleInputs.enableCloseGuard.checked = !!changes.enableCloseGuard.newValue;

@@ -50,6 +50,8 @@
     ['Đã đặt "{0}" thành {1} lần bấm.{2}', '"{0}" is now {1} taps.{2}', '已将“{0}”设为 {1} 次点按。{2}', '„{0}" ist jetzt {1} Tipps.{2}'],
 
     /* ---------- Options page: feature cards ---------- */
+    ['Chặn bằng proxy', 'Proxy ad blocking', '代理拦截广告', 'Proxy-Werbeblocker'],
+    ['Tự tắt bỏ/ẩn ad. Cần tải lại trang.', 'Replaces skip/hide. Reload to apply.', '替代跳过/隐藏广告，需刷新页面。', 'Ersetzt Überspringen/Ausblenden. Seite neu laden.'],
     ['Bỏ quảng cáo', 'Skip ads', '跳过广告', 'Werbung überspringen'],
     ['Tua nhanh, tự bấm Bỏ qua.', 'Fast-forwards and clicks Skip.', '快进并自动点击跳过。', 'Spult vor und klickt auf Überspringen.'],
     ['Tự động bỏ qua quảng cáo', 'Skip ads automatically', '自动跳过广告', 'Werbung automatisch überspringen'],
