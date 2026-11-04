@@ -713,6 +713,61 @@ html.yta-light .yt-aid-quality-chip.is-active {
   flex-shrink: 0;
 }
 
+.yt-aid-channel-blocked {
+  display: none !important;
+}
+
+#yt-aid-commit-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 24px 0;
+  padding: 8px 12px;
+  font-family: var(--yta-font-family);
+  font-size: 13px;
+  color: var(--yta-text-primary);
+  background: rgba(62, 166, 255, 0.12);
+  border: 1px solid rgba(62, 166, 255, 0.35);
+  border-radius: 12px;
+}
+
+.yt-aid-commit-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.yt-aid-commit-link {
+  flex-shrink: 0;
+  color: var(--yta-brand-blue);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.yt-aid-commit-link:hover {
+  text-decoration: underline;
+}
+
+.yt-aid-commit-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--yta-text-primary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.yt-aid-commit-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .yt-aid-random-filter {
   padding-inline: 8px;
 }
@@ -1536,8 +1591,8 @@ html.yta-light .yt-aid-sidebar-bar:hover .yt-aid-side-trigger {
 
 .yt-aid-sidebar-bar:hover .yt-aid-side-actions,
 .yt-aid-sidebar-bar:focus-within .yt-aid-side-actions {
-  /* 6 buttons x 26px + 5 gaps x 4px when the media tools are enabled. */
-  max-width: 184px;
+  /* 7 buttons x 26px + 6 gaps x 4px when the media tools are enabled. */
+  max-width: 214px;
   opacity: 1;
   pointer-events: auto;
 }

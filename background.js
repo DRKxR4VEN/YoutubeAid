@@ -7,6 +7,9 @@ const RULE_ID_LOADER = 1001;
 const RULE_ID_AFFADAFFA = 1002;
 const RULE_ID_SAVENOW = 1003;
 const AD_PROXY_SCRIPT_ID = 'yt-aid-ad-proxy';
+const COMMITS_API_URL = 'https://api.github.com/repos/DRKxR4VEN/YoutubeAid/commits/main';
+const COMMIT_PAGE_URL = 'https://github.com/DRKxR4VEN/YoutubeAid/commit/';
+const COMMIT_CHECK_MS = 60 * 60 * 1000;
 const AD_BLOCK_RULE_BASE = 1100;
 // Leave static.doubleclick.net/instream/ad_status.js alone: it sets google_ad_status, a bait for ad blockers.
 const AD_BLOCK_FILTERS = [
@@ -156,6 +159,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'getLatestCommit') {
+    handleLatestCommit().then(sendResponse, () => sendResponse({ isNew: false }));
+    return true;
+  }
+
   if (request.action === 'saveMediaFile') {
     handleSaveFile(request)
       .then((res) => sendResponse(res))
@@ -198,6 +206,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   return false;
 });
+
+// GitHub allows 60 anonymous requests an hour per IP, so the answer is cached for an hour.
+async function handleLatestCommit() {
+  const stored = await chrome.storage.local.get(['latestCommit', 'seenCommitSha']);
+  let latest = stored.latestCommit;
+  if (!latest || Date.now() - latest.checkedAt >= COMMIT_CHECK_MS) {
+    try {
+      const res = await fetch(COMMITS_API_URL, { headers: { Accept: 'application/vnd.github+json' } });
+      const data = res.ok ? await res.json() : null;
+      if (/^[0-9a-f]{40}$/.test(data?.sha)) {
+        latest = {
+          sha: data.sha,
+          message: String(data.commit?.message || '').split('\n')[0].slice(0, 120),
+          checkedAt: Date.now()
+        };
+        await chrome.storage.local.set({ latestCommit: latest });
+      }
+    } catch (err) {
+      console.warn('[YtAid Background] Commit check failed:', err);
+    }
+  }
+  if (!latest) return { isNew: false };
+  // First run: this commit is the baseline, only later ones are news.
+  if (!stored.seenCommitSha) {
+    await chrome.storage.local.set({ seenCommitSha: latest.sha });
+    return { isNew: false };
+  }
+  return {
+    isNew: latest.sha !== stored.seenCommitSha,
+    sha: latest.sha,
+    message: latest.message,
+    url: COMMIT_PAGE_URL + latest.sha
+  };
+}
 
 async function handleStartDownload({ videoUrl, format = 'mp3' }) {
   if (!videoUrl) throw new Error('Missing video URL');

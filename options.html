@@ -373,6 +373,35 @@
     }
 
     /* Keybind editor */
+    .blocked-channels {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: var(--yt-surface);
+      border: 1px solid var(--yt-border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+    }
+
+    .blocked-empty {
+      color: var(--yt-text-secondary, #aaa);
+    }
+
+    .blocked-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .blocked-name {
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
     #keybindSection {
       transition: opacity 0.25s ease, filter 0.25s ease;
     }
@@ -912,6 +941,15 @@
   </section>
 
   <!-- Appearance -->
+  <!-- Blocked channels: the list stays out of DEFAULTS so "restore defaults" can't wipe it -->
+  <section id="blockedChannelsSection">
+    <div class="section-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></svg>
+      <span data-i18n="Kênh đã chặn">Kênh đã chặn</span>
+    </div>
+    <div class="blocked-channels" id="blockedChannels"></div>
+  </section>
+
   <section id="appearanceSection">
     <div class="section-title">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>

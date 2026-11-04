@@ -92,6 +92,7 @@
     enableThumbnailDownload: true,
     enableMediaDownload: true,
     enableAdProxy: true,
+    blockedChannels: [],
     enableShortsAutoScroll: false,
     enableAnimations: true,
     enableCloseGuard: false,
@@ -230,6 +231,10 @@
           syncRandomVideoUi();
           continue;
         }
+        if (key === 'seenCommitSha') {
+          dismissCommitNotice();
+          continue;
+        }
         if (!(key in DEFAULT_SETTINGS)) continue;
         settings[key] = change.newValue === undefined ? DEFAULT_SETTINGS[key] : change.newValue;
         changedSettings.add(key);
@@ -320,6 +325,7 @@
     if (IS_MUSIC_SITE) return;
 
     if (!settings.enableShortcuts) resetKeyBuffer();
+    if (changedKeys && changed('blockedChannels')) applyChannelBlocks();
     if (changed('hideButtonNames')) syncButtonNamesUi();
     if (changed('audioPanelCollapsed')) syncAudioUi();
     if (changed('enableLoop')) ensureVideoLoop();
@@ -4543,7 +4549,7 @@
       }, delay);
     };
 
-    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger, #yt-aid-home-bookmark-btn, #yt-aid-random-home, .yt-aid-shorts-action';
+    const AID_UI_SELECTOR = '#yt-aid-channel-actions, #yt-aid-watch-toolbar, .yt-aid-card-bar, .yt-aid-home-trigger, #yt-aid-home-bookmark-btn, #yt-aid-random-home, #yt-aid-commit-notice, .yt-aid-shorts-action';
     // Native hosts carry our layout classes but still need reinjection after rerenders.
     const AID_UI_SCOPE = '[class*="yt-aid-"]:not(.yt-aid-home-card-host):not(.yt-aid-channel-actions-host):not(body):not(html), [id^="yt-aid-"]';
     // None of the injection targets live in these subtrees. They are also the
@@ -4638,6 +4644,8 @@
     if (!isHomeFeedPage()) closeHomeFlyout();
     injectBookmarkUi();
     injectRandomHomeControl();
+    syncCommitNotice();
+    if (!isChannelPage()) applyChannelBlocks(cardRoots);
 
     if (path.startsWith('/watch')) {
       injectWatchPageToolbar();
@@ -5535,6 +5543,9 @@
           <button class="yt-aid-mini-action yt-aid-mp3-dl" title="${T('Tải MP3')}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
           </button>` : ''}
+          <button class="yt-aid-mini-action yt-aid-block-channel" title="${T('Chặn kênh này')}" aria-label="${T('Chặn kênh này')}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></svg>
+          </button>
         </div>
         <button type="button" class="yt-aid-side-trigger" title="${T('Công cụ video')}" aria-label="${T('Công cụ video')}" aria-haspopup="true">
           ${homeTriggerSvg()}
@@ -5586,6 +5597,12 @@
         e.stopPropagation();
         e.preventDefault();
         downloadThumbnail(e.currentTarget, getCardTitle(), getCardUrl());
+      });
+
+      cardBar.querySelector('.yt-aid-block-channel').addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        blockChannel(cardChannelName(item));
       });
 
       const sideMediaBtn = cardBar.querySelector('.yt-aid-media-dl');
@@ -5752,6 +5769,12 @@
       `);
     }
 
+    buttons.push(`
+      <button type="button" class="yt-aid-flyout-btn yt-aid-block-channel" title="${T('Chặn kênh này')}" aria-label="${T('Chặn kênh này')}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></svg>
+      </button>
+    `);
+
     const btnCount = buttons.length;
     panel.classList.remove('yt-aid-flyout-3', 'yt-aid-flyout-5', 'yt-aid-flyout-6');
     if (btnCount >= 6) panel.classList.add('yt-aid-flyout-6');
@@ -5841,6 +5864,14 @@
         closeHomeFlyout();
       });
     }
+
+    panel.querySelector('.yt-aid-block-channel').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const name = cardChannelName(homeFlyout.item);
+      closeHomeFlyout();
+      blockChannel(name);
+    });
 
     const mp3Btn = panel.querySelector('.yt-aid-mp3-dl');
     if (mp3Btn) {
@@ -6053,6 +6084,117 @@
   }
 
 
+
+  // ----------------------------------------------------
+  // D. CHANNEL BLOCKING
+  // ----------------------------------------------------
+  // Sidebar lockups only carry the channel as plain text, so channels match by name.
+  // shortcut: same-named channels block together and Shorts shelf cards (no channel in
+  // the DOM) stay visible, upgrade if YouTube exposes channel ids on its cards.
+  function cardChannelName(card) {
+    const el = card && card.querySelector('ytd-channel-name #text, #channel-name #text, ' +
+      '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text');
+    return el ? el.textContent.split('•')[0].trim() : '';
+  }
+
+  const channelKey = (name) => name.trim().toLowerCase();
+
+  function applyChannelBlocks(roots) {
+    const names = Array.isArray(settings.blockedChannels) ? settings.blockedChannels : [];
+    if (!names.length) {
+      document.querySelectorAll('.yt-aid-channel-blocked').forEach((el) => el.classList.remove('yt-aid-channel-blocked'));
+      return;
+    }
+    const blocked = new Set(names.map(channelKey));
+    findCardsInRoots(`${HOME_CARD_ITEM_SELECTOR}, ${SIDEBAR_CARD_SELECTOR}`, roots).forEach((card) => {
+      const name = cardChannelName(card);
+      // The name is briefly empty while a card renders; keep its state until then.
+      if (name) card.classList.toggle('yt-aid-channel-blocked', blocked.has(channelKey(name)));
+    });
+  }
+
+  function setBlockedChannels(names) {
+    settings.blockedChannels = names;
+    safeSetStorage({ blockedChannels: names });
+    applyChannelBlocks();
+  }
+
+  function blockChannel(name) {
+    if (!name) {
+      showToast(T('Không đọc được tên kênh'), 'warning');
+      return;
+    }
+    const current = Array.isArray(settings.blockedChannels) ? settings.blockedChannels : [];
+    const key = channelKey(name);
+    if (!current.some((item) => channelKey(item) === key)) setBlockedChannels([...current, name]);
+    showToast(T('Đã chặn kênh: {0}', [previewText(name, 24)]), 'success', 5000, {
+      label: 'Hoàn tác',
+      onClick: () => setBlockedChannels(settings.blockedChannels.filter((item) => channelKey(item) !== key))
+    });
+  }
+
+  // ----------------------------------------------------
+  // E. NEW COMMIT NOTICE (home page)
+  // ----------------------------------------------------
+  let commitNotice = null;
+  let commitNoticeRequested = false;
+
+  function dismissCommitNotice() {
+    commitNotice = null;
+    document.getElementById('yt-aid-commit-notice')?.remove();
+  }
+
+  function renderCommitNotice(anchor) {
+    const { sha, message, url } = commitNotice;
+    const notice = document.createElement('div');
+    notice.id = 'yt-aid-commit-notice';
+    notice.setAttribute('role', 'status');
+    const text = document.createElement('span');
+    text.className = 'yt-aid-commit-text';
+    // A commit message is outside text: textContent only, never markup.
+    text.textContent = `${T('Có bản cập nhật mới:')} ${message} (${sha.slice(0, 7)})`;
+    const close = () => {
+      dismissCommitNotice();
+      safeSetStorage({ seenCommitSha: sha });
+    };
+    const link = document.createElement('a');
+    link.className = 'yt-aid-commit-link';
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = T('Xem');
+    link.addEventListener('click', close);
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'yt-aid-commit-close';
+    dismiss.title = T('Đóng thông báo');
+    dismiss.setAttribute('aria-label', T('Đóng thông báo'));
+    dismiss.textContent = '×';
+    dismiss.addEventListener('click', close);
+    notice.append(text, link, dismiss);
+    anchor.before(notice);
+  }
+
+  function syncCommitNotice() {
+    const existing = document.getElementById('yt-aid-commit-notice');
+    if (window.location.pathname !== '/') {
+      existing?.remove();
+      return;
+    }
+    if (!commitNoticeRequested) {
+      commitNoticeRequested = true;
+      try {
+        chrome.runtime.sendMessage({ action: 'getLatestCommit' }, (res) => {
+          void chrome.runtime.lastError;
+          if (!res || !res.isNew) return;
+          commitNotice = res;
+          syncCommitNotice();
+        });
+      } catch (e) { } // Extension reloaded under this page; the next load asks again.
+    }
+    const anchor = document.getElementById('yt-aid-random-home');
+    if (commitNotice && !existing && anchor) renderCommitNotice(anchor);
+  }
 
   const RANDOM_TYPES = { video: 'Video thường', shorts: 'Shorts', music: 'Video nhạc' };
   const RANDOM_TOPICS = {

@@ -50,6 +50,15 @@
     ['Đã đặt "{0}" thành {1} lần bấm.{2}', '"{0}" is now {1} taps.{2}', '已将“{0}”设为 {1} 次点按。{2}', '„{0}" ist jetzt {1} Tipps.{2}'],
 
     /* ---------- Options page: feature cards ---------- */
+    ['Chặn kênh này', 'Block this channel', '屏蔽此频道', 'Diesen Kanal blockieren'],
+    ['Đã chặn kênh: {0}', 'Blocked channel: {0}', '已屏蔽频道：{0}', 'Kanal blockiert: {0}'],
+    ['Không đọc được tên kênh', 'Could not read the channel name', '无法读取频道名称', 'Kanalname konnte nicht gelesen werden'],
+    ['Kênh đã chặn', 'Blocked channels', '已屏蔽的频道', 'Blockierte Kanäle'],
+    ['Chưa chặn kênh nào. Bấm nút chặn trên thẻ video để thêm.', 'No blocked channels yet. Use the block button on a video card.', '尚未屏蔽任何频道。请使用视频卡片上的屏蔽按钮添加。', 'Noch keine blockierten Kanäle. Nutze die Blockieren-Schaltfläche auf einer Videokarte.'],
+    ['Bỏ chặn', 'Unblock', '取消屏蔽', 'Freigeben'],
+    ['Có bản cập nhật mới:', 'New update:', '有新更新：', 'Neues Update:'],
+    ['Xem', 'View', '查看', 'Ansehen'],
+    ['Đóng thông báo', 'Dismiss notice', '关闭通知', 'Hinweis schließen'],
     ['Chặn bằng proxy', 'Proxy ad blocking', '代理拦截广告', 'Proxy-Werbeblocker'],
     ['Chặn ad video, banner. Cần tải lại trang.', 'Blocks video and banner ads. Reload page.', '拦截视频和横幅广告，需刷新页面。', 'Blockt Video- und Bannerwerbung. Neu laden.'],
     ['Lặp video', 'Auto loop', '循环视频', 'Auto-Wiederholung'],

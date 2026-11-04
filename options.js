@@ -108,10 +108,43 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { }
     clearKeybindError();
     buildKeybindEditor();
+    renderBlockedChannels();
     if (persist) {
       chrome.storage.local.set({ language: I18N.getLanguage() }, () => {
         void chrome.runtime?.lastError;
       });
+    }
+  }
+
+  const blockedEl = document.getElementById('blockedChannels');
+  let blockedChannels = [];
+
+  function renderBlockedChannels() {
+    blockedEl.textContent = '';
+    if (!blockedChannels.length) {
+      const empty = document.createElement('div');
+      empty.className = 'blocked-empty';
+      empty.textContent = T('Chưa chặn kênh nào. Bấm nút chặn trên thẻ video để thêm.');
+      blockedEl.appendChild(empty);
+      return;
+    }
+    for (const name of blockedChannels) {
+      const row = document.createElement('div');
+      row.className = 'blocked-row';
+      const label = document.createElement('span');
+      label.className = 'blocked-name';
+      label.textContent = name;
+      label.title = name;
+      const unblock = document.createElement('button');
+      unblock.type = 'button';
+      unblock.className = 'keybind-tap';
+      unblock.textContent = T('Bỏ chặn');
+      unblock.setAttribute('aria-label', `${T('Bỏ chặn')}: ${name}`);
+      unblock.addEventListener('click', () => {
+        chrome.storage.local.set({ blockedChannels: blockedChannels.filter((item) => item !== name) });
+      });
+      row.append(label, unblock);
+      blockedEl.appendChild(row);
     }
   }
 
@@ -563,6 +596,10 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleInputs.enableAnimations.checked = perfOn;
         document.body.classList.toggle('yt-aid-no-animations', perfOn);
       }
+      if (changes.blockedChannels) {
+        blockedChannels = changes.blockedChannels.newValue || [];
+        renderBlockedChannels();
+      }
       if (changes.enableAdProxy) {
         toggleInputs.enableAdProxy.checked = !!changes.enableAdProxy.newValue;
       }
@@ -594,4 +631,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   loadSettings();
+  chrome.storage.local.get({ blockedChannels: [] }, (items) => {
+    blockedChannels = Array.isArray(items.blockedChannels) ? items.blockedChannels : [];
+    renderBlockedChannels();
+  });
 });
