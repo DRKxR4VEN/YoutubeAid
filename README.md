@@ -138,7 +138,8 @@ Bốn thanh trượt nằm chung trong một panel có nhãn **ÂM THANH** (lư�
 ## Thay Đổi Gần Đây
 
 ### v1.19.0
-- **Chặn quảng cáo bằng proxy (mặc định tắt):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` và `Response.json` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube, kèm luật `declarativeNetRequest` chặn request quảng cáo chỉ trên `www.youtube.com`. Khi bật, tự bỏ qua và ẩn banner tự tắt mà không đổi lựa chọn đã lưu.
+- **Xử lý màn hình cảnh báo trình chặn quảng cáo:** khi bật proxy, `ad-proxy.js` để nguyên các bài tự kiểm tra `JSON.parse` của YouTube (phản hồi giả có quảng cáo) nên không còn bị nhận diện, không còn tự chuyển bài trong playlist; vô hiệu callback `onAbnormalityDetected`, sửa request `/player`, và nếu vẫn gặp cảnh báo thì tự tải lại video với biến thể request tiếp theo rồi ẩn giao diện cảnh báo còn sót; danh sách chặn mạng có thêm `log_event`, `qoe`, `ptracking` và `activeview`.
+- **Chặn quảng cáo bằng proxy (mặc định tắt):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube, kèm luật `declarativeNetRequest` chặn request quảng cáo chỉ trên `www.youtube.com`. Khi bật, tự bỏ qua và ẩn banner tự tắt mà không đổi lựa chọn đã lưu.
 - **Làm lại ẩn banner quảng cáo:** bỏ vòng quét JS 150ms và `display:none`; chỉ dùng CSS giữ ô quảng cáo render ở 1px trong suốt, nhằm giảm nguy cơ hiện màn hình cảnh báo trình chặn quảng cáo.
 
 ### v1.18.0

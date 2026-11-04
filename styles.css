@@ -2120,6 +2120,15 @@ body.yt-aid-hide-ads ytd-rich-section-renderer:has(ytd-ad-slot-renderer) {
 }
 
 
+/* Trình phát đã chạy lại nhưng trang vẫn giữ màn hình cảnh báo: ad-proxy.js đặt cờ này để ẩn cảnh báo. */
+html[data-yt-aid-wall-cleared] #error-screen {
+  display: none !important;
+}
+
+html[data-yt-aid-wall-cleared] ytd-watch-flexy[player-unavailable] :is(#player-container-outer, #cinematics-container, #ytd-player > #container) {
+  visibility: visible !important;
+}
+
 /* Khi đang có quảng cáo video: che màn hình bằng nền đen và hiện spinner xoay ở giữa (như đang tải/mất mạng)
    Dùng thuộc tính trên <html> do script đặt (data-yt-aid-ad), không phụ thuộc class của player.
    Chỉ ẩn hiển thị hình ảnh quảng cáo (không display:none) để nút "Bỏ qua" vẫn bấm được bằng script. */

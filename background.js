@@ -13,6 +13,10 @@ const AD_BLOCK_FILTERS = [
   '||youtube.com/pagead/',
   '||youtube.com/api/stats/ads',
   '||youtube.com/youtubei/v1/player/ad_break',
+  '||youtube.com/youtubei/v1/log_event',
+  '||youtube.com/api/stats/qoe?*event=streamingstats',
+  '||youtube.com/ptracking?',
+  '||youtube.com/pcs/activeview?',
   '||googlesyndication.com^',
   '||googleadservices.com^',
   '||googleads.g.doubleclick.net^'

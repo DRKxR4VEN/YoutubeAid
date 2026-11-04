@@ -13,7 +13,21 @@ class FakeResponse {
   }
 }
 
-const ctx = { Response: FakeResponse };
+let tickWallCheck;
+const loaded = [];
+let playerResponse = {};
+const fakePlayer = {
+  getPlayerResponse: () => playerResponse,
+  getPlaylistId: () => 'kept',
+  loadVideoById: (id, start) => loaded.push([id, start])
+};
+const ctx = {
+  Response: FakeResponse,
+  URLSearchParams,
+  location: { search: '?v=abc&t=7' },
+  document: { getElementById: () => fakePlayer, querySelector: () => null, documentElement: { toggleAttribute() { } } },
+  setInterval: (fn) => { tickWallCheck = fn; }
+};
 ctx.window = ctx;
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'ad-proxy.js'), 'utf8'), ctx);
@@ -70,6 +84,31 @@ assert.deepStrictEqual(
   { entries: [short] }
 );
 
+// YouTube's self-tests must come back intact, or it raises the wall. Three kinds exist today:
+// fixed "true" flags, fixed fake responses with a short signature, and text it just stringified itself.
+const flagsTest = { adPlacements: true, playerAds: true, playerResponse: { adPlacements: true, playerAds: true } };
+assert.deepStrictEqual(parseInPage(flagsTest), flagsTest);
+const fakeResponse = {
+  playerResponse: {
+    responseContext: { mainAppWebResponseContext: { trackingParam: 'dd' } },
+    adPlacements: [{}],
+    adSlots: [{ adSlotRenderer: {} }],
+    playerAds: [{}]
+  }
+};
+assert.deepStrictEqual(parseInPage(fakeResponse), fakeResponse);
+const generated = { adPlacements: [{ x: 1 }], adSlots: [{ adSlotRenderer: {} }] };
+assert.strictEqual(
+  vm.runInContext(`JSON.stringify(JSON.parse(JSON.stringify(${JSON.stringify(generated)})))`, ctx),
+  JSON.stringify(generated)
+);
+// A real response carries a long signature and is still pruned.
+assert.deepStrictEqual(
+  parseInPage({ responseContext: { mainAppWebResponseContext: { trackingParam: 'x'.repeat(40) } }, adPlacements: [{}] }),
+  { responseContext: { mainAppWebResponseContext: { trackingParam: 'x'.repeat(40) } } }
+);
+const wall = { status: 'ERROR', reason: 'x', errorScreen: { enforcementMessageViewModel: {} } };
+
 // Inline-script globals are pruned on assignment.
 vm.runInContext('var ytInitialPlayerResponse = { adSlots: [1], videoDetails: {} };', ctx);
 assert.strictEqual(vm.runInContext('JSON.stringify(ytInitialPlayerResponse)', ctx), '{"videoDetails":{}}');
@@ -77,8 +116,81 @@ assert.strictEqual(vm.runInContext('JSON.stringify(ytInitialPlayerResponse)', ct
 // A malformed body still throws like the native JSON.parse.
 assert.throws(() => vm.runInContext('JSON.parse("{")', ctx));
 
-// Response.json goes through the same pruning.
-vm.runInContext('new Response(\'{"adSlots":[1],"ok":true}\').json()', ctx).then((data) => {
-  assert.strictEqual(JSON.stringify(data), '{"ok":true}');
+// Player requests are edited; other payloads are not.
+const sendPlayerRequest = () => JSON.parse(vm.runInContext(
+  'JSON.stringify({ attestationRequest: {}, context: { client: { clientName: "WEB" } }, playbackContext: { contentPlaybackContext: {} } })', ctx));
+assert.strictEqual(sendPlayerRequest().params, '8AUB');
+assert.strictEqual(
+  vm.runInContext('JSON.stringify({ playbackContext: { contentPlaybackContext: {} } })', ctx),
+  '{"playbackContext":{"contentPlaybackContext":{}}}'
+);
+
+// A healthy player, or an error that isn't the wall, never triggers a retry.
+tickWallCheck();
+playerResponse = { playabilityStatus: { status: 'UNPLAYABLE', errorScreen: {} } };
+tickWallCheck();
+assert.strictEqual(loaded.length, 0);
+
+// The wall walks through each edit once, ending with an untouched request, then gives up.
+playerResponse = {
+  playabilityStatus: {
+    status: 'UNPLAYABLE',
+    errorScreen: { playerInterstitialRenderer: { content: { interstitialViewModel: { description: { commandRuns: [{ url: 'https://support.google.com/youtube/answer/3037019' }] } } } } }
+  }
+};
+tickWallCheck();
+assert.deepStrictEqual(loaded[0], ['abc', 7]);
+assert.strictEqual(sendPlayerRequest().params, 'YAHI');
+tickWallCheck();
+assert.strictEqual(sendPlayerRequest().playbackContext.contentPlaybackContext.isInlinePlaybackNoAd, true);
+tickWallCheck();
+const untouched = sendPlayerRequest();
+assert.deepStrictEqual(untouched.playbackContext.contentPlaybackContext, {});
+assert.strictEqual(untouched.params, undefined);
+tickWallCheck();
+assert.strictEqual(loaded.length, 3);
+
+// The wall as YouTube really sends it (ERROR with enforcementMessageViewModel) is recognized too.
+{
+  const freshLoaded = [];
+  const flags = [];
+  let freshResponse = { playabilityStatus: wall };
+  const freshCtx = {
+    Response: FakeResponse,
+    URLSearchParams,
+    location: { search: '?v=abc' },
+    document: {
+      getElementById: () => ({
+        getPlayerResponse: () => freshResponse,
+        getPlaylistId: () => 'kept',
+        loadVideoById: (id, start) => freshLoaded.push([id, start])
+      }),
+      querySelector: () => ({}), // the wall element is on the page
+      documentElement: { toggleAttribute: (name, on) => flags.push([name, on]) }
+    },
+    setInterval: (fn) => { freshCtx.tick = fn; }
+  };
+  freshCtx.window = freshCtx;
+  vm.createContext(freshCtx);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'ad-proxy.js'), 'utf8'), freshCtx);
+  freshCtx.tick();
+  assert.deepStrictEqual(freshLoaded, [['abc', 0]]);
+
+  // The wall is only hidden once the player itself is healthy.
+  assert.deepStrictEqual(flags.at(-1), ['data-yt-aid-wall-cleared', false]);
+  freshResponse = { playabilityStatus: { status: 'OK' } };
+  freshCtx.tick();
+  assert.deepStrictEqual(flags.at(-1), ['data-yt-aid-wall-cleared', true]);
+}
+
+// The abnormal-playback handler is swapped out; ordinary callbacks still run.
+vm.runInContext(`
+  globalThis.abnormal = 0; globalThis.normal = 0;
+  Promise.resolve().then(function () { abnormal++; return 'onAbnormalityDetected'; });
+  Promise.resolve().then(function () { normal++; });
+`, ctx);
+setTimeout(() => {
+  assert.strictEqual(ctx.abnormal, 0);
+  assert.strictEqual(ctx.normal, 1);
   console.log('ad-proxy: all checks passed');
-});
+}, 0);
