@@ -121,7 +121,7 @@ Bốn thanh trượt nằm chung trong một panel có nhãn **ÂM THANH** (lư�
 - **Auto skip:** Tự động tắt tiếng, tăng tốc độ phát lên tối đa và nhấn nút Bỏ qua ngay khi xuất hiện.
 - **Hiệu ứng che quảng cáo:** Màn hình đen với vòng xoay đệm (spinner) ở tâm như lúc đang tải mạng, không gây chói mắt.
 - **Ẩn banner quảng cáo:** Banner "Được tài trợ" ở cột đề xuất bên phải (`#secondary`), trang chủ và masthead không còn hiển thị nhưng vẫn được render (1px, trong suốt) để hạn chế bị YouTube nhận là đã chặn quảng cáo.
-- **Chặn bằng proxy (mặc định tắt):** Lọc dữ liệu quảng cáo khỏi phản hồi của YouTube trước khi trình phát đọc, không cần server riêng. Khi bật, **Bỏ quảng cáo** và **Ẩn quảng cáo** tự tắt nhưng vẫn giữ lựa chọn cũ để khôi phục khi tắt proxy. Cần tải lại trang YouTube sau khi đổi.
+- **Chặn bằng proxy (mặc định tắt):** Theo cách của Brave Shields: lọc dữ liệu quảng cáo khỏi phản hồi của YouTube trước khi trình phát đọc và chặn request quảng cáo ở tầng mạng, không cần server riêng. Khi bật, **Bỏ quảng cáo** và **Ẩn quảng cáo** tự tắt nhưng vẫn giữ lựa chọn cũ để khôi phục khi tắt proxy. Cần tải lại trang YouTube sau khi đổi.
 
 ### 13. Tự Động Lướt Shorts
 - Tự động chuyển tiếp sang video Shorts tiếp theo khi xem xong video hiện tại, rảnh tay thưởng thức video ngắn.
@@ -138,7 +138,7 @@ Bốn thanh trượt nằm chung trong một panel có nhãn **ÂM THANH** (lư�
 ## Thay Đổi Gần Đây
 
 ### v1.19.0
-- **Chặn quảng cáo bằng proxy (mặc định tắt):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` và `Response.json` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube. Khi bật, tự bỏ qua và ẩn banner tự tắt mà không đổi lựa chọn đã lưu.
+- **Chặn quảng cáo bằng proxy (mặc định tắt):** `ad-proxy.js` chạy ở MAIN world lúc `document_start`, bọc `JSON.parse` và `Response.json` bằng JS `Proxy` để xóa quảng cáo video, feed, sidebar và Shorts khỏi dữ liệu YouTube, kèm luật `declarativeNetRequest` chặn request quảng cáo chỉ trên `www.youtube.com`. Khi bật, tự bỏ qua và ẩn banner tự tắt mà không đổi lựa chọn đã lưu.
 - **Làm lại ẩn banner quảng cáo:** bỏ vòng quét JS 150ms và `display:none`; chỉ dùng CSS giữ ô quảng cáo render ở 1px trong suốt, nhằm giảm nguy cơ hiện màn hình cảnh báo trình chặn quảng cáo.
 
 ### v1.18.0

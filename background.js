@@ -7,6 +7,16 @@ const RULE_ID_LOADER = 1001;
 const RULE_ID_AFFADAFFA = 1002;
 const RULE_ID_SAVENOW = 1003;
 const AD_PROXY_SCRIPT_ID = 'yt-aid-ad-proxy';
+const AD_BLOCK_RULE_BASE = 1100;
+// Leave static.doubleclick.net/instream/ad_status.js alone: it sets google_ad_status, a bait for ad blockers.
+const AD_BLOCK_FILTERS = [
+  '||youtube.com/pagead/',
+  '||youtube.com/api/stats/ads',
+  '||youtube.com/youtubei/v1/player/ad_break',
+  '||googlesyndication.com^',
+  '||googleadservices.com^',
+  '||googleads.g.doubleclick.net^'
+];
 
 // Server danh sách: ưu tiên p.savenow.to (nhanh hơn), fallback sang loader.to
 const DOWNLOAD_SERVERS = [
@@ -90,9 +100,17 @@ chrome.runtime.onStartup.addListener(() => {
 setupHeaderRules();
 
 // MAIN-world scripts can't read chrome.storage, so the ad proxy is only registered while it's on.
-async function syncAdProxyScript() {
+async function syncAdProxy() {
   try {
     const { enableAdProxy } = await chrome.storage.local.get({ enableAdProxy: false });
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: AD_BLOCK_FILTERS.map((_, i) => AD_BLOCK_RULE_BASE + i),
+      addRules: !enableAdProxy ? [] : AD_BLOCK_FILTERS.map((urlFilter, i) => ({
+        id: AD_BLOCK_RULE_BASE + i,
+        action: { type: 'block' },
+        condition: { urlFilter, initiatorDomains: ['www.youtube.com'] }
+      }))
+    });
     const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [AD_PROXY_SCRIPT_ID] });
     if (enableAdProxy && !registered.length) {
       await chrome.scripting.registerContentScripts([{
@@ -111,10 +129,10 @@ async function syncAdProxyScript() {
 }
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && changes.enableAdProxy) syncAdProxyScript();
+  if (areaName === 'local' && changes.enableAdProxy) syncAdProxy();
 });
 
-syncAdProxyScript();
+syncAdProxy();
 
 // Message listener for content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
