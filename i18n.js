@@ -56,7 +56,7 @@
     ['Kênh đã chặn', 'Blocked channels', '已屏蔽的频道', 'Blockierte Kanäle'],
     ['Chưa chặn kênh nào. Bấm nút chặn trên thẻ video để thêm.', 'No blocked channels yet. Use the block button on a video card.', '尚未屏蔽任何频道。请使用视频卡片上的屏蔽按钮添加。', 'Noch keine blockierten Kanäle. Nutze die Blockieren-Schaltfläche auf einer Videokarte.'],
     ['Bỏ chặn', 'Unblock', '取消屏蔽', 'Freigeben'],
-    ['Có bản cập nhật mới:', 'New update:', '有新更新：', 'Neues Update:'],
+    ['Extension có phiên bản mới', 'A new extension version is available', '扩展有新版本', 'Neue Version der Erweiterung verfügbar'],
     ['Xem', 'View', '查看', 'Ansehen'],
     ['Đóng thông báo', 'Dismiss notice', '关闭通知', 'Hinweis schließen'],
     ['Chặn bằng proxy', 'Proxy ad blocking', '代理拦截广告', 'Proxy-Werbeblocker'],

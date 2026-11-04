@@ -6145,14 +6145,13 @@
   }
 
   function renderCommitNotice(anchor) {
-    const { sha, message, url } = commitNotice;
+    const { sha, url } = commitNotice;
     const notice = document.createElement('div');
     notice.id = 'yt-aid-commit-notice';
     notice.setAttribute('role', 'status');
     const text = document.createElement('span');
     text.className = 'yt-aid-commit-text';
-    // A commit message is outside text: textContent only, never markup.
-    text.textContent = `${T('Có bản cập nhật mới:')} ${message} (${sha.slice(0, 7)})`;
+    text.textContent = T('Extension có phiên bản mới');
     const close = () => {
       dismissCommitNotice();
       safeSetStorage({ seenCommitSha: sha });

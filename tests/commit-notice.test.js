@@ -47,13 +47,13 @@ const commit = (sha, message = 'feat: thing\n\nbody') => ({ ok: true, json: asyn
   assert.strictEqual((await run.check()).isNew, false);
   assert.strictEqual(stored.seenCommitSha, SHA_A);
 
-  // A newer commit is news: first line only, and the link is built from the validated sha.
+  // A newer commit is news: no commit text is passed on, and the link goes to the repo.
   stored = { seenCommitSha: SHA_A };
   run = load(stored, () => commit(SHA_B));
   let res = await run.check();
   assert.strictEqual(res.isNew, true);
-  assert.strictEqual(res.message, 'feat: thing');
-  assert.strictEqual(res.url, `https://github.com/DRKxR4VEN/YoutubeAid/commit/${SHA_B}`);
+  assert.strictEqual(res.message, undefined);
+  assert.strictEqual(res.url, 'https://github.com/DRKxR4VEN/YoutubeAid');
 
   // The answer is cached for an hour, then checked again.
   await run.check();

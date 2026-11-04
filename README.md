@@ -187,7 +187,7 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 
 ### v1.27.0
 - **Chặn kênh:** nút **Chặn kênh này** trên hàng công cụ của thẻ video (Trang chủ, tìm kiếm, feed, cột đề xuất) ẩn mọi video của kênh đó, có **Hoàn tác** ngay trên toast; danh sách và nút **Bỏ chặn** nằm ở mục **Kênh đã chặn** trong cài đặt, và **không** bị xóa khi khôi phục mặc định. Kênh được nhận theo **tên hiển thị**, vì thẻ đề xuất của YouTube chỉ có tên chứ không có link kênh.
-- **Thông báo commit mới:** Trang chủ YouTube hiện dải thông báo khi repo có commit mới, gồm dòng đầu commit, mã rút gọn và link xem; bấm **Xem** hoặc **×** là ẩn tới commit tiếp theo. Tiện ích hỏi GitHub tối đa một lần mỗi giờ, và lần chạy đầu chỉ ghi nhận commit hiện tại chứ không báo.
+- **Thông báo phiên bản mới:** Trang chủ YouTube hiện dải thông báo "Extension có phiên bản mới" khi repo có commit mới, kèm link tới trang repo; bấm **Xem** hoặc **×** là ẩn tới commit tiếp theo. Tiện ích hỏi GitHub tối đa một lần mỗi giờ, và lần chạy đầu chỉ ghi nhận commit hiện tại chứ không báo.
 
 ### v1.26.0
 - **Sửa nút Thu nhỏ:** trước đây `setMinimized(true)` chỉ đổi player sang giao diện mini ngay tại chỗ, video vẫn to và trang vẫn ở `/watch`. Nay nút dùng phím `i` của YouTube nên player thật sự về góc màn hình và trang về Trang chủ.
