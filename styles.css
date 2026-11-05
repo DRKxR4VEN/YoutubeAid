@@ -3407,6 +3407,250 @@ html.yta-light .yt-aid-trim-progress {
 }
 
 /* ========================================================
+   ENHANCED SHORTS PLAYER (TIMELINE + FULLSCREEN)
+   ======================================================== */
+#yt-aid-shorts-timeline {
+  --yta-shorts-played: 0%;
+  --yta-shorts-buffered: 0%;
+  position: fixed;
+  z-index: 2147483000;
+  left: 0;
+  width: 300px;
+  bottom: 0;
+  height: 24px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: 8px;
+  user-select: none;
+  pointer-events: auto;
+  font-family: var(--yta-font-family);
+}
+
+#yt-aid-shorts-timeline[hidden] {
+  display: none !important;
+}
+
+.yt-aid-shorts-time {
+  flex-shrink: 0;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#yt-aid-shorts-fullscreen {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+#yt-aid-shorts-fullscreen:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+#yt-aid-shorts-fullscreen:focus-visible {
+  outline: 2px solid var(--yta-brand-blue);
+  outline-offset: 1px;
+}
+
+#yt-aid-shorts-fullscreen svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.yt-aid-shorts-track {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 24px;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+}
+
+.yt-aid-shorts-track:focus-visible {
+  box-shadow: 0 0 0 2px var(--yta-brand-blue);
+  border-radius: 4px;
+}
+
+.yt-aid-shorts-track::before,
+.yt-aid-shorts-buffered,
+.yt-aid-shorts-played {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  pointer-events: none;
+  transition: height 0.12s ease;
+}
+
+.yt-aid-shorts-track::before {
+  content: '';
+  right: 0;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.yt-aid-shorts-track:hover::before,
+.yt-aid-shorts-track:hover .yt-aid-shorts-buffered,
+.yt-aid-shorts-track:hover .yt-aid-shorts-played,
+.yt-aid-shorts-track.is-dragging::before,
+.yt-aid-shorts-track.is-dragging .yt-aid-shorts-buffered,
+.yt-aid-shorts-track.is-dragging .yt-aid-shorts-played,
+.yt-aid-shorts-track:focus-visible::before,
+.yt-aid-shorts-track:focus-visible .yt-aid-shorts-buffered,
+.yt-aid-shorts-track:focus-visible .yt-aid-shorts-played {
+  height: 6px;
+}
+
+.yt-aid-shorts-buffered {
+  width: var(--yta-shorts-buffered);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.yt-aid-shorts-played {
+  width: var(--yta-shorts-played);
+  background: var(--yta-brand-red);
+}
+
+.yt-aid-shorts-thumb {
+  position: absolute;
+  top: 50%;
+  left: var(--yta-shorts-played);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--yta-brand-red), 0 1px 4px rgba(0, 0, 0, 0.65);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: transform 0.12s ease;
+}
+
+.yt-aid-shorts-track:hover .yt-aid-shorts-thumb,
+.yt-aid-shorts-track.is-dragging .yt-aid-shorts-thumb {
+  transform: translate(-50%, -50%) scale(1.18);
+}
+
+/* Hide YouTube's own Shorts progress bar while Shorts Pro is active */
+html[data-yt-aid-shorts-pro] ytd-shorts #scrubber,
+html[data-yt-aid-shorts-pro] ytd-reel-video-renderer #scrubber,
+html[data-yt-aid-shorts-pro] ytd-shorts yt-progress-bar,
+html[data-yt-aid-shorts-pro] ytd-reel-player-overlay-renderer #progress-bar {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Shorts Fullscreen mode (scoped to html[data-yt-aid-shorts-fs]) */
+html[data-yt-aid-shorts-fs],
+html[data-yt-aid-shorts-fs] body {
+  background: #000 !important;
+  overflow: hidden !important;
+}
+
+html[data-yt-aid-shorts-fs] #masthead-container,
+html[data-yt-aid-shorts-fs] ytd-masthead,
+html[data-yt-aid-shorts-fs] tp-yt-app-drawer,
+html[data-yt-aid-shorts-fs] ytd-mini-guide-renderer,
+html[data-yt-aid-shorts-fs] ytd-guide-renderer {
+  display: none !important;
+}
+
+/* Neutralise any containing-block property on ancestors of the Shorts player
+   (notably `.reel-video-in-sequence-new` which sets `contain: size layout`)
+   so `position: fixed` on the player and video resolves against the viewport. */
+html[data-yt-aid-shorts-fs] ytd-app,
+html[data-yt-aid-shorts-fs] #content.ytd-app,
+html[data-yt-aid-shorts-fs] ytd-page-manager,
+html[data-yt-aid-shorts-fs] ytd-shorts,
+html[data-yt-aid-shorts-fs] #shorts-container,
+html[data-yt-aid-shorts-fs] #shorts-inner-container,
+html[data-yt-aid-shorts-fs] .reel-video-in-sequence,
+html[data-yt-aid-shorts-fs] .reel-video-in-sequence-new,
+html[data-yt-aid-shorts-fs] #reel-overlay-container,
+html[data-yt-aid-shorts-fs] ytd-reel-video-renderer,
+html[data-yt-aid-shorts-fs] #short-video-container,
+html[data-yt-aid-shorts-fs] .player-wrapper,
+html[data-yt-aid-shorts-fs] #player-container,
+html[data-yt-aid-shorts-fs] ytd-player,
+html[data-yt-aid-shorts-fs] #container.ytd-player,
+html[data-yt-aid-shorts-fs] [data-yt-aid-fs-ancestor] {
+  transform: none !important;
+  perspective: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  contain: none !important;
+  will-change: auto !important;
+}
+
+html[data-yt-aid-shorts-fs] #shorts-player,
+html[data-yt-aid-shorts-fs] ytd-reel-video-renderer[is-active] #player-container,
+html[data-yt-aid-shorts-fs] ytd-reel-video-renderer[is-active] .html5-video-player {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+  z-index: 2147482000 !important;
+}
+
+html[data-yt-aid-shorts-fs] #shorts-player .html5-video-container,
+html[data-yt-aid-shorts-fs] ytd-reel-video-renderer[is-active] .html5-video-container {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: block !important;
+  background: #000 !important;
+}
+
+html[data-yt-aid-shorts-fs] #shorts-player video,
+html[data-yt-aid-shorts-fs] ytd-reel-video-renderer[is-active] video {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  background: #000 !important;
+}
+
+html[data-yt-aid-shorts-fs] #yt-aid-shorts-timeline {
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  border-radius: 0 !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+
+/* ========================================================
    PERFORMANCE MODE (DISABLE ALL ANIMATIONS & TRANSITIONS)
    ======================================================== */
 body.yt-aid-no-animations [class*="yt-aid-"],

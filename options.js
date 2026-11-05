@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableMediaDownload: true,
     enableAdProxy: true,
     enableShortsAutoScroll: false,
+    enableShortsPro: true,
     enableAnimations: true,
     enableCloseGuard: false,
     uiScale: 100,
@@ -59,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     enableMediaDownload: document.getElementById('enableMediaDownload'),
     enableAdProxy: document.getElementById('enableAdProxy'),
     enableShortsAutoScroll: document.getElementById('enableShortsAutoScroll'),
+    enableShortsPro: document.getElementById('enableShortsPro'),
     enableAnimations: document.getElementById('enableAnimations'),
     enableCloseGuard: document.getElementById('enableCloseGuard')
   };
@@ -602,6 +604,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (changes.enableAdProxy) {
         toggleInputs.enableAdProxy.checked = !!changes.enableAdProxy.newValue;
+      }
+      if (changes.enableShortsPro && toggleInputs.enableShortsPro) {
+        toggleInputs.enableShortsPro.checked = !!changes.enableShortsPro.newValue;
       }
       if (changes.enableCloseGuard && toggleInputs.enableCloseGuard) {
         toggleInputs.enableCloseGuard.checked = !!changes.enableCloseGuard.newValue;
