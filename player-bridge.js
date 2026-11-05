@@ -17,8 +17,20 @@
   const REQUEST = 'yt-aid-player-request';
   const RESPONSE = 'yt-aid-player-response';
 
+  function isShortsRoute() {
+    const path = location.pathname;
+    return path === '/shorts' || path.startsWith('/shorts/') ||
+      path === '/feed/shorts' || path.startsWith('/feed/shorts/');
+  }
+
   function getPlayer() {
-    const player = document.getElementById('movie_player');
+    if (isShortsRoute()) {
+      const shortsPlayer = document.getElementById('shorts-player');
+      if (shortsPlayer && typeof shortsPlayer.getAvailableQualityLevels === 'function') {
+        return shortsPlayer;
+      }
+    }
+    const player = document.getElementById('movie_player') || document.getElementById('shorts-player');
     return player && typeof player.getAvailableQualityLevels === 'function' ? player : null;
   }
 
@@ -488,12 +500,20 @@
 
     if (detail.level) {
       const player = getPlayer();
+      // #shorts-player ignores setPlaybackQualityRange('highres') when the
+      // requested cap is above the Short's highest available stream, so resolve
+      // an unavailable cap to the best level the player reports.
+      let target = detail.level;
+      if (target !== 'auto' && before.levels.length && !before.levels.includes(target)) {
+        const best = before.levels.find((lvl) => lvl && lvl !== 'auto');
+        if (best) target = best;
+      }
       try {
         // Range pins both ends so the adaptive player cannot drift away from
         // the level the user asked for; the plain call covers the same-video
         // switch. Either may be ignored by the player, hence the read-back.
-        player.setPlaybackQualityRange(detail.level);
-        player.setPlaybackQuality(detail.level);
+        player.setPlaybackQualityRange(target);
+        player.setPlaybackQuality(target);
       } catch (e) {
         return answer({ ok: false, error: 'apply-failed', levels: before.levels, current: before.current });
       }

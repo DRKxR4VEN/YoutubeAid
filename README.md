@@ -185,6 +185,9 @@ Nút **Cắt đoạn** (icon cái kéo) đứng **ngay sau nút Download** trên
 
 ## Thay Đổi Gần Đây
 
+### v2.1.0
+- **Trình phát Shorts Pro (mặc định bật):** thêm thanh tua luôn hiện dưới video Shorts, có thời gian, bấm hoặc kéo để tua, phím ← → tua 5 giây khi đang chọn thanh; nút **Toàn màn hình** ngay trên thanh, vẫn giữ toàn màn hình khi sang Short khác; tự chọn chất lượng cao nhất mà video có, bỏ qua giới hạn chất lượng đã đặt khi đang ở Shorts. Tắt trong cài đặt là gỡ ngay, không cần tải lại trang.
+
 ### v1.27.0
 - **Chặn kênh:** nút **Chặn kênh này** trên hàng công cụ của thẻ video (Trang chủ, tìm kiếm, feed, cột đề xuất) ẩn mọi video của kênh đó, có **Hoàn tác** ngay trên toast; danh sách và nút **Bỏ chặn** nằm ở mục **Kênh đã chặn** trong cài đặt, và **không** bị xóa khi khôi phục mặc định. Kênh được nhận theo **tên hiển thị**, vì thẻ đề xuất của YouTube chỉ có tên chứ không có link kênh.
 - **Thông báo phiên bản mới:** Trang chủ YouTube hiện dải thông báo "Extension có phiên bản mới" khi repo có commit mới, kèm link tới trang repo; bấm **Xem** hoặc **×** là ẩn tới commit tiếp theo. Tiện ích hỏi GitHub tối đa một lần mỗi giờ, và lần chạy đầu chỉ ghi nhận commit hiện tại chứ không báo.

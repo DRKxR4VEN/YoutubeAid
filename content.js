@@ -94,6 +94,7 @@
     enableAdProxy: true,
     blockedChannels: [],
     enableShortsAutoScroll: false,
+    enableShortsPro: true,
     enableAnimations: true,
     enableCloseGuard: false,
     hideButtonNames: false,
@@ -354,6 +355,9 @@
         changed('enableAutoPasteSearch') || changed('enableAutoPasteReplace')) {
       syncToolbarState();
     }
+    if (changed('enableShortsPro')) {
+      syncShortsProState();
+    }
   }
 
   // Rebuilds every injected surface so the new language applies to all labels
@@ -379,6 +383,7 @@
 
     injectAllAreas();
     syncButtonNamesUi();
+    syncShortsProLabels();
   }
 
   // ==========================================
@@ -500,7 +505,8 @@
       initDropdownDismiss,
       initDOMObserver,
       initBookmarks,
-      initShortsAutoScroll
+      initShortsAutoScroll,
+      initShortsPro
     ].forEach((fn) => {
       try { fn(); } catch (e) { console.error('[YoutubeAid] init lỗi:', fn.name, e); }
     });
@@ -1925,6 +1931,7 @@
 
   async function runQualityTick() {
     if (IS_MUSIC_SITE || !settings.enableAutoQuality) return;
+    if (isShortsPage() && settings.enableShortsPro) return;
     const key = currentVideoKey();
     if (!key) return;
     if (key !== qualityVideoKey) {
@@ -7821,6 +7828,523 @@
       if (!isShortsPage()) return;
       showShortsChip(settings.enableShortsAutoScroll ? 'Auto scroll Shorts: ON' : 'Auto scroll Shorts: OFF (bật trong Options)');
     }, 1500);
+  }
+
+  // ==========================================
+  // 13. ENHANCED SHORTS PLAYER (timeline, fullscreen, highest quality)
+  // ==========================================
+  const SHORTS_PRO_HTML_ATTR = 'data-yt-aid-shorts-pro';
+  const SHORTS_FS_HTML_ATTR = 'data-yt-aid-shorts-fs';
+  const SHORTS_RESOLVE_INTERVAL_MS = 250;
+  const SHORTS_QUALITY_RETRY_MS = 1200;
+  const SHORTS_QUALITY_MAX_TRIES = 6;
+  const SHORTS_FS_ENTER_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
+  const SHORTS_FS_EXIT_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>';
+
+  let shortsTimelineEl = null;
+  let shortsTimeLabelEl = null;
+  let shortsFullscreenBtnEl = null;
+  let shortsTrackEl = null;
+  let shortsRafId = 0;
+  let shortsLastResolveAt = 0;
+  let shortsCachedVideo = null;
+  let shortsCachedRect = null;
+  let shortsDragging = false;
+  let shortsDragPointerId = null;
+  let shortsLastTimeText = '';
+  let shortsProQualityKey = '';
+  let shortsProQualityLockedKey = '';
+  let shortsProQualityTries = 0;
+  let shortsProQualityTimer = 0;
+  let shortsProLastVideo = null;
+
+  function isShortsFullscreen() {
+    return document.documentElement.hasAttribute(SHORTS_FS_HTML_ATTR);
+  }
+
+  function clearShortsFsAncestors() {
+    document.querySelectorAll('[data-yt-aid-fs-ancestor]').forEach((el) => {
+      el.removeAttribute('data-yt-aid-fs-ancestor');
+    });
+  }
+
+  function markShortsFsAncestors() {
+    clearShortsFsAncestors();
+    const video = getBoostVideo() || document.querySelector('#shorts-player video');
+    if (!video) return;
+    let node = video.parentElement;
+    while (node && node !== document.body && node !== document.documentElement) {
+      const cs = getComputedStyle(node);
+      if (
+        (cs.transform && cs.transform !== 'none') ||
+        (cs.perspective && cs.perspective !== 'none') ||
+        (cs.filter && cs.filter !== 'none') ||
+        (cs.backdropFilter && cs.backdropFilter !== 'none') ||
+        (cs.contain && cs.contain !== 'none') ||
+        (cs.willChange && cs.willChange !== 'auto')
+      ) {
+        node.setAttribute('data-yt-aid-fs-ancestor', '');
+      }
+      node = node.parentElement;
+    }
+  }
+
+  function syncShortsFullscreenButton() {
+    if (!shortsFullscreenBtnEl) return;
+    const fs = isShortsFullscreen();
+    const label = T(fs ? 'Thoát toàn màn hình' : 'Toàn màn hình');
+    if (shortsFullscreenBtnEl.title !== label) shortsFullscreenBtnEl.title = label;
+    if (shortsFullscreenBtnEl.getAttribute('aria-label') !== label) {
+      shortsFullscreenBtnEl.setAttribute('aria-label', label);
+    }
+    shortsFullscreenBtnEl.setAttribute('aria-pressed', fs ? 'true' : 'false');
+    const wantedSvg = fs ? SHORTS_FS_EXIT_SVG : SHORTS_FS_ENTER_SVG;
+    if (shortsFullscreenBtnEl.dataset.iconState !== (fs ? 'exit' : 'enter')) {
+      shortsFullscreenBtnEl.dataset.iconState = fs ? 'exit' : 'enter';
+      shortsFullscreenBtnEl.innerHTML = wantedSvg;
+    }
+  }
+
+  function syncShortsProLabels() {
+    if (shortsTrackEl) {
+      shortsTrackEl.setAttribute('aria-label', T('Thanh tua Shorts'));
+    }
+    syncShortsFullscreenButton();
+  }
+
+  function exitShortsFullscreen() {
+    const hadAttr = isShortsFullscreen();
+    if (hadAttr) {
+      document.documentElement.removeAttribute(SHORTS_FS_HTML_ATTR);
+    }
+    clearShortsFsAncestors();
+    syncShortsFullscreenButton();
+    if (hadAttr && document.fullscreenElement) {
+      try {
+        const p = document.exitFullscreen();
+        if (p && typeof p.catch === 'function') p.catch(() => { });
+      } catch (e) { }
+    }
+    shortsLastResolveAt = 0;
+    if (hadAttr && shortsTimelineEl && settings.enableShortsPro && isShortsPage()) {
+      shortsCachedVideo = getBoostVideo();
+      const playerEl = resolveShortsPlayerElement(shortsCachedVideo);
+      shortsCachedRect = playerEl ? playerEl.getBoundingClientRect() : null;
+      updateShortsTimelineSlow(shortsCachedVideo);
+    }
+  }
+
+  function enterShortsFullscreen() {
+    document.documentElement.setAttribute(SHORTS_FS_HTML_ATTR, '');
+    markShortsFsAncestors();
+    syncShortsFullscreenButton();
+    shortsLastResolveAt = 0;
+    if (shortsTimelineEl) {
+      updateShortsTimelineSlow(shortsCachedVideo || getBoostVideo());
+    }
+    try {
+      const p = document.documentElement.requestFullscreen();
+      if (p && typeof p.catch === 'function') p.catch(() => { });
+    } catch (e) { }
+  }
+
+  function toggleShortsFullscreen() {
+    if (isShortsFullscreen()) exitShortsFullscreen();
+    else enterShortsFullscreen();
+  }
+
+  function resolveShortsPlayerElement(video) {
+    if (video) {
+      const player = video.closest('#shorts-player, .html5-video-player, #player-container');
+      if (player) {
+        const r = player.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) return player;
+      }
+      const vr = video.getBoundingClientRect();
+      if (vr.width > 0 && vr.height > 0) return video;
+    }
+    const fallback = document.getElementById('shorts-player') ||
+      document.querySelector('ytd-reel-video-renderer[is-active] #player-container');
+    if (fallback) {
+      const r = fallback.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return fallback;
+    }
+    return null;
+  }
+
+  function seekShortsToClientX(clientX) {
+    const video = shortsCachedVideo || getBoostVideo();
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return;
+    if (!shortsTrackEl) return;
+    const basis = shortsTrackEl.getBoundingClientRect();
+    if (basis.width <= 0) return;
+    const ratio = Math.min(1, Math.max(0, (clientX - basis.left) / basis.width));
+    try {
+      video.currentTime = ratio * video.duration;
+    } catch (e) { }
+    renderShortsTimelineFrame(video);
+  }
+
+  function ensureShortsTimeline() {
+    if (shortsTimelineEl && shortsTimelineEl.isConnected) return shortsTimelineEl;
+    document.querySelectorAll('#yt-aid-shorts-timeline').forEach((el) => el.remove());
+
+    const bar = document.createElement('div');
+    bar.id = 'yt-aid-shorts-timeline';
+    bar.dataset.ytAidVersion = EXT_VERSION;
+    bar.hidden = true;
+
+    const timeLabel = document.createElement('span');
+    timeLabel.className = 'yt-aid-shorts-time';
+    timeLabel.textContent = '0:00 / 0:00';
+
+    const track = document.createElement('div');
+    track.className = 'yt-aid-shorts-track';
+    track.setAttribute('role', 'slider');
+    track.setAttribute('tabindex', '0');
+    track.setAttribute('aria-label', T('Thanh tua Shorts'));
+    track.setAttribute('aria-valuemin', '0');
+    track.setAttribute('aria-valuemax', '0');
+    track.setAttribute('aria-valuenow', '0');
+    track.setAttribute('aria-valuetext', '0:00 / 0:00');
+
+    const buffered = document.createElement('div');
+    buffered.className = 'yt-aid-shorts-buffered';
+
+    const played = document.createElement('div');
+    played.className = 'yt-aid-shorts-played';
+
+    const thumb = document.createElement('div');
+    thumb.className = 'yt-aid-shorts-thumb';
+
+    track.append(buffered, played, thumb);
+
+    const fsBtn = document.createElement('button');
+    fsBtn.type = 'button';
+    fsBtn.id = 'yt-aid-shorts-fullscreen';
+    fsBtn.dataset.iconState = 'enter';
+    fsBtn.innerHTML = SHORTS_FS_ENTER_SVG;
+
+    bar.append(timeLabel, track, fsBtn);
+
+    // Swallow mouse/click/touch/pointer events so YouTube never sees a click on
+    // the bar and never toggles play/pause.
+    const stopOnly = (e) => {
+      e.stopPropagation();
+    };
+    ['pointerdown', 'pointerup', 'click', 'dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'contextmenu'].forEach((type) => {
+      bar.addEventListener(type, stopOnly);
+    });
+
+    fsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleShortsFullscreen();
+    });
+
+    track.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      shortsDragging = true;
+      shortsDragPointerId = e.pointerId;
+      track.classList.add('is-dragging');
+      try { track.setPointerCapture(e.pointerId); } catch (err) { }
+      try { track.focus({ preventScroll: true }); } catch (err) { }
+      seekShortsToClientX(e.clientX);
+    });
+
+    track.addEventListener('pointermove', (e) => {
+      if (!shortsDragging) return;
+      if (shortsDragPointerId !== null && e.pointerId !== shortsDragPointerId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      seekShortsToClientX(e.clientX);
+    });
+
+    const finishDrag = (e) => {
+      if (!shortsDragging) return;
+      if (shortsDragPointerId !== null && e.pointerId !== undefined && e.pointerId !== shortsDragPointerId) return;
+      e.stopPropagation();
+      if (e.type === 'pointerup') seekShortsToClientX(e.clientX);
+      shortsDragging = false;
+      shortsDragPointerId = null;
+      track.classList.remove('is-dragging');
+      try {
+        if (e.pointerId !== undefined && track.hasPointerCapture(e.pointerId)) {
+          track.releasePointerCapture(e.pointerId);
+        }
+      } catch (err) { }
+    };
+    track.addEventListener('pointerup', finishDrag);
+    track.addEventListener('pointercancel', finishDrag);
+    track.addEventListener('lostpointercapture', () => {
+      shortsDragging = false;
+      shortsDragPointerId = null;
+      track.classList.remove('is-dragging');
+    });
+
+    track.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      e.stopPropagation();
+      const video = shortsCachedVideo || getBoostVideo();
+      if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return;
+      const delta = e.key === 'ArrowRight' ? 5 : -5;
+      const next = Math.min(video.duration, Math.max(0, (Number(video.currentTime) || 0) + delta));
+      try { video.currentTime = next; } catch (err) { }
+      renderShortsTimelineFrame(video);
+    });
+
+    document.body.appendChild(bar);
+    shortsTimelineEl = bar;
+    shortsTimeLabelEl = timeLabel;
+    shortsFullscreenBtnEl = fsBtn;
+    shortsTrackEl = track;
+    shortsLastTimeText = '';
+    syncShortsFullscreenButton();
+    return bar;
+  }
+
+  function updateShortsTimelineSlow(video) {
+    const bar = shortsTimelineEl;
+    if (!bar) return;
+
+    if (isShortsFullscreen()) {
+      bar.style.left = '0px';
+      bar.style.width = '100vw';
+      bar.style.bottom = '0px';
+    } else {
+      const rect = shortsCachedRect;
+      if (!rect || rect.width <= 0 || rect.height <= 0) {
+        if (!bar.hidden) bar.hidden = true;
+        return;
+      }
+      const bottomOffset = rect.bottom + 24 <= window.innerHeight
+        ? Math.round(window.innerHeight - rect.bottom - 24)
+        : Math.max(0, Math.round(window.innerHeight - rect.bottom));
+      bar.style.left = `${Math.round(rect.left)}px`;
+      bar.style.width = `${Math.round(rect.width)}px`;
+      bar.style.bottom = `${bottomOffset}px`;
+    }
+
+    const duration = video ? video.duration : NaN;
+    if (!video || !Number.isFinite(duration) || duration <= 0) return;
+    const current = Math.min(duration, Math.max(0, Number(video.currentTime) || 0));
+    let bufferedEnd = 0;
+    try {
+      const buf = video.buffered;
+      if (buf && buf.length > 0) {
+        for (let i = 0; i < buf.length; i++) {
+          if (buf.start(i) <= current + 0.5 && buf.end(i) > bufferedEnd) {
+            bufferedEnd = buf.end(i);
+          }
+        }
+        if (!bufferedEnd) bufferedEnd = buf.end(buf.length - 1);
+      }
+    } catch (e) { bufferedEnd = 0; }
+    const bufferedPct = `${(Math.min(1, Math.max(0, bufferedEnd / duration)) * 100).toFixed(2)}%`;
+    bar.style.setProperty('--yta-shorts-buffered', bufferedPct);
+  }
+
+  function renderShortsTimelineFrame(video) {
+    const bar = shortsTimelineEl;
+    if (!bar) return;
+    const duration = video ? video.duration : NaN;
+    if (!video || !Number.isFinite(duration) || duration <= 0) {
+      if (!bar.hidden) bar.hidden = true;
+      return;
+    }
+    if (!isShortsFullscreen() && (!shortsCachedRect || shortsCachedRect.width <= 0 || shortsCachedRect.height <= 0)) {
+      if (!bar.hidden) bar.hidden = true;
+      return;
+    }
+    if (bar.hidden) bar.hidden = false;
+
+    const current = Math.min(duration, Math.max(0, Number(video.currentTime) || 0));
+    const playedPct = `${((current / duration) * 100).toFixed(2)}%`;
+    bar.style.setProperty('--yta-shorts-played', playedPct);
+
+    const timeText = `${formatVideoTime(current)} / ${formatVideoTime(duration)}`;
+    if (shortsLastTimeText !== timeText) {
+      shortsLastTimeText = timeText;
+      if (shortsTimeLabelEl) shortsTimeLabelEl.textContent = timeText;
+      if (shortsTrackEl) {
+        shortsTrackEl.setAttribute('aria-valuenow', String(Math.floor(current)));
+        shortsTrackEl.setAttribute('aria-valuemax', String(Math.floor(duration)));
+        shortsTrackEl.setAttribute('aria-valuetext', timeText);
+      }
+    }
+  }
+
+  function currentShortsReelKey(video) {
+    const id = currentShortsId();
+    if (id) return `short:${id}`;
+    const src = video && (video.currentSrc || video.src);
+    return src ? `src:${src}` : '';
+  }
+
+  function stopShortsProQualityTimer() {
+    if (!shortsProQualityTimer) return;
+    clearTimeout(shortsProQualityTimer);
+    shortsProQualityTimer = 0;
+  }
+
+  async function runShortsProQualityForReel(reelKey) {
+    if (!settings.enableShortsPro || !isShortsPage()) return;
+    if (!reelKey || shortsProQualityLockedKey === reelKey) return;
+    if (reelKey !== shortsProQualityKey) {
+      shortsProQualityKey = reelKey;
+      shortsProQualityTries = 0;
+    }
+    if (shortsProQualityTries >= SHORTS_QUALITY_MAX_TRIES) return;
+    shortsProQualityTries += 1;
+
+    const res = await requestPlayerQuality('highres');
+    if (!settings.enableShortsPro || !isShortsPage() || shortsProQualityKey !== reelKey) return;
+    if (res && res.ok && Array.isArray(res.levels) && res.levels.length) {
+      const best = pickQualityLevel(res.levels, 'highres');
+      if (best && res.current && qualityRank(res.current) <= qualityRank(best)) {
+        shortsProQualityLockedKey = reelKey;
+        return;
+      }
+    }
+    stopShortsProQualityTimer();
+    shortsProQualityTimer = setTimeout(() => {
+      shortsProQualityTimer = 0;
+      void runShortsProQualityForReel(reelKey);
+    }, SHORTS_QUALITY_RETRY_MS);
+  }
+
+  function checkShortsReelChange(video) {
+    const key = currentShortsReelKey(video);
+    const videoChanged = video && video !== shortsProLastVideo;
+    if (videoChanged) {
+      shortsProLastVideo = video;
+      if (isShortsFullscreen()) markShortsFsAncestors();
+    }
+    if (key && key !== shortsProQualityKey) {
+      stopShortsProQualityTimer();
+      void runShortsProQualityForReel(key);
+    }
+  }
+
+  function shortsProTick(now) {
+    shortsRafId = 0;
+    if (!settings.enableShortsPro || !isShortsPage() || document.visibilityState === 'hidden') {
+      return;
+    }
+
+    ensureShortsTimeline();
+
+    if (!shortsLastResolveAt || now - shortsLastResolveAt >= SHORTS_RESOLVE_INTERVAL_MS || !shortsCachedVideo || !shortsCachedVideo.isConnected) {
+      shortsLastResolveAt = now;
+      shortsCachedVideo = getBoostVideo();
+      const playerEl = resolveShortsPlayerElement(shortsCachedVideo);
+      shortsCachedRect = playerEl ? playerEl.getBoundingClientRect() : null;
+      checkShortsReelChange(shortsCachedVideo);
+      updateShortsTimelineSlow(shortsCachedVideo);
+    }
+
+    renderShortsTimelineFrame(shortsCachedVideo);
+    shortsRafId = requestAnimationFrame(shortsProTick);
+  }
+
+  function startShortsProLoop() {
+    if (shortsRafId) return;
+    if (!settings.enableShortsPro || !isShortsPage() || document.visibilityState === 'hidden') return;
+    shortsLastResolveAt = 0;
+    shortsRafId = requestAnimationFrame(shortsProTick);
+  }
+
+  function stopShortsProLoop() {
+    if (!shortsRafId) return;
+    cancelAnimationFrame(shortsRafId);
+    shortsRafId = 0;
+  }
+
+  function teardownShortsPro(releaseQuality = false) {
+    stopShortsProLoop();
+    stopShortsProQualityTimer();
+    shortsDragging = false;
+    shortsDragPointerId = null;
+    shortsCachedVideo = null;
+    shortsCachedRect = null;
+    shortsProLastVideo = null;
+    shortsProQualityKey = '';
+    shortsProQualityLockedKey = '';
+    shortsProQualityTries = 0;
+    document.documentElement.removeAttribute(SHORTS_PRO_HTML_ATTR);
+    if (shortsTimelineEl) {
+      shortsTimelineEl.remove();
+      shortsTimelineEl = null;
+      shortsTimeLabelEl = null;
+      shortsFullscreenBtnEl = null;
+      shortsTrackEl = null;
+    }
+    document.querySelectorAll('#yt-aid-shorts-timeline').forEach((el) => el.remove());
+    exitShortsFullscreen();
+    if (releaseQuality && isShortsPage()) {
+      void requestPlayerQuality(QUALITY_AUTO);
+    }
+  }
+
+  function syncShortsProState() {
+    if (IS_MUSIC_SITE) return;
+    const active = !!settings.enableShortsPro && isShortsPage();
+    if (!active) {
+      teardownShortsPro(!settings.enableShortsPro);
+      return;
+    }
+    document.documentElement.setAttribute(SHORTS_PRO_HTML_ATTR, '');
+    ensureShortsTimeline();
+    shortsLastResolveAt = 0;
+    if (document.visibilityState !== 'hidden') {
+      startShortsProLoop();
+    }
+  }
+
+  function initShortsPro() {
+    if (IS_MUSIC_SITE) return;
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && isShortsFullscreen()) {
+        exitShortsFullscreen();
+        // The browser resized before this event, so the player measured the fullscreen layout; make it measure again.
+        window.dispatchEvent(new Event('resize'));
+      }
+    });
+
+    window.addEventListener('yt-navigate-start', () => {
+      // Leaving Shorts or navigating between routes: if destination is not Shorts,
+      // syncShortsProState on finish will also clean up, and we force a fresh resolve.
+      shortsLastResolveAt = 0;
+      if (!isShortsPage()) teardownShortsPro(false);
+    });
+
+    window.addEventListener('yt-navigate-finish', () => {
+      shortsLastResolveAt = 0;
+      syncShortsProState();
+    });
+
+    document.addEventListener('yt-page-data-updated', () => {
+      shortsLastResolveAt = 0;
+      syncShortsProState();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        stopShortsProLoop();
+      } else {
+        syncShortsProState();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      shortsLastResolveAt = 0;
+    }, { passive: true });
+
+    syncShortsProState();
   }
 
 })();
